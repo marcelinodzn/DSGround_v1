@@ -125,7 +125,7 @@ export function RootLayoutClient({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 pl-6 pb-6 bg-background overflow-auto">
+        <main className="flex-1 pl-6 bg-background overflow-auto">
           {children}
         </main>
       </div>
