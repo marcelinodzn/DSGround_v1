@@ -11,6 +11,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { Separator } from "@/components/ui/separator"
 
 function getBreadcrumbItems(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
@@ -40,42 +41,43 @@ export function RootLayoutClient({
             <div className="space-y-2">
               <Link 
                 href="/" 
-                className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
                 Overview
               </Link>
               <Link 
                 href="/brands" 
-                className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
                 Brands
               </Link>
             </div>
 
             <div>
-              <h3 className="px-4 text-sm font-medium text-muted-foreground mb-2">Foundations</h3>
+              <Separator className="-mx-4 w-[calc(100%+32px)]" />
+              <h3 className="px-4 mt-4 text-sm font-medium text-muted-foreground mb-2">Foundations</h3>
               <div className="space-y-1">
                 <Link 
                   href="/foundations/typography" 
-                  className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
                   Typography
                 </Link>
                 <Link 
                   href="/foundations/colors" 
-                  className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
                   Colors
                 </Link>
                 <Link 
                   href="/foundations/spacing" 
-                  className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
                   Spacing
                 </Link>
                 <Link 
                   href="/foundations/surfaces" 
-                  className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
                   Surfaces
                 </Link>
@@ -83,10 +85,11 @@ export function RootLayoutClient({
             </div>
 
             <div>
-              <h3 className="px-4 text-sm font-medium text-muted-foreground mb-2">Settings</h3>
+              <Separator className="-mx-4 w-[calc(100%+32px)]" />
+              <h3 className="px-4 mt-4 text-sm font-medium text-muted-foreground mb-2">Settings</h3>
               <Link 
                 href="/sync" 
-                className="block px-4 py-2 text-sm hover:bg-accent rounded-md"
+                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
                 Sync Settings
               </Link>
@@ -122,7 +125,7 @@ export function RootLayoutClient({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 p-6 bg-background overflow-auto">
+        <main className="flex-1 pl-6 pb-6 bg-background overflow-auto">
           {children}
         </main>
       </div>
