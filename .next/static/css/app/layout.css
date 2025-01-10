@@ -832,9 +832,15 @@ video {
 .min-w-\[var\(--radix-select-trigger-width\)\] {
   min-width: var(--radix-select-trigger-width);
 }
+.min-w-0 {
+  min-width: 0px;
+}
 .max-w-max {
   max-width: -moz-max-content;
   max-width: max-content;
+}
+.max-w-full {
+  max-width: 100%;
 }
 .flex-1 {
   flex: 1 1 0%;

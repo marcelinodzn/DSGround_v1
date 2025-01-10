@@ -9,17 +9,25 @@ import {
 } from "@/components/ui/table"
 
 export function TypeScalePreview() {
-  const { scale, scaleMethod } = useTypographyStore()
+  const { scale } = useTypographyStore()
+  
+  const calculateSize = (step: number) => {
+    return Math.round(scale.baseSize * Math.pow(scale.ratio, step))
+  }
 
   const typeScaleItems = [
-    { id: 'h1', label: 'H1', size: 49, ratio: '3.063x' },
-    { id: 'h2', label: 'H2', size: 39, ratio: '2.438x' },
-    { id: 'h3', label: 'H3', size: 31, ratio: '1.938x' },
-    { id: 'h4', label: 'H4', size: 25, ratio: '1.563x' },
-    { id: 'h5', label: 'H5', size: 20, ratio: '1.250x' },
-    { id: 'h6', label: 'H6', size: 16, ratio: '1.000x' },
-    { id: 'body', label: 'Body', size: 16, ratio: '1x' },
-  ]
+    { id: 'h1', label: 'H1', step: 5 },
+    { id: 'h2', label: 'H2', step: 4 },
+    { id: 'h3', label: 'H3', step: 3 },
+    { id: 'h4', label: 'H4', step: 2 },
+    { id: 'h5', label: 'H5', step: 1 },
+    { id: 'h6', label: 'H6', step: 0 },
+    { id: 'body', label: 'Body', step: 0 },
+  ].map(item => ({
+    ...item,
+    size: calculateSize(item.step),
+    ratio: item.step === 0 ? '1x' : `${(calculateSize(item.step) / scale.baseSize).toFixed(3)}x`
+  }))
 
   return (
     <div className="border-y">
@@ -37,14 +45,20 @@ export function TypeScalePreview() {
             <TableRow key={item.id} className="h-auto">
               <TableCell className="font-medium py-4 pl-0">{item.label}</TableCell>
               <TableCell className="py-4 pl-0">
-                <div 
-                  style={{ 
-                    fontSize: `${item.size}px`,
-                    lineHeight: 1.2
-                  }} 
-                  className="truncate"
-                >
-                  The quick brown fox jumps over the lazy dog
+                <div className="min-w-0 max-w-full">
+                  <div 
+                    style={{ 
+                      fontSize: `${item.size}px`,
+                      lineHeight: 1.2,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'normal',
+                      maxHeight: `${Math.max(item.size * 1.2 * 2, 48)}px`,
+                      overflow: 'hidden'
+                    }} 
+                  >
+                    The quick brown fox jumps over the lazy dog
+                  </div>
                 </div>
               </TableCell>
               <TableCell className="py-4 pl-0">{item.size}px</TableCell>
