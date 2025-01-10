@@ -711,6 +711,9 @@ video {
 .inline-flex {
   display: inline-flex;
 }
+.table {
+  display: table;
+}
 .grid {
   display: grid;
 }
@@ -774,6 +777,9 @@ video {
 .h-8 {
   height: 2rem;
 }
+.h-auto {
+  height: auto;
+}
 .w-10 {
   width: 2.5rem;
 }
@@ -817,6 +823,9 @@ video {
 .w-\[400px\] {
   width: 400px;
 }
+.w-\[100px\] {
+  width: 100px;
+}
 .min-w-\[8rem\] {
   min-width: 8rem;
 }
@@ -832,6 +841,9 @@ video {
 }
 .shrink-0 {
   flex-shrink: 0;
+}
+.caption-bottom {
+  caption-side: bottom;
 }
 .rotate-45 {
   --tw-rotate: 45deg;
@@ -963,6 +975,10 @@ video {
 .border-2 {
   border-width: 2px;
 }
+.border-y {
+  border-top-width: 1px;
+  border-bottom-width: 1px;
+}
 .border-b {
   border-bottom-width: 1px;
 }
@@ -1011,6 +1027,9 @@ video {
 .bg-transparent {
   background-color: transparent;
 }
+.bg-muted\/50 {
+  background-color: hsl(var(--muted) / 0.5);
+}
 .fill-current {
   fill: currentColor;
 }
@@ -1025,6 +1044,9 @@ video {
 }
 .p-8 {
   padding: 2rem;
+}
+.p-2 {
+  padding: 0.5rem;
 }
 .px-3 {
   padding-left: 0.75rem;
@@ -1054,6 +1076,10 @@ video {
   padding-top: 1rem;
   padding-bottom: 1rem;
 }
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
 .pb-4 {
   padding-bottom: 1rem;
 }
@@ -1077,6 +1103,15 @@ video {
 }
 .pl-6 {
   padding-left: 1.5rem;
+}
+.pl-0 {
+  padding-left: 0px;
+}
+.text-left {
+  text-align: left;
+}
+.align-middle {
+  vertical-align: middle;
 }
 .text-2xl {
   font-size: 1.5rem;
@@ -1259,6 +1294,10 @@ video {
   background-color: hsl(var(--secondary) / 0.8);
 }
  
+.hover\:bg-muted\/50:hover {
+  background-color: hsl(var(--muted) / 0.5);
+}
+ 
 .hover\:text-accent-foreground:hover {
   color: hsl(var(--accent-foreground));
 }
@@ -1377,6 +1416,10 @@ video {
  
 .data-\[state\=open\]\:bg-accent\/50[data-state="open"] {
   background-color: hsl(var(--accent) / 0.5);
+}
+ 
+.data-\[state\=selected\]\:bg-muted[data-state="selected"] {
+  background-color: hsl(var(--muted));
 }
  
 .data-\[state\=active\]\:text-foreground[data-state="active"] {
@@ -1549,8 +1592,29 @@ video {
   border-color: hsl(var(--primary));
 }
  
+.\[\&\:has\(\[role\=checkbox\]\)\]\:pr-0:has([role=checkbox]) {
+  padding-right: 0px;
+}
+ 
+.\[\&\>\[role\=checkbox\]\]\:translate-y-\[2px\]>[role=checkbox] {
+  --tw-translate-y: 2px;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+ 
 .\[\&\>svg\]\:size-3\.5>svg {
   width: 0.875rem;
   height: 0.875rem;
+}
+ 
+.\[\&\>tr\]\:last\:border-b-0:last-child>tr {
+  border-bottom-width: 0px;
+}
+ 
+.\[\&_tr\:last-child\]\:border-0 tr:last-child {
+  border-width: 0px;
+}
+ 
+.\[\&_tr\]\:border-b tr {
+  border-bottom-width: 1px;
 }
 

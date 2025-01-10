@@ -1,48 +1,58 @@
 import { useTypographyStore } from "@/store/typography"
-import { Separator } from "@/components/ui/separator"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 export function TypeScalePreview() {
-  const { scale } = useTypographyStore()
-  const levels = 6
+  const { scale, scaleMethod } = useTypographyStore()
 
-  const calculateSize = (level: number) => {
-    return Math.round(scale.baseSize * Math.pow(scale.ratio, levels - level))
-  }
+  const typeScaleItems = [
+    { id: 'h1', label: 'H1', size: 49, ratio: '3.063x' },
+    { id: 'h2', label: 'H2', size: 39, ratio: '2.438x' },
+    { id: 'h3', label: 'H3', size: 31, ratio: '1.938x' },
+    { id: 'h4', label: 'H4', size: 25, ratio: '1.563x' },
+    { id: 'h5', label: 'H5', size: 20, ratio: '1.250x' },
+    { id: 'h6', label: 'H6', size: 16, ratio: '1.000x' },
+    { id: 'body', label: 'Body', size: 16, ratio: '1x' },
+  ]
 
   return (
-    <div className="space-y-6">
-      {[...Array(levels)].map((_, i) => {
-        const size = calculateSize(i + 1)
-        return (
-          <div key={i}>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>H{i + 1}</span>
-                <span>{size}px ({(size / scale.baseSize).toFixed(3)}x)</span>
-              </div>
-              <div
-                style={{ fontSize: size }}
-                className="font-semibold truncate"
-              >
-                The quick brown fox jumps over the lazy dog
-              </div>
-            </div>
-            {i < levels - 1 && <Separator className="mt-6" />}
-          </div>
-        )
-      })}
-
-      <div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>Body</span>
-            <span>{scale.baseSize}px (1x)</span>
-          </div>
-          <p style={{ fontSize: scale.baseSize }}>
-            The quick brown fox jumps over the lazy dog
-          </p>
-        </div>
-      </div>
+    <div className="border-y">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px] pl-0">Label</TableHead>
+            <TableHead className="pl-0">Preview</TableHead>
+            <TableHead className="w-[100px] pl-0">Size</TableHead>
+            <TableHead className="w-[100px] pl-0">Ratio</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {typeScaleItems.map((item) => (
+            <TableRow key={item.id} className="h-auto">
+              <TableCell className="font-medium py-4 pl-0">{item.label}</TableCell>
+              <TableCell className="py-4 pl-0">
+                <div 
+                  style={{ 
+                    fontSize: `${item.size}px`,
+                    lineHeight: 1.2
+                  }} 
+                  className="truncate"
+                >
+                  The quick brown fox jumps over the lazy dog
+                </div>
+              </TableCell>
+              <TableCell className="py-4 pl-0">{item.size}px</TableCell>
+              <TableCell className="py-4 pl-0">{item.ratio}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }
