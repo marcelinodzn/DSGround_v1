@@ -69,9 +69,23 @@ export function TypeScalePreview() {
         distanceScale.lighting,
         distanceScale.ppi
       )
-      return Math.round(baseSize * Math.pow(1.25, step))
+      return Math.round(baseSize * Math.pow(scale.ratio, step))  // Using the same ratio as modular scale
     }
     return Math.round(scale.baseSize * Math.pow(scale.ratio, step))
+  }
+
+  const getBaseSize = () => {
+    if (scaleMethod === 'distance') {
+      return calculateDistanceBasedSize(
+        distanceScale.viewingDistance,
+        distanceScale.visualAcuity,
+        distanceScale.meanLengthRatio,
+        distanceScale.textType,
+        distanceScale.lighting,
+        distanceScale.ppi
+      )
+    }
+    return scale.baseSize
   }
 
   const calculateRatio = (size: number) => {
@@ -105,8 +119,13 @@ export function TypeScalePreview() {
     }
   })
 
+  const baseSize = getBaseSize()
+
   return (
     <div className="border-y">
+      <div className="py-4 text-sm text-muted-foreground">
+        Base Size: {baseSize}px • Scale Ratio: {scale.ratio}
+      </div>
       <Table>
         <TableHeader>
           <TableRow>

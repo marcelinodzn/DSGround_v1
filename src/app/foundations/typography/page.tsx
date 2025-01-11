@@ -9,8 +9,7 @@ export default function TypographyPage() {
       <div className="flex-1">
         <div className="flex items-center pt-6 mb-6">
           <div>
-            <h1 className="text-xl font-bold">Typography Scale</h1>
-            <p className="text-muted-foreground mt-2 text-sm">Configure your type scale and platform-specific settings</p>
+            <h1 className="text-[30px] font-bold">Typography Scale</h1>
           </div>
         </div>
 

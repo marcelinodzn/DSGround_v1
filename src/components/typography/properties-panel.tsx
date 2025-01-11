@@ -139,46 +139,47 @@ export function PropertiesPanel() {
 
             {currentSettings.scaleMethod === 'modular' && (
               <div className="mt-4 space-y-4">
-                <div>
+                <div className="space-y-2">
                   <Label className="text-xs">Scale Type</Label>
                   <Select
-                    value={currentSettings.scale.type.toLowerCase()}
+                    value={currentSettings.scale.ratio.toString()}
                     onValueChange={(value) => {
-                      const selectedScale = typographyScales.find(
-                        (s) => s.name.toLowerCase() === value
-                      )
-                      if (selectedScale) {
-                        handleScaleChange(selectedScale.name, selectedScale.ratio, currentSettings.scale.baseSize)
-                      }
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          ratio: parseFloat(value)
+                        }
+                      })
                     }}
                   >
                     <SelectTrigger className="text-xs h-8">
                       <SelectValue placeholder="Select scale type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {typographyScales.map((s) => (
-                        <SelectItem
-                          key={s.name}
-                          value={s.name.toLowerCase()}
-                          className="text-xs"
-                        >
-                          {s.name} ({s.ratio})
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                      <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                      <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                      <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                      <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                      <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                      <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                      <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs">Base Size (px)</Label>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Base Size</Label>
                   <Input
                     type="number"
                     value={currentSettings.scale.baseSize}
                     onChange={(e) => {
-                      handleScaleChange(
-                        currentSettings.scale.type,
-                        currentSettings.scale.ratio,
-                        parseInt(e.target.value)
-                      )
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          baseSize: parseFloat(e.target.value)
+                        }
+                      })
                     }}
                     className="text-xs h-8"
                   />
@@ -188,16 +189,46 @@ export function PropertiesPanel() {
 
             {currentSettings.scaleMethod === 'distance' && (
               <div className="mt-4 space-y-4">
-                <div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Scale Type</Label>
+                  <Select
+                    value={currentSettings.scale.ratio.toString()}
+                    onValueChange={(value) => {
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          ratio: parseFloat(value)
+                        }
+                      })
+                    }}
+                  >
+                    <SelectTrigger className="text-xs h-8">
+                      <SelectValue placeholder="Select scale type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                      <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                      <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                      <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                      <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                      <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                      <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                      <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label className="text-xs">Viewing Distance (cm)</Label>
                   <Input
                     type="number"
-                    min="1"
-                    step="1"
                     value={currentSettings.distanceScale.viewingDistance}
                     onChange={(e) => {
-                      handleDistanceScaleChange({
-                        viewingDistance: Number(e.target.value),
+                      updatePlatform(currentPlatform, {
+                        distanceScale: {
+                          ...currentSettings.distanceScale,
+                          viewingDistance: parseFloat(e.target.value)
+                        }
                       })
                     }}
                     className="text-xs h-8"

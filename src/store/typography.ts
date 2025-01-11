@@ -9,9 +9,8 @@ export interface Platform {
   name: string
   scaleMethod: ScaleMethod
   scale: {
-    type: string
-    ratio: number
     baseSize: number
+    ratio: number
   }
   distanceScale: {
     viewingDistance: number
@@ -34,21 +33,6 @@ interface TypographyState {
   updatePlatform: (platformId: string, updates: Partial<Platform>) => void
 }
 
-const defaultScale = {
-  type: 'Major Third',
-  ratio: 1.25,
-  baseSize: 16,
-}
-
-const defaultDistanceScale = {
-  viewingDistance: 45,
-  visualAcuity: 1.0,
-  meanLengthRatio: 1.0,
-  textType: 'continuous' as const,
-  lighting: 'good' as const,
-  ppi: 96,
-}
-
 const defaultAccessibility = {
   minContrastBody: 4.5,
   minContrastLarge: 3,
@@ -59,72 +43,54 @@ const initialPlatforms: Platform[] = [
     id: 'web',
     name: 'Web',
     scaleMethod: 'modular',
-    scale: { ...defaultScale },
-    distanceScale: { ...defaultDistanceScale, ppi: 96 },
+    scale: {
+      baseSize: 16,
+      ratio: 1.25
+    },
+    distanceScale: {
+      viewingDistance: 50,
+      visualAcuity: 1,
+      meanLengthRatio: 1,
+      textType: 'continuous' as const,
+      lighting: 'good' as const,
+      ppi: 96
+    },
     accessibility: { ...defaultAccessibility }
   },
   {
-    id: 'mobile',
-    name: 'Mobile',
+    id: 'ios',
+    name: 'iOS',
     scaleMethod: 'modular',
-    scale: { ...defaultScale, baseSize: 14 },
-    distanceScale: { ...defaultDistanceScale, ppi: 326, viewingDistance: 30 },
+    scale: {
+      baseSize: 16,
+      ratio: 1.25
+    },
+    distanceScale: {
+      viewingDistance: 30,
+      visualAcuity: 1,
+      meanLengthRatio: 1,
+      textType: 'continuous' as const,
+      lighting: 'good' as const,
+      ppi: 264
+    },
     accessibility: { ...defaultAccessibility }
   },
   {
-    id: 'watch',
-    name: 'Watch',
+    id: 'android',
+    name: 'Android',
     scaleMethod: 'modular',
-    scale: { ...defaultScale, baseSize: 12 },
-    distanceScale: { ...defaultDistanceScale, ppi: 326, viewingDistance: 25 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'vr',
-    name: 'VR',
-    scaleMethod: 'distance',
-    scale: { ...defaultScale, baseSize: 24 },
-    distanceScale: { ...defaultDistanceScale, ppi: 1440, viewingDistance: 50 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'tv',
-    name: 'TV',
-    scaleMethod: 'distance',
-    scale: { ...defaultScale, baseSize: 32 },
-    distanceScale: { ...defaultDistanceScale, ppi: 72, viewingDistance: 300 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'ar',
-    name: 'AR',
-    scaleMethod: 'distance',
-    scale: { ...defaultScale, baseSize: 20 },
-    distanceScale: { ...defaultDistanceScale, ppi: 1440, viewingDistance: 60 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'outdoor',
-    name: 'Outdoor',
-    scaleMethod: 'distance',
-    scale: { ...defaultScale, baseSize: 48 },
-    distanceScale: { ...defaultDistanceScale, ppi: 72, viewingDistance: 500 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'instore',
-    name: 'In-Store',
-    scaleMethod: 'distance',
-    scale: { ...defaultScale, baseSize: 36 },
-    distanceScale: { ...defaultDistanceScale, ppi: 72, viewingDistance: 200 },
-    accessibility: { ...defaultAccessibility }
-  },
-  {
-    id: 'print',
-    name: 'Print',
-    scaleMethod: 'modular',
-    scale: { ...defaultScale },
-    distanceScale: { ...defaultDistanceScale, ppi: 300, viewingDistance: 40 },
+    scale: {
+      baseSize: 16,
+      ratio: 1.25
+    },
+    distanceScale: {
+      viewingDistance: 30,
+      visualAcuity: 1,
+      meanLengthRatio: 1,
+      textType: 'continuous' as const,
+      lighting: 'good' as const,
+      ppi: 160
+    },
     accessibility: { ...defaultAccessibility }
   },
 ]
