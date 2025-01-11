@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTypographyStore, ScaleMethod } from "@/store/typography"
+import { useTypographyStore, ScaleMethod, Platform } from "@/store/typography"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -28,6 +28,10 @@ interface DistanceScale {
 
 export function PropertiesPanel() {
   const { 
+    currentPlatform,
+    platforms,
+    setCurrentPlatform,
+    updatePlatform,
     scaleMethod, 
     scale, 
     accessibility, 
@@ -38,25 +42,65 @@ export function PropertiesPanel() {
     setDistanceScale 
   } = useTypographyStore()
 
-  const setDistanceScaleUpdates = (updates: Partial<DistanceScale>) => {
-    setDistanceScale({
-      ...distanceScale,
-      ...updates
+  const currentSettings = platforms.find(p => p.id === currentPlatform)!
+
+  const handleScaleMethodChange = (method: ScaleMethod) => {
+    updatePlatform(currentPlatform, { scaleMethod: method })
+  }
+
+  const handleScaleChange = (type: string, ratio: number, baseSize: number) => {
+    updatePlatform(currentPlatform, {
+      scale: { type, ratio, baseSize }
+    })
+  }
+
+  const handleDistanceScaleChange = (updates: Partial<Platform['distanceScale']>) => {
+    updatePlatform(currentPlatform, {
+      distanceScale: { ...currentSettings.distanceScale, ...updates }
+    })
+  }
+
+  const handleAccessibilityChange = (updates: Partial<Platform['accessibility']>) => {
+    updatePlatform(currentPlatform, {
+      accessibility: { ...currentSettings.accessibility, ...updates }
     })
   }
 
   return (
     <div className="h-full">
+      <div className="px-4 py-4 border-b">
+        <Label className="text-xs mb-2 block">Platform</Label>
+        <Select
+          value={currentPlatform}
+          onValueChange={setCurrentPlatform}
+        >
+          <SelectTrigger className="text-xs h-8">
+            <SelectValue placeholder="Select platform" />
+          </SelectTrigger>
+          <SelectContent>
+            {platforms.map((platform) => (
+              <SelectItem
+                key={platform.id}
+                value={platform.id}
+                className="text-xs"
+              >
+                {platform.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t">
           <span>Scale Method</span>
           <ChevronDown className="h-4 w-4" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4">
             <RadioGroup
-              value={scaleMethod}
-              onValueChange={(value) => setScaleMethod(value as ScaleMethod)}
+              value={currentSettings.scaleMethod}
+              onValueChange={(value) => handleScaleMethodChange(value as ScaleMethod)}
               className="grid grid-cols-3 gap-4"
             >
               <div>
@@ -91,18 +135,18 @@ export function PropertiesPanel() {
               </div>
             </RadioGroup>
 
-            {scaleMethod === 'modular' && (
+            {currentSettings.scaleMethod === 'modular' && (
               <div className="mt-4 space-y-4">
                 <div>
                   <Label className="text-xs">Scale Type</Label>
                   <Select
-                    value={scale.type.toLowerCase()}
+                    value={currentSettings.scale.type.toLowerCase()}
                     onValueChange={(value) => {
                       const selectedScale = typographyScales.find(
                         (s) => s.name.toLowerCase() === value
                       )
                       if (selectedScale) {
-                        setScale(selectedScale.name, selectedScale.ratio, scale.baseSize)
+                        handleScaleChange(selectedScale.name, selectedScale.ratio, currentSettings.scale.baseSize)
                       }
                     }}
                   >
@@ -111,21 +155,28 @@ export function PropertiesPanel() {
                     </SelectTrigger>
                     <SelectContent>
                       {typographyScales.map((s) => (
-                        <SelectItem key={s.name} value={s.name.toLowerCase()} className="text-xs">
+                        <SelectItem
+                          key={s.name}
+                          value={s.name.toLowerCase()}
+                          className="text-xs"
+                        >
                           {s.name} ({s.ratio})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
                   <Label className="text-xs">Base Size (px)</Label>
                   <Input
                     type="number"
-                    value={scale.baseSize}
+                    value={currentSettings.scale.baseSize}
                     onChange={(e) => {
-                      setScale(scale.type, scale.ratio, parseInt(e.target.value))
+                      handleScaleChange(
+                        currentSettings.scale.type,
+                        currentSettings.scale.ratio,
+                        parseInt(e.target.value)
+                      )
                     }}
                     className="text-xs h-8"
                   />
@@ -133,7 +184,7 @@ export function PropertiesPanel() {
               </div>
             )}
 
-            {scaleMethod === 'distance' && (
+            {currentSettings.scaleMethod === 'distance' && (
               <div className="mt-4 space-y-4">
                 <div>
                   <Label className="text-xs">Viewing Distance (cm)</Label>
@@ -141,9 +192,9 @@ export function PropertiesPanel() {
                     type="number"
                     min="1"
                     step="1"
-                    value={distanceScale.viewingDistance}
+                    value={currentSettings.distanceScale.viewingDistance}
                     onChange={(e) => {
-                      setDistanceScaleUpdates({
+                      handleDistanceScaleChange({
                         viewingDistance: Number(e.target.value),
                       })
                     }}
@@ -158,9 +209,9 @@ export function PropertiesPanel() {
                     min="0.1"
                     max="2.0"
                     step="0.1"
-                    value={distanceScale.visualAcuity}
+                    value={currentSettings.distanceScale.visualAcuity}
                     onChange={(e) => {
-                      setDistanceScaleUpdates({
+                      handleDistanceScaleChange({
                         visualAcuity: Number(e.target.value),
                       })
                     }}
@@ -174,9 +225,9 @@ export function PropertiesPanel() {
                     type="number"
                     min="0.1"
                     step="0.1"
-                    value={distanceScale.meanLengthRatio}
+                    value={currentSettings.distanceScale.meanLengthRatio}
                     onChange={(e) => {
-                      setDistanceScaleUpdates({
+                      handleDistanceScaleChange({
                         meanLengthRatio: Number(e.target.value),
                       })
                     }}
@@ -187,9 +238,9 @@ export function PropertiesPanel() {
                 <div>
                   <Label className="text-xs">Text Type</Label>
                   <Select 
-                    value={distanceScale.textType}
+                    value={currentSettings.distanceScale.textType}
                     onValueChange={(value) => 
-                      setDistanceScaleUpdates({ textType: value as 'continuous' | 'isolated' })
+                      handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
                     }
                   >
                     <SelectTrigger className="text-xs h-8">
@@ -205,9 +256,9 @@ export function PropertiesPanel() {
                 <div>
                   <Label className="text-xs">Lighting Conditions</Label>
                   <Select 
-                    value={distanceScale.lighting}
+                    value={currentSettings.distanceScale.lighting}
                     onValueChange={(value) => 
-                      setDistanceScaleUpdates({ lighting: value as 'good' | 'moderate' | 'poor' })
+                      handleDistanceScaleChange({ lighting: value as 'good' | 'moderate' | 'poor' })
                     }
                   >
                     <SelectTrigger className="text-xs h-8">
@@ -227,9 +278,9 @@ export function PropertiesPanel() {
                     type="number"
                     min="72"
                     step="1"
-                    value={distanceScale.ppi}
+                    value={currentSettings.distanceScale.ppi}
                     onChange={(e) => {
-                      setDistanceScaleUpdates({
+                      handleDistanceScaleChange({
                         ppi: Number(e.target.value),
                       })
                     }}
@@ -239,7 +290,7 @@ export function PropertiesPanel() {
               </div>
             )}
 
-            {scaleMethod === 'ai' && (
+            {currentSettings.scaleMethod === 'ai' && (
               <div className="mt-4 space-y-4">
                 <div>
                   <Label className="text-xs">Content Type</Label>
@@ -288,10 +339,9 @@ export function PropertiesPanel() {
               <Input
                 type="number"
                 step="0.1"
-                value={accessibility.minContrastBody}
+                value={currentSettings.accessibility.minContrastBody}
                 onChange={(e) => {
-                  setAccessibility({
-                    ...accessibility,
+                  handleAccessibilityChange({
                     minContrastBody: Number(e.target.value),
                   })
                 }}
@@ -304,10 +354,9 @@ export function PropertiesPanel() {
               <Input
                 type="number"
                 step="0.1"
-                value={accessibility.minContrastLarge}
+                value={currentSettings.accessibility.minContrastLarge}
                 onChange={(e) => {
-                  setAccessibility({
-                    ...accessibility,
+                  handleAccessibilityChange({
                     minContrastLarge: Number(e.target.value),
                   })
                 }}

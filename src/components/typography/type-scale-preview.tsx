@@ -8,19 +8,83 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+const calculateDistanceBasedSize = (
+  distance: number,
+  visualAcuity: number,
+  meanLengthRatio: number,
+  textType: 'continuous' | 'isolated',
+  lighting: 'good' | 'moderate' | 'poor',
+  ppi: number
+): number => {
+  // Constants from leserlich.info calculation
+  const MIN_VISUAL_ANGLE = 0.21 // Minimum visual angle in degrees
+  const LIGHTING_FACTORS = {
+    good: 1,
+    moderate: 1.25,
+    poor: 1.5
+  }
+  const TEXT_TYPE_FACTORS = {
+    continuous: 1,
+    isolated: 1.5
+  }
+
+  // Convert distance from cm to mm
+  const distanceInMm = distance * 10
+
+  // Calculate base size using visual angle formula
+  const visualAngleRad = (MIN_VISUAL_ANGLE * Math.PI) / 180
+  let baseSize = 2 * distanceInMm * Math.tan(visualAngleRad / 2)
+
+  // Apply visual acuity adjustment
+  baseSize = baseSize / visualAcuity
+
+  // Apply mean length ratio
+  baseSize = baseSize * meanLengthRatio
+
+  // Apply lighting and text type factors
+  baseSize = baseSize * LIGHTING_FACTORS[lighting] * TEXT_TYPE_FACTORS[textType]
+
+  // Convert mm to pixels using PPI
+  const pixelSize = (baseSize * ppi) / 25.4 // 25.4 mm per inch
+
+  return Math.round(pixelSize)
+}
+
 export function TypeScalePreview() {
-  const { scale, scaleMethod, calculateDistanceBasedSize } = useTypographyStore()
+  const { 
+    currentPlatform,
+    platforms
+  } = useTypographyStore()
+
+  const currentSettings = platforms.find(p => p.id === currentPlatform)!
+  const { scaleMethod, scale, distanceScale } = currentSettings
   
   const calculateSize = (step: number) => {
     if (scaleMethod === 'distance') {
-      const baseSize = calculateDistanceBasedSize()
-      return Math.round(baseSize * Math.pow(1.25, step)) // Using 1.25 as default ratio for distance method
+      const baseSize = calculateDistanceBasedSize(
+        distanceScale.viewingDistance,
+        distanceScale.visualAcuity,
+        distanceScale.meanLengthRatio,
+        distanceScale.textType,
+        distanceScale.lighting,
+        distanceScale.ppi
+      )
+      return Math.round(baseSize * Math.pow(1.25, step))
     }
     return Math.round(scale.baseSize * Math.pow(scale.ratio, step))
   }
 
   const calculateRatio = (size: number) => {
-    const baseSize = scaleMethod === 'distance' ? calculateDistanceBasedSize() : scale.baseSize
+    const baseSize = scaleMethod === 'distance' 
+      ? calculateDistanceBasedSize(
+          distanceScale.viewingDistance,
+          distanceScale.visualAcuity,
+          distanceScale.meanLengthRatio,
+          distanceScale.textType,
+          distanceScale.lighting,
+          distanceScale.ppi
+        )
+      : scale.baseSize
     return size === baseSize ? '1x' : `${(size / baseSize).toFixed(3)}x`
   }
 

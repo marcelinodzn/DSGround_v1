@@ -32,9 +32,9 @@ export function RootLayoutClient({
   const breadcrumbItems = getBreadcrumbItems(pathname)
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* Left Sidebar */}
-      <aside className="w-64 bg-card border-r">
+      <aside className="w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto">
         <nav className="p-4">
           <h2 className="text-xl font-bold mb-6">Design System</h2>
           <div className="space-y-6">
@@ -98,9 +98,9 @@ export function RootLayoutClient({
         </nav>
       </aside>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 ml-64 flex flex-col">
         {/* Header */}
-        <header className="h-16 bg-card border-b flex items-center justify-between px-6">
+        <header className="h-16 bg-card border-b flex items-center justify-between px-6 fixed top-0 right-0 left-64 z-10">
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -125,7 +125,7 @@ export function RootLayoutClient({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 pl-6 bg-background overflow-auto">
+        <main className="flex-1 pl-6 bg-background overflow-y-auto pt-16">
           {children}
         </main>
       </div>
