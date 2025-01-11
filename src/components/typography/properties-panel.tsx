@@ -68,7 +68,7 @@ export function PropertiesPanel() {
 
   return (
     <div className="h-full">
-      <div className="px-4 py-4 border-b">
+      <div className="px-4 py-4">
         <Label className="text-xs mb-2 block">Platform</Label>
         <Select
           value={currentPlatform}
@@ -91,8 +91,10 @@ export function PropertiesPanel() {
         </Select>
       </div>
 
+      <Separator className="mb-4" />
+
       <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold">
           <span>Scale Method</span>
           <ChevronDown className="h-4 w-4" />
         </CollapsibleTrigger>

@@ -6,15 +6,15 @@ import { PropertiesPanel } from "@/components/typography/properties-panel"
 export default function TypographyPage() {
   return (
     <div className="h-full flex">
-      <div className="flex-1 pr-8">
+      <div className="flex-1">
         <div className="flex items-center pt-6 mb-6">
           <div>
             <h1 className="text-xl font-bold">Typography Scale</h1>
-            <p className="text-muted-foreground mt-2">Configure your type scale and platform-specific settings</p>
+            <p className="text-muted-foreground mt-2 text-sm">Configure your type scale and platform-specific settings</p>
           </div>
         </div>
 
-        <div className="py-8">
+        <div className="py-8 pr-24">
           <TypeScalePreview />
         </div>
       </div>

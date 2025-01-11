@@ -723,6 +723,9 @@ video {
 .ml-64 {
   margin-left: 16rem;
 }
+.mr-2 {
+  margin-right: 0.5rem;
+}
 .block {
   display: block;
 }
@@ -1114,6 +1117,12 @@ video {
 .fill-current {
   fill: currentColor;
 }
+.fill-primary {
+  fill: hsl(var(--primary));
+}
+.fill-background {
+  fill: hsl(var(--background));
+}
 .p-1 {
   padding: 0.25rem;
 }
@@ -1198,6 +1207,18 @@ video {
 .pt-16 {
   padding-top: 4rem;
 }
+.pr-6 {
+  padding-right: 1.5rem;
+}
+.pl-3 {
+  padding-left: 0.75rem;
+}
+.pl-2 {
+  padding-left: 0.5rem;
+}
+.pr-24 {
+  padding-right: 6rem;
+}
 .text-left {
   text-align: left;
 }
@@ -1281,6 +1302,12 @@ video {
 }
 .opacity-50 {
   opacity: 0.5;
+}
+.opacity-30 {
+  opacity: 0.3;
+}
+.opacity-60 {
+  opacity: 0.6;
 }
 .shadow-lg {
   --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);

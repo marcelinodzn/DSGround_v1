@@ -12,6 +12,16 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
+import { Logo } from '@/components/logo'
+import { 
+  LayoutGrid,
+  Type,
+  Palette,
+  Ruler,
+  Layers,
+  Settings,
+  Home
+} from 'lucide-react'
 
 function getBreadcrumbItems(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
@@ -36,19 +46,23 @@ export function RootLayoutClient({
       {/* Left Sidebar */}
       <aside className="w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto">
         <nav className="p-4">
-          <h2 className="text-xl font-bold mb-6">Design System</h2>
+          <div className="mb-6">
+            <Logo />
+          </div>
           <div className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Link 
                 href="/" 
-                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
+                <Home className="w-4 h-4 mr-2" />
                 Overview
               </Link>
               <Link 
                 href="/brands" 
-                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
+                <LayoutGrid className="w-4 h-4 mr-2" />
                 Brands
               </Link>
             </div>
@@ -59,26 +73,30 @@ export function RootLayoutClient({
               <div className="space-y-1">
                 <Link 
                   href="/foundations/typography" 
-                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                  className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
+                  <Type className="w-4 h-4 mr-2" />
                   Typography
                 </Link>
                 <Link 
                   href="/foundations/colors" 
-                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                  className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
+                  <Palette className="w-4 h-4 mr-2" />
                   Colors
                 </Link>
                 <Link 
                   href="/foundations/spacing" 
-                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                  className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
+                  <Ruler className="w-4 h-4 mr-2" />
                   Spacing
                 </Link>
                 <Link 
                   href="/foundations/surfaces" 
-                  className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                  className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
                 >
+                  <Layers className="w-4 h-4 mr-2" />
                   Surfaces
                 </Link>
               </div>
@@ -89,8 +107,9 @@ export function RootLayoutClient({
               <h3 className="px-4 mt-4 text-sm font-medium text-muted-foreground mb-2">Settings</h3>
               <Link 
                 href="/sync" 
-                className="block px-4 py-2 text-xs hover:bg-accent rounded-md"
+                className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
+                <Settings className="w-4 h-4 mr-2" />
                 Sync Settings
               </Link>
             </div>
