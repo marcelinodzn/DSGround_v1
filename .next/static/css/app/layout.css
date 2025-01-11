@@ -1086,6 +1086,10 @@ video {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
 }
+.py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
 .pb-4 {
   padding-bottom: 1rem;
 }
@@ -1112,6 +1116,9 @@ video {
 }
 .pl-0 {
   padding-left: 0px;
+}
+.pr-8 {
+  padding-right: 2rem;
 }
 .text-left {
   text-align: left;

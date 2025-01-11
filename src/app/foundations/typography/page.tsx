@@ -12,7 +12,7 @@ export default function TypographyPage() {
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="py-8 pr-8">
         <TypeScalePreview />
       </div>
     </div>

@@ -9,10 +9,19 @@ import {
 } from "@/components/ui/table"
 
 export function TypeScalePreview() {
-  const { scale } = useTypographyStore()
+  const { scale, scaleMethod, calculateDistanceBasedSize } = useTypographyStore()
   
   const calculateSize = (step: number) => {
+    if (scaleMethod === 'distance') {
+      const baseSize = calculateDistanceBasedSize()
+      return Math.round(baseSize * Math.pow(1.25, step)) // Using 1.25 as default ratio for distance method
+    }
     return Math.round(scale.baseSize * Math.pow(scale.ratio, step))
+  }
+
+  const calculateRatio = (size: number) => {
+    const baseSize = scaleMethod === 'distance' ? calculateDistanceBasedSize() : scale.baseSize
+    return size === baseSize ? '1x' : `${(size / baseSize).toFixed(3)}x`
   }
 
   const typeScaleItems = [
@@ -23,11 +32,14 @@ export function TypeScalePreview() {
     { id: 'h5', label: 'H5', step: 1 },
     { id: 'h6', label: 'H6', step: 0 },
     { id: 'body', label: 'Body', step: 0 },
-  ].map(item => ({
-    ...item,
-    size: calculateSize(item.step),
-    ratio: item.step === 0 ? '1x' : `${(calculateSize(item.step) / scale.baseSize).toFixed(3)}x`
-  }))
+  ].map(item => {
+    const size = calculateSize(item.step)
+    return {
+      ...item,
+      size,
+      ratio: calculateRatio(size)
+    }
+  })
 
   return (
     <div className="border-y">

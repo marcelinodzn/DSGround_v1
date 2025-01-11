@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,8 +17,33 @@ const typographyScales = [
   { name: "Golden Ratio", ratio: 1.618 },
 ]
 
+interface DistanceScale {
+  viewingDistance: number
+  visualAcuity: number
+  meanLengthRatio: number
+  textType: 'continuous' | 'isolated'
+  lighting: 'good' | 'moderate' | 'poor'
+  ppi: number
+}
+
 export function PropertiesPanel() {
-  const { scaleMethod, scale, accessibility, setScaleMethod, setScale, setAccessibility } = useTypographyStore()
+  const { 
+    scaleMethod, 
+    scale, 
+    accessibility, 
+    distanceScale,
+    setScaleMethod, 
+    setScale, 
+    setAccessibility,
+    setDistanceScale 
+  } = useTypographyStore()
+
+  const setDistanceScaleUpdates = (updates: Partial<DistanceScale>) => {
+    setDistanceScale({
+      ...distanceScale,
+      ...updates
+    })
+  }
 
   return (
     <div className="h-full">
@@ -85,7 +111,7 @@ export function PropertiesPanel() {
                     </SelectTrigger>
                     <SelectContent>
                       {typographyScales.map((s) => (
-                        <SelectItem key={s.name.toLowerCase()} value={s.name.toLowerCase()} className="text-xs">
+                        <SelectItem key={s.name} value={s.name.toLowerCase()} className="text-xs">
                           {s.name} ({s.ratio})
                         </SelectItem>
                       ))}
@@ -108,23 +134,107 @@ export function PropertiesPanel() {
             )}
 
             {scaleMethod === 'distance' && (
-              <div className="mt-4">
-                <Label className="text-xs">Viewing Distance (m)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={accessibility.viewingDistance}
-                  onChange={(e) => {
-                    setAccessibility({
-                      ...accessibility,
-                      viewingDistance: Number(e.target.value),
-                    })
-                  }}
-                  className="text-xs h-8"
-                />
-                <div className="mt-2 space-y-2 text-xs text-muted-foreground">
-                  <p>Headlines: {(0.00582 * accessibility.viewingDistance * 100).toFixed(2)}cm cap height</p>
-                  <p>Body Text: {(0.00465 * accessibility.viewingDistance * 100).toFixed(2)}cm cap height</p>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <Label className="text-xs">Viewing Distance (cm)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={distanceScale.viewingDistance}
+                    onChange={(e) => {
+                      setDistanceScaleUpdates({
+                        viewingDistance: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs">Visual Acuity (decimal)</Label>
+                  <Input
+                    type="number"
+                    min="0.1"
+                    max="2.0"
+                    step="0.1"
+                    value={distanceScale.visualAcuity}
+                    onChange={(e) => {
+                      setDistanceScaleUpdates({
+                        visualAcuity: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs">Mean Length-Font Size Ratio</Label>
+                  <Input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={distanceScale.meanLengthRatio}
+                    onChange={(e) => {
+                      setDistanceScaleUpdates({
+                        meanLengthRatio: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs">Text Type</Label>
+                  <Select 
+                    value={distanceScale.textType}
+                    onValueChange={(value) => 
+                      setDistanceScaleUpdates({ textType: value as 'continuous' | 'isolated' })
+                    }
+                  >
+                    <SelectTrigger className="text-xs h-8">
+                      <SelectValue placeholder="Select text type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="continuous" className="text-xs">Continuous Text</SelectItem>
+                      <SelectItem value="isolated" className="text-xs">Isolated Text</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">Lighting Conditions</Label>
+                  <Select 
+                    value={distanceScale.lighting}
+                    onValueChange={(value) => 
+                      setDistanceScaleUpdates({ lighting: value as 'good' | 'moderate' | 'poor' })
+                    }
+                  >
+                    <SelectTrigger className="text-xs h-8">
+                      <SelectValue placeholder="Select lighting condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="good" className="text-xs">Good</SelectItem>
+                      <SelectItem value="moderate" className="text-xs">Moderate</SelectItem>
+                      <SelectItem value="poor" className="text-xs">Poor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-xs">Screen PPI</Label>
+                  <Input
+                    type="number"
+                    min="72"
+                    step="1"
+                    value={distanceScale.ppi}
+                    onChange={(e) => {
+                      setDistanceScaleUpdates({
+                        ppi: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
                 </div>
               </div>
             )}
@@ -203,7 +313,7 @@ export function PropertiesPanel() {
                 }}
                 className="text-xs h-8"
               />
-              <p className="text-xs text-muted-foreground mt-1">WCAG 2.1 Level AA requires 3:1</p>
+              <p className="text-xs text-muted-foreground mt-1">WCAG 2.1 Level AA requires 3:1 for large text</p>
             </div>
           </div>
         </CollapsibleContent>
