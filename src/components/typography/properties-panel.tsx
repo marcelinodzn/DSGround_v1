@@ -191,6 +191,7 @@ export function PropertiesPanel() {
     platforms,
     setCurrentPlatform,
     updatePlatform,
+    copyTypeStylesToAllPlatforms
   } = useTypographyStore()
 
   const currentSettings = platforms.find(p => p.id === currentPlatform)!
@@ -286,6 +287,13 @@ export function PropertiesPanel() {
       updatePlatform(currentPlatform, {
         typeStyles: newTypeStyles
       });
+    }
+  };
+
+  const handleCopyStylesToAllPlatforms = () => {
+    const currentStyles = currentSettings.typeStyles;
+    if (currentStyles) {
+      copyTypeStylesToAllPlatforms(currentStyles);
     }
   };
 
@@ -659,14 +667,24 @@ export function PropertiesPanel() {
           <div className="px-4 py-4 space-y-4">
             <div className="flex justify-between items-center">
               <Label className="text-xs">Styles</Label>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
-                onClick={handleAddTypeStyle}
-              >
-                Add Style
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs"
+                  onClick={handleCopyStylesToAllPlatforms}
+                >
+                  Copy to All Platforms
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs"
+                  onClick={handleAddTypeStyle}
+                >
+                  Add Style
+                </Button>
+              </div>
             </div>
             
             <DndContext

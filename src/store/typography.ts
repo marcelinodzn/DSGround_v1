@@ -48,6 +48,7 @@ interface TypographyState {
   setCurrentPlatform: (platformId: string) => void
   updatePlatform: (platformId: string, updates: Partial<Platform>) => void
   getScaleValues: (platformId: string) => { size: number; ratio: number; label: string }[]
+  copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => void
 }
 
 const defaultAccessibility = {
@@ -220,13 +221,24 @@ export const useTypographyStore = create(
         set((state) => ({
           platforms: state.platforms.map((platform) => {
             if (platform.id === platformId) {
-              // If updating scale or scaleMethod, update all type styles' sizes
-              if (updates.scale || updates.scaleMethod) {
-                const currentTypeStyles = platform.typeStyles;
+              // If updating scale, scaleMethod, or distance settings, preserve type styles
+              if (updates.scale || updates.scaleMethod || updates.distanceScale) {
                 return {
                   ...platform,
                   ...updates,
-                  typeStyles: currentTypeStyles // Preserve existing type styles
+                  typeStyles: platform.typeStyles // Preserve existing type styles
+                };
+              }
+              // If updating type styles, preserve scale steps
+              if (updates.typeStyles) {
+                const newTypeStyles = updates.typeStyles.map(style => ({
+                  ...style,
+                  scaleStep: platform.typeStyles?.find(ts => ts.name === style.name)?.scaleStep || style.scaleStep
+                }));
+                return {
+                  ...platform,
+                  ...updates,
+                  typeStyles: newTypeStyles
                 };
               }
               return { ...platform, ...updates };
@@ -243,11 +255,37 @@ export const useTypographyStore = create(
         const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
         const scaleValues = [];
 
+        // Calculate base size for distance method
+        let effectiveBaseSize = baseSize;
+        if (platform.scaleMethod === 'distance') {
+          const { viewingDistance, visualAcuity, meanLengthRatio, textType, lighting, ppi } = platform.distanceScale;
+          
+          // Constants
+          const MIN_VISUAL_ANGLE = 0.21;
+          const LIGHTING_FACTORS = { good: 1, moderate: 1.25, poor: 1.5 };
+          const TEXT_TYPE_FACTORS = { continuous: 1, isolated: 1.5 };
+
+          // Convert distance from cm to mm
+          const distanceInMm = viewingDistance * 10;
+
+          // Calculate base size using visual angle formula
+          const visualAngleRad = (MIN_VISUAL_ANGLE * Math.PI) / 180;
+          let calculatedSize = 2 * distanceInMm * Math.tan(visualAngleRad / 2);
+
+          // Apply adjustments
+          calculatedSize = calculatedSize / visualAcuity;
+          calculatedSize = calculatedSize * meanLengthRatio;
+          calculatedSize = calculatedSize * LIGHTING_FACTORS[lighting] * TEXT_TYPE_FACTORS[textType];
+
+          // Convert mm to pixels
+          effectiveBaseSize = Math.round((calculatedSize * ppi) / 25.4);
+        }
+
         // Generate decreasing values (f-n to f-1)
         for (let i = stepsDown; i > 0; i--) {
           scaleValues.push({
             label: `f-${i}`,
-            size: baseSize / Math.pow(ratio, i),
+            size: effectiveBaseSize / Math.pow(ratio, i),
             ratio: 1 / Math.pow(ratio, i)
           });
         }
@@ -255,7 +293,7 @@ export const useTypographyStore = create(
         // Add base size (f0)
         scaleValues.push({
           label: 'f0',
-          size: baseSize,
+          size: effectiveBaseSize,
           ratio: 1
         });
 
@@ -263,13 +301,41 @@ export const useTypographyStore = create(
         for (let i = 1; i <= stepsUp; i++) {
           scaleValues.push({
             label: `f${i}`,
-            size: baseSize * Math.pow(ratio, i),
+            size: effectiveBaseSize * Math.pow(ratio, i),
             ratio: Math.pow(ratio, i)
           });
         }
 
         return scaleValues;
-      }
+      },
+
+      // Modify the copyTypeStylesToAllPlatforms function
+      copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => {
+        set((state) => ({
+          platforms: state.platforms.map(platform => {
+            // Get existing type styles for this platform to preserve scale steps
+            const existingTypeStyles = platform.typeStyles || [];
+            
+            // Create new type styles while preserving existing scale steps
+            const newTypeStyles = sourceTypeStyles.map(style => {
+              // Try to find matching style by name in existing platform styles
+              const existingStyle = existingTypeStyles.find(ts => ts.name === style.name);
+              
+              return {
+                ...style,
+                id: crypto.randomUUID(),
+                // Keep existing scale step if style exists, otherwise use the source scale step
+                scaleStep: existingStyle?.scaleStep || style.scaleStep
+              };
+            });
+
+            return {
+              ...platform,
+              typeStyles: newTypeStyles
+            };
+          }),
+        }))
+      },
     }),
     {
       name: 'typography-storage',
