@@ -11,6 +11,16 @@ export interface ScaleConfig {
   stepsDown: number // Number of steps below base
 }
 
+export interface TypeStyle {
+  id: string
+  name: string
+  scaleStep: string
+  fontWeight: number
+  lineHeight: number
+  opticalSize: number
+  letterSpacing: number
+}
+
 export interface Platform {
   id: string
   name: string
@@ -28,6 +38,7 @@ export interface Platform {
     minContrastBody: number
     minContrastLarge: number
   }
+  typeStyles: TypeStyle[]
 }
 
 interface TypographyState {
@@ -50,6 +61,36 @@ const defaultScale: ScaleConfig = {
   stepsDown: 2   // Will generate f-1 and f-2
 }
 
+const defaultTypeStyles: TypeStyle[] = [
+  {
+    id: 'display',
+    name: 'Display',
+    scaleStep: 'f6',
+    fontWeight: 700,
+    lineHeight: 1.1,
+    opticalSize: 48,
+    letterSpacing: -0.02
+  },
+  {
+    id: 'heading1',
+    name: 'Heading 1',
+    scaleStep: 'f5',
+    fontWeight: 700,
+    lineHeight: 1.2,
+    opticalSize: 32,
+    letterSpacing: -0.01
+  },
+  {
+    id: 'body',
+    name: 'Body',
+    scaleStep: 'f0',
+    fontWeight: 400,
+    lineHeight: 1.5,
+    opticalSize: 16,
+    letterSpacing: 0
+  }
+]
+
 const initialPlatforms: Platform[] = [
   {
     id: 'web',
@@ -64,7 +105,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'good',
       ppi: 96
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'mobile',
@@ -79,7 +121,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'good',
       ppi: 160
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'outdoor',
@@ -94,7 +137,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'moderate',
       ppi: 72
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'print',
@@ -109,7 +153,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'good',
       ppi: 300
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'instore',
@@ -124,7 +169,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'good',
       ppi: 72
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'vr',
@@ -139,7 +185,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'moderate',
       ppi: 1200
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
   {
     id: 'tv',
@@ -154,7 +201,8 @@ const initialPlatforms: Platform[] = [
       lighting: 'moderate',
       ppi: 40
     },
-    accessibility: { ...defaultAccessibility }
+    accessibility: { ...defaultAccessibility },
+    typeStyles: [...defaultTypeStyles]
   },
 ]
 
