@@ -32,14 +32,6 @@ export function PropertiesPanel() {
     platforms,
     setCurrentPlatform,
     updatePlatform,
-    scaleMethod, 
-    scale, 
-    accessibility, 
-    distanceScale,
-    setScaleMethod, 
-    setScale, 
-    setAccessibility,
-    setDistanceScale 
   } = useTypographyStore()
 
   const currentSettings = platforms.find(p => p.id === currentPlatform)!
@@ -48,9 +40,13 @@ export function PropertiesPanel() {
     updatePlatform(currentPlatform, { scaleMethod: method })
   }
 
-  const handleScaleChange = (type: string, ratio: number, baseSize: number) => {
+  const handleScaleChange = (ratio: number, baseSize: number) => {
     updatePlatform(currentPlatform, {
-      scale: { type, ratio, baseSize }
+      scale: { 
+        ...currentSettings.scale,
+        ratio,
+        baseSize
+      }
     })
   }
 
@@ -144,12 +140,7 @@ export function PropertiesPanel() {
                   <Select
                     value={currentSettings.scale.ratio.toString()}
                     onValueChange={(value) => {
-                      updatePlatform(currentPlatform, {
-                        scale: {
-                          ...currentSettings.scale,
-                          ratio: parseFloat(value)
-                        }
-                      })
+                      handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
                     <SelectTrigger className="text-xs h-8">
@@ -174,10 +165,43 @@ export function PropertiesPanel() {
                     type="number"
                     value={currentSettings.scale.baseSize}
                     onChange={(e) => {
+                      handleScaleChange(currentSettings.scale.ratio, parseFloat(e.target.value))
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Steps Up</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={currentSettings.scale.stepsUp}
+                    onChange={(e) => {
                       updatePlatform(currentPlatform, {
                         scale: {
                           ...currentSettings.scale,
-                          baseSize: parseFloat(e.target.value)
+                          stepsUp: parseInt(e.target.value)
+                        }
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Steps Down</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={currentSettings.scale.stepsDown}
+                    onChange={(e) => {
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          stepsDown: parseInt(e.target.value)
                         }
                       })
                     }}
@@ -194,12 +218,7 @@ export function PropertiesPanel() {
                   <Select
                     value={currentSettings.scale.ratio.toString()}
                     onValueChange={(value) => {
-                      updatePlatform(currentPlatform, {
-                        scale: {
-                          ...currentSettings.scale,
-                          ratio: parseFloat(value)
-                        }
-                      })
+                      handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
                     <SelectTrigger className="text-xs h-8">
@@ -224,11 +243,8 @@ export function PropertiesPanel() {
                     type="number"
                     value={currentSettings.distanceScale.viewingDistance}
                     onChange={(e) => {
-                      updatePlatform(currentPlatform, {
-                        distanceScale: {
-                          ...currentSettings.distanceScale,
-                          viewingDistance: parseFloat(e.target.value)
-                        }
+                      handleDistanceScaleChange({
+                        viewingDistance: parseFloat(e.target.value),
                       })
                     }}
                     className="text-xs h-8"
@@ -315,6 +331,44 @@ export function PropertiesPanel() {
                     onChange={(e) => {
                       handleDistanceScaleChange({
                         ppi: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <Label className="text-xs">Steps Up</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={currentSettings.scale.stepsUp}
+                    onChange={(e) => {
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          stepsUp: parseInt(e.target.value)
+                        }
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Steps Down</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="10"
+                    value={currentSettings.scale.stepsDown}
+                    onChange={(e) => {
+                      updatePlatform(currentPlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          stepsDown: parseInt(e.target.value)
+                        }
                       })
                     }}
                     className="text-xs h-8"
