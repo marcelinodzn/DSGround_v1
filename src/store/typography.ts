@@ -221,23 +221,33 @@ export const useTypographyStore = create(
         set((state) => ({
           platforms: state.platforms.map((platform) => {
             if (platform.id === platformId) {
-              // If updating scale, scaleMethod, or distance settings, preserve type styles
+              // If updating scale, scaleMethod, or distance settings
               if (updates.scale || updates.scaleMethod || updates.distanceScale) {
+                // Keep type styles with their current scale steps
                 return {
                   ...platform,
                   ...updates,
-                  typeStyles: platform.typeStyles // Preserve existing type styles
+                  typeStyles: platform.typeStyles
                 };
               }
-              // If updating type styles, preserve scale steps
+              // If updating type styles
               if (updates.typeStyles) {
-                const newTypeStyles = updates.typeStyles.map(style => ({
-                  ...style,
-                  scaleStep: platform.typeStyles?.find(ts => ts.name === style.name)?.scaleStep || style.scaleStep
-                }));
+                const newTypeStyles = updates.typeStyles.map(style => {
+                  // Find existing style by ID
+                  const existingStyle = platform.typeStyles?.find(ts => ts.id === style.id);
+                  
+                  // If we're explicitly changing the scale step (from the dropdown)
+                  // or if it's a new style, use the new scale step
+                  const useNewScaleStep = !existingStyle || style.scaleStep !== existingStyle.scaleStep;
+                  
+                  return {
+                    ...style,
+                    scaleStep: useNewScaleStep ? style.scaleStep : existingStyle.scaleStep
+                  };
+                });
+                
                 return {
                   ...platform,
-                  ...updates,
                   typeStyles: newTypeStyles
                 };
               }
