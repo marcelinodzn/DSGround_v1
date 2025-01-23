@@ -6,14 +6,12 @@ import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/ty
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, GripVertical, Trash2, Copy } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { GripVertical } from "lucide-react"
-import { Trash2 } from "lucide-react"
-import { Copy } from "lucide-react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -339,7 +337,7 @@ export function PropertiesPanel() {
         <CollapsibleContent>
           <div className="px-4 py-4">
             <RadioGroup
-              value={currentSettings.scaleMethod}
+              value={currentSettings.scaleMethod} 
               onValueChange={(value) => handleScaleMethodChange(value as ScaleMethod)}
               className="grid grid-cols-3 gap-4"
             >
@@ -528,40 +526,34 @@ export function PropertiesPanel() {
                 </div>
 
                 <div>
-                  <Label className="text-xs">Text Type</Label>
-                  <Select 
+                  <Label className="text-xs mb-2">Text Type</Label>
+                  <Tabs 
                     value={currentSettings.distanceScale.textType}
                     onValueChange={(value) => 
                       handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
                     }
                   >
-                    <SelectTrigger className="text-xs h-8">
-                      <SelectValue placeholder="Select text type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="continuous" className="text-xs">Continuous Text</SelectItem>
-                      <SelectItem value="isolated" className="text-xs">Isolated Text</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="continuous">Continuous</TabsTrigger>
+                      <TabsTrigger value="isolated">Isolated</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
 
                 <div>
-                  <Label className="text-xs">Lighting Conditions</Label>
-                  <Select 
+                  <Label className="text-xs mb-2">Lighting Conditions</Label>
+                  <Tabs 
                     value={currentSettings.distanceScale.lighting}
                     onValueChange={(value) => 
                       handleDistanceScaleChange({ lighting: value as 'good' | 'moderate' | 'poor' })
                     }
                   >
-                    <SelectTrigger className="text-xs h-8">
-                      <SelectValue placeholder="Select lighting condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="good" className="text-xs">Good</SelectItem>
-                      <SelectItem value="moderate" className="text-xs">Moderate</SelectItem>
-                      <SelectItem value="poor" className="text-xs">Poor</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="good">Good</TabsTrigger>
+                      <TabsTrigger value="moderate">Moderate</TabsTrigger>
+                      <TabsTrigger value="poor">Poor</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
 
                 <div>

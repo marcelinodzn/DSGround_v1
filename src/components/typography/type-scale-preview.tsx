@@ -10,6 +10,7 @@ import {
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { TypeStyle } from "@/store/typography"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const calculateDistanceBasedSize = (
   distance: number,
@@ -91,22 +92,12 @@ export function TypeScalePreview() {
         <div className="py-4 text-sm text-muted-foreground">
           Base Size: {scale.baseSize}px • Scale Ratio: {scale.ratio} • Steps Up: {scale.stepsUp} • Steps Down: {scale.stepsDown}
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant={view === 'scale' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setView('scale')}
-          >
-            Scale View
-          </Button>
-          <Button
-            variant={view === 'styles' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setView('styles')}
-          >
-            Styles View
-          </Button>
-        </div>
+        <Tabs value={view} onValueChange={(value) => setView(value as 'scale' | 'styles')}>
+          <TabsList>
+            <TabsTrigger value="scale">Scale View</TabsTrigger>
+            <TabsTrigger value="styles">Styles View</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {view === 'scale' ? (
