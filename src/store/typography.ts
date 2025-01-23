@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export type ScaleMethod = 'modular' | 'distance' | 'ai'
 export type TextType = 'continuous' | 'isolated'
@@ -206,52 +207,99 @@ const initialPlatforms: Platform[] = [
   },
 ]
 
-export const useTypographyStore = create<TypographyState>((set, get) => ({
-  currentPlatform: 'web',
-  platforms: initialPlatforms,
-  
-  setCurrentPlatform: (platformId) =>
-    set({ currentPlatform: platformId }),
-    
-  updatePlatform: (platformId, updates) =>
-    set((state) => ({
-      platforms: state.platforms.map((platform) =>
-        platform.id === platformId ? { ...platform, ...updates } : platform
-      ),
-    })),
+export const useTypographyStore = create(
+  persist<TypographyState>(
+    (set, get) => ({
+      currentPlatform: 'web',
+      platforms: initialPlatforms,
+      
+      setCurrentPlatform: (platformId) =>
+        set({ currentPlatform: platformId }),
+        
+      updatePlatform: (platformId, updates) => {
+        set((state) => ({
+          platforms: state.platforms.map((platform) => {
+            if (platform.id === platformId) {
+              // If updating scale or scaleMethod, update all type styles' sizes
+              if (updates.scale || updates.scaleMethod) {
+                const currentTypeStyles = platform.typeStyles;
+                return {
+                  ...platform,
+                  ...updates,
+                  typeStyles: currentTypeStyles // Preserve existing type styles
+                };
+              }
+              return { ...platform, ...updates };
+            }
+            return platform;
+          }),
+        }))
+      },
 
-  getScaleValues: (platformId) => {
-    const platform = get().platforms.find(p => p.id === platformId);
-    if (!platform) return [];
+      getScaleValues: (platformId) => {
+        const platform = get().platforms.find(p => p.id === platformId);
+        if (!platform) return [];
 
-    const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
-    const scaleValues = [];
+        const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
+        const scaleValues = [];
 
-    // Generate decreasing values (f-n to f-1)
-    for (let i = stepsDown; i > 0; i--) {
-      scaleValues.push({
-        label: `f-${i}`,
-        size: baseSize / Math.pow(ratio, i),
-        ratio: 1 / Math.pow(ratio, i)
-      });
+        // Generate decreasing values (f-n to f-1)
+        for (let i = stepsDown; i > 0; i--) {
+          scaleValues.push({
+            label: `f-${i}`,
+            size: baseSize / Math.pow(ratio, i),
+            ratio: 1 / Math.pow(ratio, i)
+          });
+        }
+
+        // Add base size (f0)
+        scaleValues.push({
+          label: 'f0',
+          size: baseSize,
+          ratio: 1
+        });
+
+        // Generate increasing values (f1 to fn)
+        for (let i = 1; i <= stepsUp; i++) {
+          scaleValues.push({
+            label: `f${i}`,
+            size: baseSize * Math.pow(ratio, i),
+            ratio: Math.pow(ratio, i)
+          });
+        }
+
+        return scaleValues;
+      }
+    }),
+    {
+      name: 'typography-storage',
+      version: 1,
+      partialize: (state) => ({ 
+        platforms: state.platforms,
+        currentPlatform: state.currentPlatform 
+      }),
+      migrate: (persistedState: any, version: number) => {
+        if (version === 0) {
+          return {
+            ...persistedState,
+            platforms: persistedState.platforms.map((platform: Platform) => ({
+              ...platform,
+              typeStyles: platform.typeStyles || [...defaultTypeStyles]
+            }))
+          }
+        }
+        return persistedState
+      },
+      merge: (persistedState: any, currentState: TypographyState) => {
+        return {
+          ...currentState,
+          ...persistedState,
+          platforms: persistedState.platforms.map((platform: Platform) => ({
+            ...platform,
+            typeStyles: platform.typeStyles || [...defaultTypeStyles]
+          }))
+        }
+      }
     }
-
-    // Add base size (f0)
-    scaleValues.push({
-      label: 'f0',
-      size: baseSize,
-      ratio: 1
-    });
-
-    // Generate increasing values (f1 to fn)
-    for (let i = 1; i <= stepsUp; i++) {
-      scaleValues.push({
-        label: `f${i}`,
-        size: baseSize * Math.pow(ratio, i),
-        ratio: Math.pow(ratio, i)
-      });
-    }
-
-    return scaleValues;
-  }
-}))
+  )
+)

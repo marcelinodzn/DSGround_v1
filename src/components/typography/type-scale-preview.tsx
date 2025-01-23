@@ -142,8 +142,9 @@ function ScaleView({ scaleValues }: ScaleViewProps) {
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word',
                     whiteSpace: 'normal',
-                    maxHeight: `${Math.max(item.size * 1.2 * 2, 48)}px`,
-                    overflow: 'hidden'
+                    minHeight: `${Math.max(item.size * 1.2, 48)}px`,
+                    display: 'flex',
+                    alignItems: 'center'
                   }} 
                 >
                   The quick brown fox jumps over the lazy dog
@@ -196,8 +197,9 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word',
                       whiteSpace: 'normal',
-                      maxHeight: `${Math.max((scaleValue?.size || 16) * style.lineHeight * 2, 48)}px`,
-                      overflow: 'hidden'
+                      minHeight: `${Math.max((scaleValue?.size || 16) * style.lineHeight, 48)}px`,
+                      display: 'flex',
+                      alignItems: 'center'
                     }} 
                   >
                     The quick brown fox jumps over the lazy dog
