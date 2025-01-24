@@ -104,7 +104,7 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
                   value={typeStyle.scaleStep}
                   onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { scaleStep: value })}
                 >
-                  <SelectTrigger className="text-xs h-8">
+                  <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
                     <SelectValue placeholder="Scale" />
                   </SelectTrigger>
                   <SelectContent>
@@ -310,7 +310,7 @@ export function PropertiesPanel() {
           value={currentPlatform}
           onValueChange={setCurrentPlatform}
         >
-          <SelectTrigger className="text-xs h-8">
+          <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
             <SelectValue placeholder="Select platform" />
           </SelectTrigger>
           <SelectContent>
@@ -327,12 +327,14 @@ export function PropertiesPanel() {
         </Select>
       </div>
 
-      <Separator className="mb-4" />
+      <div className="mt-[11.9px]">
+        <Separator className="mb-4" />
+      </div>
 
       <Collapsible defaultOpen>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold group">
           <span>Scale Method</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4">
@@ -383,7 +385,7 @@ export function PropertiesPanel() {
                       handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8">
+                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
                       <SelectValue placeholder="Select scale type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -462,7 +464,7 @@ export function PropertiesPanel() {
                       handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8">
+                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
                       <SelectValue placeholder="Select scale type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -617,8 +619,13 @@ export function PropertiesPanel() {
               <div className="mt-4 space-y-4">
                 <div>
                   <Label className="text-xs">Content Type</Label>
-                  <Select defaultValue="article">
-                    <SelectTrigger className="text-xs h-8">
+                  <Select
+                    value={currentSettings.distanceScale.textType}
+                    onValueChange={(value) => {
+                      handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
+                    }}
+                  >
+                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
                       <SelectValue placeholder="Select content type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -632,7 +639,7 @@ export function PropertiesPanel() {
                 <div>
                   <Label className="text-xs">Brand Personality</Label>
                   <Select defaultValue="professional">
-                    <SelectTrigger className="text-xs h-8">
+                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
                       <SelectValue placeholder="Select brand personality" />
                     </SelectTrigger>
                     <SelectContent>
@@ -651,9 +658,9 @@ export function PropertiesPanel() {
       </Collapsible>
 
       <Collapsible>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t group">
           <span>Type Styles</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4 space-y-4">
@@ -700,9 +707,9 @@ export function PropertiesPanel() {
       </Collapsible>
 
       <Collapsible>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t group">
           <span>Accessibility</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4 space-y-4">
@@ -739,13 +746,6 @@ export function PropertiesPanel() {
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      <div className="px-4 py-4 mt-auto">
-        <div className="flex space-x-4">
-          <Button variant="outline" className="flex-1 text-xs">Reset</Button>
-          <Button className="flex-1 text-xs">Save</Button>
-        </div>
-      </div>
     </div>
   )
 }

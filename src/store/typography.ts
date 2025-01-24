@@ -266,7 +266,7 @@ export const useTypographyStore = create(
         const scaleValues = [];
 
         // Calculate base size for distance method
-        let effectiveBaseSize = baseSize;
+        let effectiveBaseSize = Math.round(baseSize); // Ensure consistent rounding
         if (platform.scaleMethod === 'distance') {
           const { viewingDistance, visualAcuity, meanLengthRatio, textType, lighting, ppi } = platform.distanceScale;
           
@@ -287,16 +287,17 @@ export const useTypographyStore = create(
           calculatedSize = calculatedSize * meanLengthRatio;
           calculatedSize = calculatedSize * LIGHTING_FACTORS[lighting] * TEXT_TYPE_FACTORS[textType];
 
-          // Convert mm to pixels
+          // Convert mm to pixels and ensure consistent rounding
           effectiveBaseSize = Math.round((calculatedSize * ppi) / 25.4);
         }
 
         // Generate decreasing values (f-n to f-1)
         for (let i = stepsDown; i > 0; i--) {
+          const size = effectiveBaseSize / Math.pow(ratio, i);
           scaleValues.push({
             label: `f-${i}`,
-            size: effectiveBaseSize / Math.pow(ratio, i),
-            ratio: 1 / Math.pow(ratio, i)
+            size: Math.round(size),
+            ratio: Math.round((1 / Math.pow(ratio, i)) * 1000) / 1000
           });
         }
 
@@ -309,10 +310,11 @@ export const useTypographyStore = create(
 
         // Generate increasing values (f1 to fn)
         for (let i = 1; i <= stepsUp; i++) {
+          const size = effectiveBaseSize * Math.pow(ratio, i);
           scaleValues.push({
             label: `f${i}`,
-            size: effectiveBaseSize * Math.pow(ratio, i),
-            ratio: Math.pow(ratio, i)
+            size: Math.round(size),
+            ratio: Math.round(Math.pow(ratio, i) * 1000) / 1000
           });
         }
 

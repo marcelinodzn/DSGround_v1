@@ -1,4 +1,5 @@
-import { useTypographyStore } from "@/store/typography"
+import { useState, useMemo, useEffect } from "react"
+import { useTypographyStore, TypeStyle } from "@/store/typography"
 import {
   Table,
   TableBody,
@@ -7,10 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { TypeStyle } from "@/store/typography"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
+import dynamic from 'next/dynamic'
 
 const calculateDistanceBasedSize = (
   distance: number,
@@ -72,6 +72,49 @@ interface StylesViewProps {
   }>
 }
 
+// Create a dynamic version of ScaleView with SSR disabled
+const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps) => (
+  <Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead className="w-[100px] pl-0">Label</TableHead>
+        <TableHead className="pl-0">Preview</TableHead>
+        <TableHead className="w-[100px] pl-0">Size</TableHead>
+        <TableHead className="w-[100px] pl-0">Scale Factor</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {scaleValues.map((item) => (
+        <TableRow key={item.label} className="h-auto">
+          <TableCell className="font-medium py-4 pl-0">{item.label}</TableCell>
+          <TableCell className="py-4 pl-0">
+            <div className="min-w-0 max-w-full">
+              <div 
+                style={{ 
+                  fontSize: `${Math.round(item.size)}px`,
+                  lineHeight: 1.2,
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  whiteSpace: 'normal',
+                  minHeight: `${Math.max(item.size * 1.2, 48)}px`,
+                  display: 'flex',
+                  alignItems: 'center'
+                }} 
+              >
+                The quick brown fox jumps over the lazy dog
+              </div>
+            </div>
+          </TableCell>
+          <TableCell className="py-4 pl-0">{Math.round(item.size)}px</TableCell>
+          <TableCell className="py-4 pl-0 text-muted-foreground text-sm">
+            {item.ratio.toFixed(3)}x
+          </TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+)), { ssr: false })
+
 export function TypeScalePreview() {
   const { 
     currentPlatform,
@@ -87,8 +130,12 @@ export function TypeScalePreview() {
   const [view, setView] = useState<'scale' | 'styles'>('scale')
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div>
+      <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
+        <Separator className="w-screen" />
+      </div>
+      
+      <div className="flex justify-between items-center px-4 pt-6">
         <div className="py-4 text-sm text-muted-foreground">
           Base Size: {scale.baseSize}px • Scale Ratio: {scale.ratio} • Steps Up: {scale.stepsUp} • Steps Down: {scale.stepsDown}
         </div>
@@ -100,56 +147,14 @@ export function TypeScalePreview() {
         </Tabs>
       </div>
 
-      {view === 'scale' ? (
-        <ScaleView scaleValues={scaleValues} />
-      ) : (
-        <StylesView typeStyles={currentSettings.typeStyles} scaleValues={scaleValues} />
-      )}
+      <div className="p-4">
+        {view === 'scale' ? (
+          <ScaleView scaleValues={scaleValues} />
+        ) : (
+          <StylesView typeStyles={currentSettings.typeStyles} scaleValues={scaleValues} />
+        )}
+      </div>
     </div>
-  )
-}
-
-function ScaleView({ scaleValues }: ScaleViewProps) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[100px] pl-0">Label</TableHead>
-          <TableHead className="pl-0">Preview</TableHead>
-          <TableHead className="w-[100px] pl-0">Size</TableHead>
-          <TableHead className="w-[100px] pl-0">Scale Factor</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {scaleValues.map((item) => (
-          <TableRow key={item.label} className="h-auto">
-            <TableCell className="font-medium py-4 pl-0">{item.label}</TableCell>
-            <TableCell className="py-4 pl-0">
-              <div className="min-w-0 max-w-full">
-                <div 
-                  style={{ 
-                    fontSize: `${item.size}px`,
-                    lineHeight: 1.2,
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word',
-                    whiteSpace: 'normal',
-                    minHeight: `${Math.max(item.size * 1.2, 48)}px`,
-                    display: 'flex',
-                    alignItems: 'center'
-                  }} 
-                >
-                  The quick brown fox jumps over the lazy dog
-                </div>
-              </div>
-            </TableCell>
-            <TableCell className="py-4 pl-0">{Math.round(item.size)}px</TableCell>
-            <TableCell className="py-4 pl-0 text-muted-foreground text-sm">
-              {item.ratio.toFixed(3)}x
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
   )
 }
 
