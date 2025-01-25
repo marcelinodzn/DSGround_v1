@@ -104,7 +104,7 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
                   value={typeStyle.scaleStep}
                   onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { scaleStep: value })}
                 >
-                  <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
+                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                     <SelectValue placeholder="Scale" />
                   </SelectTrigger>
                   <SelectContent>
@@ -310,7 +310,7 @@ export function PropertiesPanel() {
           value={currentPlatform}
           onValueChange={setCurrentPlatform}
         >
-          <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 [&>svg:last-child]:hidden">
             <SelectValue placeholder="Select platform" />
           </SelectTrigger>
           <SelectContent>
@@ -385,7 +385,7 @@ export function PropertiesPanel() {
                       handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                       <SelectValue placeholder="Select scale type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -464,7 +464,7 @@ export function PropertiesPanel() {
                       handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                       <SelectValue placeholder="Select scale type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -625,7 +625,7 @@ export function PropertiesPanel() {
                       handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
                     }}
                   >
-                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                       <SelectValue placeholder="Select content type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -639,7 +639,7 @@ export function PropertiesPanel() {
                 <div>
                   <Label className="text-xs">Brand Personality</Label>
                   <Select defaultValue="professional">
-                    <SelectTrigger className="text-xs h-8 border-transparent hover:border-input focus:border-input transition-colors">
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                       <SelectValue placeholder="Select brand personality" />
                     </SelectTrigger>
                     <SelectContent>

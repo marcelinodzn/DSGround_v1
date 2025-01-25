@@ -1,5 +1,4 @@
 {
-  "/sync/page": "app/sync/page.js",
   "/brands/page": "app/brands/page.js",
   "/foundations/typography/page": "app/foundations/typography/page.js"
 }
