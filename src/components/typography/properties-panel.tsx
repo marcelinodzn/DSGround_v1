@@ -6,12 +6,18 @@ import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/ty
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, GripVertical, Trash2, Copy } from "lucide-react"
+import { ChevronDown, GripVertical, Trash2, Copy, Upload, X } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { generateTypeScale, parseAIRecommendation } from "@/lib/claude"
+import { convertToBase64 } from "@/lib/utils"
+import { Progress } from "@/components/ui/progress"
+import { Loader2 } from "lucide-react"
+import { Sparkles } from "lucide-react"
+import { AnimatedTabs } from "@/components/ui/animated-tabs"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -194,6 +200,29 @@ export function PropertiesPanel() {
 
   const currentSettings = platforms.find(p => p.id === currentPlatform)!
 
+  const [selectedDevice, setSelectedDevice] = useState('')
+  const [selectedContext, setSelectedContext] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState('')
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [platformReasoning, setPlatformReasoning] = useState<string | null>(null)
+  const [imageAnalysis, setImageAnalysis] = useState<string | null>(null)
+  const [activeViewTab, setActiveViewTab] = useState('scale')
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState('platform')
+  
+  const viewTabs = [
+    { id: 'scale', label: 'Scale View' },
+    { id: 'styles', label: 'Styles View' }
+  ];
+
+  const analysisTabs = [
+    { id: 'platform', label: 'Platform Analysis' },
+    { id: 'image', label: 'Image Analysis' }
+  ];
+
   const handleScaleMethodChange = (method: ScaleMethod) => {
     updatePlatform(currentPlatform, { scaleMethod: method })
   }
@@ -302,6 +331,143 @@ export function PropertiesPanel() {
     })
   );
 
+  const handleAIScaleGeneration = async () => {
+    try {
+      setAiError(null)
+      setIsGenerating(true)
+      setProgress(0)
+      setPlatformReasoning(null)
+      
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 10, 90))
+      }, 500)
+      
+      const recommendation = await generateTypeScale({
+        deviceType: currentPlatform,
+        context: selectedContext,
+        location: selectedLocation
+      })
+      
+      clearInterval(progressInterval)
+      setProgress(100)
+      
+      const params = parseAIRecommendation(recommendation)
+      const reasoningMatch = recommendation.match(/Reasoning:([\s\S]+)$/i)
+      
+      if (reasoningMatch) {
+        const baseSize = params.baseSize
+        const scaleRatio = params.ratio
+        const stepsUp = params.stepsUp
+        const stepsDown = params.stepsDown
+        
+        const analysisText = `Scale Parameters:
+• Base Size: ${baseSize}px
+• Scale Ratio: ${scaleRatio}
+• Steps Up: ${stepsUp}
+• Steps Down: ${stepsDown}
+
+Reasoning:
+${reasoningMatch[1].trim()}`
+
+        setPlatformReasoning(analysisText)
+      }
+      
+      updatePlatform(currentPlatform, {
+        scale: {
+          ...params
+        }
+      })
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'Failed to generate scale')
+    } finally {
+      setIsGenerating(false)
+      setTimeout(() => setProgress(0), 500)
+    }
+  }
+
+  const handleImageAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      try {
+        setAiError(null)
+        setIsAnalyzing(true)
+        setProgress(0)
+        
+        const base64 = await convertToBase64(file)
+        setSelectedImage(base64)
+        
+        // Start analysis immediately after image is loaded
+        await handleGenerateFromImage(base64)
+      } catch (error) {
+        setAiError('Failed to process image')
+        setSelectedImage(null)
+      } finally {
+        setIsAnalyzing(false)
+      }
+    }
+  }
+
+  const handleGenerateFromImage = async (base64Image: string) => {
+    try {
+      setAiError(null)
+      setIsAnalyzing(true)
+      setProgress(0)
+      setPlatformReasoning(null)
+      
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 10, 90))
+      }, 500)
+
+      // Truncate base64 string if it's too long
+      const truncatedImage = base64Image.length > 1000000 
+        ? base64Image.substring(0, 1000000) 
+        : base64Image
+
+      const recommendation = await generateTypeScale({
+        deviceType: currentPlatform,
+        context: selectedContext,
+        location: selectedLocation,
+        image: truncatedImage
+      })
+
+      clearInterval(progressInterval)
+      setProgress(100)
+
+      if (!recommendation) {
+        throw new Error('No recommendation received from AI')
+      }
+
+      const params = parseAIRecommendation(recommendation)
+      const reasoningMatch = recommendation.match(/Reasoning:([\s\S]+)$/i)
+
+      if (reasoningMatch) {
+        const analysisText = `Scale Parameters:
+• Base Size: ${params.baseSize}px
+• Scale Ratio: ${params.ratio}
+• Steps Up: ${params.stepsUp}
+• Steps Down: ${params.stepsDown}
+
+Reasoning:
+${reasoningMatch[1].trim()}`
+
+        setImageAnalysis(analysisText)
+        setPlatformReasoning(analysisText)
+      }
+
+      updatePlatform(currentPlatform, {
+        scale: {
+          ...params
+        }
+      })
+    } catch (error) {
+      console.error('Error in handleGenerateFromImage:', error)
+      setAiError(error instanceof Error ? error.message : 'Failed to analyze image')
+    } finally {
+      setIsAnalyzing(false)
+      setTimeout(() => setProgress(0), 500)
+    }
+  }
+
   return (
     <div className="h-full">
       <div className="px-4 py-4">
@@ -369,7 +535,7 @@ export function PropertiesPanel() {
                   htmlFor="ai"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M2 12h20"/><path d="m12 2 4 4"/><path d="m12 2-4 4"/><path d="m12 22 4-4"/><path d="m12 22-4-4"/><path d="m2 12 4 4"/><path d="m2 12 4-4"/><path d="m22 12-4 4"/><path d="m22 12-4-4"/></svg>
+                  <Sparkles className="h-6 w-6" />
                   <div className="mt-2 text-xs">AI</div>
                 </Label>
               </div>
@@ -617,40 +783,369 @@ export function PropertiesPanel() {
 
             {currentSettings.scaleMethod === 'ai' && (
               <div className="mt-4 space-y-4">
-                <div>
-                  <Label className="text-xs">Content Type</Label>
-                  <Select
-                    value={currentSettings.distanceScale.textType}
-                    onValueChange={(value) => {
-                      handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
-                    }}
-                  >
-                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                      <SelectValue placeholder="Select content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="article" className="text-xs">Article</SelectItem>
-                      <SelectItem value="marketing" className="text-xs">Marketing</SelectItem>
-                      <SelectItem value="documentation" className="text-xs">Documentation</SelectItem>
-                      <SelectItem value="dashboard" className="text-xs">Dashboard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Brand Personality</Label>
-                  <Select defaultValue="professional">
-                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                      <SelectValue placeholder="Select brand personality" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="professional" className="text-xs">Professional</SelectItem>
-                      <SelectItem value="friendly" className="text-xs">Friendly</SelectItem>
-                      <SelectItem value="bold" className="text-xs">Bold</SelectItem>
-                      <SelectItem value="minimal" className="text-xs">Minimal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full text-xs">Generate Scale</Button>
+                <AnimatedTabs
+                  tabs={analysisTabs}
+                  defaultTab="platform"
+                  onChange={(value) => {
+                    setActiveAnalysisTab(value);
+                    // Clear states when switching tabs
+                    setAiError(null);
+                    setPlatformReasoning(null);
+                    setImageAnalysis(null);
+                    setProgress(0);
+                    if (value === 'platform') {
+                      setSelectedImage(null);
+                    }
+                  }}
+                  layoutId="analysis-method-tabs"
+                />
+
+                {activeAnalysisTab === 'platform' && (
+                  <div className="space-y-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-xs">Usage Context</Label>
+                        <Select
+                          value={selectedContext}
+                          onValueChange={setSelectedContext}
+                        >
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Select context" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="reading">Long-form Reading</SelectItem>
+                            <SelectItem value="ui">UI Interface</SelectItem>
+                            <SelectItem value="marketing">Marketing/Ads</SelectItem>
+                            <SelectItem value="signage">Digital Signage</SelectItem>
+                            <SelectItem value="dashboard">Data Dashboard</SelectItem>
+                            <SelectItem value="mobile-app">Mobile Application</SelectItem>
+                            <SelectItem value="web-app">Web Application</SelectItem>
+                            <SelectItem value="e-commerce">E-commerce</SelectItem>
+                            <SelectItem value="documentation">Documentation</SelectItem>
+                            <SelectItem value="blog">Blog/Article</SelectItem>
+                            <SelectItem value="presentation">Presentation</SelectItem>
+                            <SelectItem value="social-media">Social Media</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Location</Label>
+                        <Select
+                          value={selectedLocation}
+                          onValueChange={setSelectedLocation}
+                        >
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Select location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="indoor">Indoor</SelectItem>
+                            <SelectItem value="outdoor-shaded">Outdoor (Shaded)</SelectItem>
+                            <SelectItem value="outdoor-direct">Outdoor (Direct Sunlight)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {aiError && (
+                        <div className="text-sm text-red-500">
+                          {aiError}
+                        </div>
+                      )}
+
+                      {isGenerating && (
+                        <div className="space-y-2">
+                          <Progress value={progress} className="h-1" />
+                          <div className="flex items-center justify-center text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                            Generating recommendations...
+                          </div>
+                        </div>
+                      )}
+
+                      {platformReasoning && (
+                        <div className="mt-4 p-4 bg-muted rounded-lg">
+                          <h4 className="text-xs font-medium mb-2">Platform Analysis Results</h4>
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                            {platformReasoning}
+                          </p>
+                        </div>
+                      )}
+
+                      {(platformReasoning || imageAnalysis) && (
+                        <div className="mt-4 space-y-4 border-t pt-4">
+                          <h4 className="text-xs font-medium">Adjust Scale Parameters</h4>
+                          
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Base Size</Label>
+                              <Input
+                                type="number"
+                                value={currentSettings.scale.baseSize}
+                                onChange={(e) => {
+                                  updatePlatform(currentPlatform, {
+                                    scale: {
+                                      ...currentSettings.scale,
+                                      baseSize: parseFloat(e.target.value)
+                                    }
+                                  })
+                                }}
+                                className="text-xs h-8"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-xs">Scale Type</Label>
+                              <Select
+                                value={currentSettings.scale.ratio.toString()}
+                                onValueChange={(value) => {
+                                  updatePlatform(currentPlatform, {
+                                    scale: {
+                                      ...currentSettings.scale,
+                                      ratio: parseFloat(value)
+                                    }
+                                  })
+                                }}
+                              >
+                                <SelectTrigger className="text-xs h-8">
+                                  <SelectValue placeholder="Select scale type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                                  <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                                  <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                                  <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                                  <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                                  <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                                  <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                                  <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Steps Up</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  value={currentSettings.scale.stepsUp}
+                                  onChange={(e) => {
+                                    updatePlatform(currentPlatform, {
+                                      scale: {
+                                        ...currentSettings.scale,
+                                        stepsUp: parseInt(e.target.value)
+                                      }
+                                    })
+                                  }}
+                                  className="text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Steps Down</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  value={currentSettings.scale.stepsDown}
+                                  onChange={(e) => {
+                                    updatePlatform(currentPlatform, {
+                                      scale: {
+                                        ...currentSettings.scale,
+                                        stepsDown: parseInt(e.target.value)
+                                      }
+                                    })
+                                  }}
+                                  className="text-xs h-8"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button 
+                        className="w-full text-xs"
+                        onClick={handleAIScaleGeneration}
+                        disabled={!selectedContext || isGenerating}
+                      >
+                        {isGenerating ? 'Generating...' : 'Generate Scale'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {activeAnalysisTab === 'image' && (
+                  <div className="space-y-4">
+                    {!selectedImage ? (
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                        <Input 
+                          type="file" 
+                          accept="image/*"
+                          className="hidden" 
+                          id="image-upload"
+                          onChange={handleImageAnalysis}
+                        />
+                        <Label htmlFor="image-upload" className="cursor-pointer">
+                          <div className="space-y-2">
+                            <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">
+                              Upload UI/Environment Image
+                            </p>
+                          </div>
+                        </Label>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="relative aspect-video rounded-lg overflow-hidden border">
+                          <img 
+                            src={selectedImage} 
+                            alt="Preview" 
+                            className="object-contain w-full h-full"
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setSelectedImage(null)
+                              setImageAnalysis(null)
+                              setAiError(null)
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {aiError && (
+                          <div className="text-sm text-red-500">
+                            {aiError}
+                          </div>
+                        )}
+
+                        {isAnalyzing && (
+                          <div className="space-y-2">
+                            <Progress value={progress} className="h-1" />
+                            <div className="flex items-center justify-center text-xs text-muted-foreground">
+                              <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                              Analyzing image...
+                            </div>
+                          </div>
+                        )}
+
+                        {imageAnalysis && (
+                          <div className="mt-4 p-4 bg-muted rounded-lg">
+                            <h4 className="text-xs font-medium mb-2">Image Analysis Results</h4>
+                            <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                              {imageAnalysis}
+                            </p>
+                          </div>
+                        )}
+
+                        {(platformReasoning || imageAnalysis) && (
+                          <div className="mt-4 space-y-4 border-t pt-4">
+                            <h4 className="text-xs font-medium">Adjust Scale Parameters</h4>
+                            
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Base Size</Label>
+                                <Input
+                                  type="number"
+                                  value={currentSettings.scale.baseSize}
+                                  onChange={(e) => {
+                                    updatePlatform(currentPlatform, {
+                                      scale: {
+                                        ...currentSettings.scale,
+                                        baseSize: parseFloat(e.target.value)
+                                      }
+                                    })
+                                  }}
+                                  className="text-xs h-8"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-xs">Scale Type</Label>
+                                <Select
+                                  value={currentSettings.scale.ratio.toString()}
+                                  onValueChange={(value) => {
+                                    updatePlatform(currentPlatform, {
+                                      scale: {
+                                        ...currentSettings.scale,
+                                        ratio: parseFloat(value)
+                                      }
+                                    })
+                                  }}
+                                >
+                                  <SelectTrigger className="text-xs h-8">
+                                    <SelectValue placeholder="Select scale type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                                    <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                                    <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                                    <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                                    <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                                    <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                                    <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                                    <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Steps Up</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    value={currentSettings.scale.stepsUp}
+                                    onChange={(e) => {
+                                      updatePlatform(currentPlatform, {
+                                        scale: {
+                                          ...currentSettings.scale,
+                                          stepsUp: parseInt(e.target.value)
+                                        }
+                                      })
+                                    }}
+                                    className="text-xs h-8"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Steps Down</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    value={currentSettings.scale.stepsDown}
+                                    onChange={(e) => {
+                                      updatePlatform(currentPlatform, {
+                                        scale: {
+                                          ...currentSettings.scale,
+                                          stepsDown: parseInt(e.target.value)
+                                        }
+                                      })
+                                    }}
+                                    className="text-xs h-8"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <Button 
+                          className="w-full text-xs"
+                          onClick={() => handleGenerateFromImage(selectedImage)}
+                          disabled={isAnalyzing}
+                        >
+                          {isAnalyzing ? 'Analyzing...' : 'Analyze Image'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -658,9 +1153,14 @@ export function PropertiesPanel() {
       </Collapsible>
 
       <Collapsible>
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t group">
+        <CollapsibleTrigger 
+          className="flex w-full items-center justify-between px-4 py-4 text-sm font-semibold border-t group"
+        >
           <span>Type Styles</span>
-          <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          <ChevronDown 
+            className="h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" 
+            aria-hidden="true"
+          />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4 space-y-4">

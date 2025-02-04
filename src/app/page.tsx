@@ -1,50 +1,108 @@
-import { Button } from "@/components/ui/button"
+'use client'
 
-export default function Home() {
+import { useLayout } from "@/contexts/layout-context"
+import { Button } from "@/components/ui/button"
+import { Maximize2, Minimize2 } from 'lucide-react'
+import { cn } from "@/lib/utils"
+
+export default function HomePage() {
+  const { isFullscreen, setIsFullscreen } = useLayout()
+
   return (
-    <div className="grid gap-8">
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Master Brands</h2>
-          <Button>Create Brand</Button>
+    <div className={cn(
+      "h-full flex transition-all duration-300 ease-in-out",
+      isFullscreen && "fixed inset-0 bg-background z-50 overflow-y-auto p-6 max-w-[100vw]"
+    )}>
+      <div className="flex-1 min-w-0 max-w-full">
+        <div className={cn(
+          "flex items-center justify-between mb-6",
+          isFullscreen ? "" : "pt-6 px-6"
+        )}>
+          <div>
+            <h1 className="text-[30px] font-bold">Overview</h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="ml-2"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="p-6 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-semibold mb-2">Default Brand</h3>
-            <p className="text-sm text-muted-foreground mb-4">Main design system configuration</p>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm">Edit</Button>
-              <Button variant="ghost" size="sm">View Tokens</Button>
+
+        <div className="py-8 px-6 max-w-full overflow-x-hidden">
+          <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="border rounded-lg p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Total Brands</h3>
+                <p className="text-2xl font-bold mt-2">3</p>
+              </div>
+              <div className="border rounded-lg p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Active Projects</h3>
+                <p className="text-2xl font-bold mt-2">12</p>
+              </div>
+              <div className="border rounded-lg p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Design Tokens</h3>
+                <p className="text-2xl font-bold mt-2">156</p>
+              </div>
+              <div className="border rounded-lg p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Team Members</h3>
+                <p className="text-2xl font-bold mt-2">8</p>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Recent Activity</h2>
+              <div className="border rounded-lg divide-y">
+                <div className="p-4">
+                  <p className="text-sm font-medium">Typography scale updated</p>
+                  <p className="text-sm text-muted-foreground mt-1">Updated by John Doe • 2h ago</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm font-medium">New brand created</p>
+                  <p className="text-sm text-muted-foreground mt-1">Created by Jane Smith • 5h ago</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm font-medium">Color tokens modified</p>
+                  <p className="text-sm text-muted-foreground mt-1">Updated by Mike Johnson • 1d ago</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Button variant="outline" className="h-auto py-4 px-6">
+                  <div className="text-left">
+                    <p className="font-medium">Create New Brand</p>
+                    <p className="text-sm text-muted-foreground mt-1">Set up a new design system</p>
+                  </div>
+                </Button>
+                <Button variant="outline" className="h-auto py-4 px-6">
+                  <div className="text-left">
+                    <p className="font-medium">Import Tokens</p>
+                    <p className="text-sm text-muted-foreground mt-1">Import from Figma or JSON</p>
+                  </div>
+                </Button>
+                <Button variant="outline" className="h-auto py-4 px-6">
+                  <div className="text-left">
+                    <p className="font-medium">Invite Team Member</p>
+                    <p className="text-sm text-muted-foreground mt-1">Add collaborators</p>
+                  </div>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Design Foundations</h2>
-        <div className="grid grid-cols-4 gap-4">
-          <div className="p-6 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-semibold mb-2">Typography</h3>
-            <p className="text-sm text-muted-foreground mb-4">Type scale and fonts</p>
-            <Button variant="outline" size="sm">Configure</Button>
-          </div>
-          <div className="p-6 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-semibold mb-2">Colors</h3>
-            <p className="text-sm text-muted-foreground mb-4">Color system and palettes</p>
-            <Button variant="outline" size="sm">Configure</Button>
-          </div>
-          <div className="p-6 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-semibold mb-2">Spacing</h3>
-            <p className="text-sm text-muted-foreground mb-4">Layout and grid system</p>
-            <Button variant="outline" size="sm">Configure</Button>
-          </div>
-          <div className="p-6 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="font-semibold mb-2">Surfaces</h3>
-            <p className="text-sm text-muted-foreground mb-4">Elevation and materials</p>
-            <Button variant="outline" size="sm">Configure</Button>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   )
 }

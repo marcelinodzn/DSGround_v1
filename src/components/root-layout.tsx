@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -20,8 +21,13 @@ import {
   Ruler,
   Layers,
   Settings,
-  Home
+  Home,
+  Maximize2,
+  Minimize2
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useLayout } from "@/contexts/layout-context"
+import { DocumentationModal } from '@/components/documentation-modal'
 
 function getBreadcrumbItems(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
@@ -38,13 +44,23 @@ export function RootLayoutClient({
 }: {
   children: React.ReactNode
 }) {
+  const { isFullscreen } = useLayout()
   const pathname = usePathname()
   const breadcrumbItems = getBreadcrumbItems(pathname)
+  const [isDocumentationOpen, setIsDocumentationOpen] = useState(false)
+  const showDocumentation = pathname === '/foundations/typography'
+
+  if (isFullscreen) {
+    return children
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Left Sidebar */}
-      <aside className="w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto">
+      <aside className={cn(
+        "w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto transition-transform",
+        isFullscreen && "-translate-x-full"
+      )}>
         <nav className="p-4">
           <div className="mb-6">
             <Logo />
@@ -117,9 +133,16 @@ export function RootLayoutClient({
         </nav>
       </aside>
 
-      <div className="flex-1 ml-64 flex flex-col">
+      <div className={cn(
+        "flex-1 flex flex-col transition-all",
+        isFullscreen ? "ml-0" : "ml-64"
+      )}>
         {/* Header */}
-        <header className="h-16 bg-card border-b flex items-center justify-between px-6 fixed top-0 right-0 left-64 z-10">
+        <header className={cn(
+          "h-16 bg-card border-b flex items-center justify-between px-6 fixed top-0 z-10 transition-all",
+          isFullscreen ? "left-0" : "left-64",
+          "right-0"
+        )}>
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -138,15 +161,27 @@ export function RootLayoutClient({
             </BreadcrumbList>
           </Breadcrumb>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">Documentation</Button>
-            <Button size="sm">New Brand</Button>
+            {showDocumentation && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsDocumentationOpen(true)}
+              >
+                Documentation
+              </Button>
+            )}
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 pl-6 bg-background overflow-y-auto pt-16">
+        <main className="flex-1 bg-background overflow-y-auto pt-16">
           {children}
         </main>
+
+        <DocumentationModal 
+          isOpen={isDocumentationOpen}
+          onClose={() => setIsDocumentationOpen(false)}
+        />
       </div>
     </div>
   )

@@ -64,6 +64,20 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }
+
+  .relative {
+    position: relative;
+  }
+  
+  .collapsible-content {
+    position: relative;
+    z-index: 1;
+  }
+  
+  .button-container {
+    position: relative;
+    z-index: 2;
+  }
 }
  
 @layer base {

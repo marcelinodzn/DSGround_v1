@@ -8,9 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import dynamic from 'next/dynamic'
+import { AnimatedTabs } from "@/components/ui/animated-tabs"
 
 const calculateDistanceBasedSize = (
   distance: number,
@@ -74,45 +74,47 @@ interface StylesViewProps {
 
 // Create a dynamic version of ScaleView with SSR disabled
 const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps) => (
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead className="w-[100px] pl-0">Label</TableHead>
-        <TableHead className="pl-0">Preview</TableHead>
-        <TableHead className="w-[100px] pl-0">Size</TableHead>
-        <TableHead className="w-[100px] pl-0">Scale Factor</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {scaleValues.map((item) => (
-        <TableRow key={item.label} className="h-auto">
-          <TableCell className="font-medium py-4 pl-0">{item.label}</TableCell>
-          <TableCell className="py-4 pl-0">
-            <div className="min-w-0 max-w-full">
-              <div 
-                style={{ 
-                  fontSize: `${Math.round(item.size)}px`,
-                  lineHeight: 1.2,
-                  wordBreak: 'break-word',
-                  overflowWrap: 'break-word',
-                  whiteSpace: 'normal',
-                  minHeight: `${Math.max(item.size * 1.2, 48)}px`,
-                  display: 'flex',
-                  alignItems: 'center'
-                }} 
-              >
-                The quick brown fox jumps over the lazy dog
-              </div>
-            </div>
-          </TableCell>
-          <TableCell className="py-4 pl-0">{Math.round(item.size)}px</TableCell>
-          <TableCell className="py-4 pl-0 text-muted-foreground text-sm">
-            {item.ratio.toFixed(3)}x
-          </TableCell>
+  <div className="w-full min-w-0">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-[100px]">Label</TableHead>
+          <TableHead>Preview</TableHead>
+          <TableHead className="w-[100px] text-right">Size</TableHead>
+          <TableHead className="w-[100px] text-right">Scale Factor</TableHead>
         </TableRow>
-      ))}
-    </TableBody>
-  </Table>
+      </TableHeader>
+      <TableBody>
+        {scaleValues.map((item) => (
+          <TableRow key={item.label}>
+            <TableCell className="font-medium py-6">{item.label}</TableCell>
+            <TableCell className="py-6">
+              <div className="min-w-0">
+                <div 
+                  style={{ 
+                    fontSize: `${Math.round(item.size)}px`,
+                    lineHeight: 1.2,
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'normal',
+                    minHeight: `${Math.max(item.size * 1.2, 48)}px`,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }} 
+                >
+                  The quick brown fox jumps over the lazy dog
+                </div>
+              </div>
+            </TableCell>
+            <TableCell className="py-6 text-right">{Math.round(item.size)}px</TableCell>
+            <TableCell className="text-muted-foreground text-sm py-6 text-right">
+              {item.ratio.toFixed(3)}x
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </div>
 )), { ssr: false })
 
 export function TypeScalePreview() {
@@ -123,68 +125,110 @@ export function TypeScalePreview() {
   } = useTypographyStore()
 
   const currentSettings = platforms.find(p => p.id === currentPlatform)!
-  const { scaleMethod, scale } = currentSettings
+  const { scaleMethod, scale, distanceScale } = currentSettings
   
   const scaleValues = getScaleValues(currentPlatform)
 
+  // Calculate the correct base size based on scale method
+  let displayBaseSize = scale.baseSize
+  if (scaleMethod === 'distance' && distanceScale) {
+    displayBaseSize = calculateDistanceBasedSize(
+      distanceScale.viewingDistance,
+      distanceScale.visualAcuity,
+      distanceScale.meanLengthRatio,
+      distanceScale.textType,
+      distanceScale.lighting,
+      distanceScale.ppi
+    )
+  }
+
   const [view, setView] = useState<'scale' | 'styles'>('scale')
 
+  const viewTabs = [
+    { id: 'scale', label: 'Scale View' },
+    { id: 'styles', label: 'Styles View' }
+  ]
+
   return (
-    <div>
+    <div className="relative w-full">
       <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
         <Separator className="w-screen" />
       </div>
       
-      <div className="flex justify-between items-center px-4 pt-6">
+      <div className="flex justify-between items-center pt-6">
         <div className="py-4 text-sm text-muted-foreground">
-          Base Size: {scale.baseSize}px • Scale Ratio: {scale.ratio} • Steps Up: {scale.stepsUp} • Steps Down: {scale.stepsDown}
+          Base Size: {Math.round(displayBaseSize)}px
+          {scaleMethod === 'distance' && ' (distance-based)'} • 
+          Scale Ratio: {scale.ratio} • 
+          Steps Up: {scale.stepsUp} • 
+          Steps Down: {scale.stepsDown}
         </div>
-        <Tabs value={view} onValueChange={(value) => setView(value as 'scale' | 'styles')}>
-          <TabsList>
-            <TabsTrigger value="scale">Scale View</TabsTrigger>
-            <TabsTrigger value="styles">Styles View</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <AnimatedTabs
+          tabs={viewTabs}
+          defaultTab="scale"
+          onChange={(value) => setView(value as 'scale' | 'styles')}
+          layoutId="preview-view-tabs"
+        />
       </div>
 
-      <div className="p-4">
-        {view === 'scale' ? (
-          <ScaleView scaleValues={scaleValues} />
-        ) : (
-          <StylesView typeStyles={currentSettings.typeStyles} scaleValues={scaleValues} />
-        )}
+      <div className="py-4">
+        <div className="min-w-0 overflow-x-auto">
+          {view === 'scale' ? (
+            <ScaleView scaleValues={scaleValues} />
+          ) : (
+            <StylesView typeStyles={currentSettings.typeStyles} scaleValues={scaleValues} />
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
 function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
+  const { platforms, currentPlatform } = useTypographyStore()
+  const platform = platforms.find(p => p.id === currentPlatform)
+  
+  // Calculate the correct base size based on scale method
+  let displayBaseSize = platform?.scale.baseSize || 16
+  if (platform?.scaleMethod === 'distance' && platform.distanceScale) {
+    displayBaseSize = calculateDistanceBasedSize(
+      platform.distanceScale.viewingDistance,
+      platform.distanceScale.visualAcuity,
+      platform.distanceScale.meanLengthRatio,
+      platform.distanceScale.textType,
+      platform.distanceScale.lighting,
+      platform.distanceScale.ppi
+    )
+  }
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[150px] pl-0">Style</TableHead>
-          <TableHead className="pl-0">Preview</TableHead>
-          <TableHead className="w-[100px] pl-0">Size</TableHead>
-          <TableHead className="w-[100px] pl-0">Properties</TableHead>
+          <TableHead className="w-[100px]">Label</TableHead>
+          <TableHead>Preview</TableHead>
+          <TableHead className="w-[100px] text-right">Size</TableHead>
+          <TableHead className="w-[100px] text-right">Properties</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {typeStyles.map(style => {
           const scaleValue = scaleValues.find(s => s.label === style.scaleStep)
+          const fontSize = scaleValue?.size || displayBaseSize // Use calculated base size if no scale value
+
           return (
-            <TableRow key={style.id} className="h-auto">
-              <TableCell className="font-medium py-4 pl-0">
+            <TableRow key={style.id}>
+              <TableCell className="font-medium py-6">
                 <div className="flex flex-col">
                   <span>{style.name}</span>
                   <span className="text-xs text-muted-foreground">{style.scaleStep}</span>
                 </div>
               </TableCell>
-              <TableCell className="py-4 pl-0">
-                <div className="min-w-0 max-w-full">
+              <TableCell className="py-6">
+                <div className="min-w-0">
                   <div 
                     style={{ 
-                      fontSize: `${scaleValue?.size}px`,
+                      fontSize: `${fontSize}px`,
                       lineHeight: style.lineHeight,
                       fontWeight: style.fontWeight,
                       letterSpacing: `${style.letterSpacing}em`,
@@ -193,7 +237,7 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word',
                       whiteSpace: 'normal',
-                      minHeight: `${Math.max((scaleValue?.size || 16) * style.lineHeight, 48)}px`,
+                      minHeight: `${Math.max(fontSize * style.lineHeight, 48)}px`,
                       display: 'flex',
                       alignItems: 'center'
                     }} 
@@ -202,10 +246,10 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="py-4 pl-0">
-                {scaleValue?.size ? `${Math.round(scaleValue.size)}px` : '-'}
+              <TableCell className="py-6 text-right">
+                {fontSize ? `${Math.round(fontSize)}px` : '-'}
               </TableCell>
-              <TableCell className="py-4 pl-0">
+              <TableCell className="py-6 text-right">
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div>Weight: {style.fontWeight}</div>
                   <div>Line Height: {style.lineHeight}</div>
