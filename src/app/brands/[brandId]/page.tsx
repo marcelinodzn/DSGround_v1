@@ -453,56 +453,6 @@ export const typography = {
                 <div className="grid grid-cols-1 gap-6">
                   <Card>
                     <CardHeader>
-                      <h3 className="font-semibold">Core Tokens</h3>
-                      <p className="text-sm text-muted-foreground">Base design tokens</p>
-                    </CardHeader>
-                    <CardContent>
-                      <AnimatedTabs 
-                        tabs={coreTokenTabs}
-                        defaultTab="colors"
-                        onChange={setActiveCoreTokenTab}
-                        layoutId="core-token-tabs"
-                      />
-                      <div className={activeCoreTokenTab === 'colors' ? 'block' : 'hidden'}>
-                        <Tabs defaultValue="colors">
-                          <TabsList>
-                            <TabsTrigger value="colors">Colors</TabsTrigger>
-                          </TabsList>
-                          <div className="mt-4">
-                            <Button variant="outline" size="sm">Add Token</Button>
-                          </div>
-                        </Tabs>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <h3 className="font-semibold">Semantic Tokens</h3>
-                      <p className="text-sm text-muted-foreground">Theme-specific tokens</p>
-                    </CardHeader>
-                    <CardContent>
-                      <AnimatedTabs 
-                        tabs={semanticTokenTabs}
-                        defaultTab="light"
-                        onChange={setActiveSemanticTokenTab}
-                        layoutId="semantic-token-tabs"
-                      />
-                      <div className={activeSemanticTokenTab === 'light' ? 'block' : 'hidden'}>
-                        <Tabs defaultValue="light">
-                          <TabsList>
-                            <TabsTrigger value="light">Light Theme</TabsTrigger>
-                          </TabsList>
-                          <div className="mt-4">
-                            <Button variant="outline" size="sm">Add Token</Button>
-                          </div>
-                        </Tabs>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="font-semibold">Typography Tokens</h3>
@@ -528,32 +478,7 @@ export const typography = {
                           >
                             Sync to Figma
                           </Button>
-                          <GitHubSyncDialog onSync={async (config) => {
-                            try {
-                              const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN
-                              if (!githubToken) {
-                                throw new Error('GitHub token not configured')
-                              }
-
-                              const styleDictionarySync = new StyleDictionarySync(
-                                githubToken,
-                                config.owner,
-                                config.repo,
-                                config.branch
-                              )
-
-                              const commitSha = await styleDictionarySync.syncToGithub(
-                                generateTypographyTokens(),
-                                config.commitMessage
-                              )
-
-                              console.log('Successfully synced to GitHub:', commitSha)
-                              toast.success('Successfully synced tokens to GitHub')
-                            } catch (error) {
-                              console.error('Failed to sync with GitHub:', error)
-                              toast.error(error instanceof Error ? error.message : 'Failed to sync with GitHub')
-                            }
-                          }} />
+                          <GitHubSyncDialog onSync={handleGitSync} />
                         </div>
                       </div>
                     </CardHeader>
