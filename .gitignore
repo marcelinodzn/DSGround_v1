@@ -7,3 +7,8 @@ node_modules
 # next.js
 .next/
 
+
+# next.js
+.next/
+.next
+
