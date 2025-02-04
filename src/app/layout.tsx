@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { LayoutProvider } from '@/contexts/layout-context'
 import { TypeScaleProvider } from '@/contexts/type-scale-context'
 import { Toaster } from 'sonner'
+import { StoreProvider } from '@/providers/store-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,11 +25,13 @@ export default function RootLayout({
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
         <TypeScaleProvider>
           <LayoutProvider>
-            <RootLayoutClient>
-              <main className="h-[calc(100vh-4rem)] overflow-y-auto">
-                {children}
-              </main>
-            </RootLayoutClient>
+            <StoreProvider>
+              <RootLayoutClient>
+                <main className="h-[calc(100vh-4rem)] overflow-y-auto">
+                  {children}
+                </main>
+              </RootLayoutClient>
+            </StoreProvider>
           </LayoutProvider>
         </TypeScaleProvider>
         <Toaster />

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
 import { CardMenu } from "@/components/ui/card-menu"
+import { usePlatformStore } from "@/store/platform-store"
 
 interface Platform {
   id: string
@@ -28,26 +28,7 @@ interface Platform {
 export default function PlatformsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const [platforms, setPlatforms] = useState<Platform[]>(() => {
-    // Load platforms from localStorage
-    const savedPlatforms = JSON.parse(localStorage.getItem('platforms') || '[]')
-    return savedPlatforms.length > 0 ? savedPlatforms : [{
-      id: 'web',
-      name: 'Web Platform',
-      description: 'Default web platform configuration',
-      createdAt: new Date().toISOString(),
-      units: {
-        distance: 'rem',
-        typography: 'rem'
-      },
-      layout: {
-        baseSize: 16,
-        gridColumns: 12,
-        gridGutter: 24,
-        containerPadding: 16
-      }
-    }]
-  })
+  const { platforms, deletePlatform, duplicatePlatform, updatePlatform } = usePlatformStore()
 
   const handleAddPlatform = () => {
     router.push('/platforms/new')
@@ -59,31 +40,17 @@ export default function PlatformsPage() {
 
   const handleDeletePlatform = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updatedPlatforms = platforms.filter(p => p.id !== id)
-    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
-    setPlatforms(updatedPlatforms)
+    deletePlatform(id)
   }
 
-  const handleDuplicatePlatform = (platform: Platform, e: React.MouseEvent) => {
+  const handleDuplicatePlatform = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const newPlatform = {
-      ...platform,
-      id: crypto.randomUUID(),
-      name: `${platform.name} (Copy)`,
-      createdAt: new Date().toISOString()
-    }
-    const updatedPlatforms = [...platforms, newPlatform]
-    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
-    setPlatforms(updatedPlatforms)
+    duplicatePlatform(id)
   }
 
   const handleEditPlatform = (id: string, newName: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updatedPlatforms = platforms.map(p => 
-      p.id === id ? { ...p, name: newName } : p
-    )
-    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
-    setPlatforms(updatedPlatforms)
+    updatePlatform(id, { name: newName })
   }
 
   return (
@@ -143,7 +110,7 @@ export default function PlatformsPage() {
                     if (newName) handleEditPlatform(platform.id, newName, e)
                   }}
                   onDelete={(e) => handleDeletePlatform(platform.id, e)}
-                  onDuplicate={(e) => handleDuplicatePlatform(platform, e)}
+                  onDuplicate={(e) => handleDuplicatePlatform(platform.id, e)}
                 />
               </div>
             ))}

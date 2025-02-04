@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
+import { usePlatformStore, Platform } from "@/store/platform-store"
 
 interface PlatformForm {
   name: string
@@ -31,21 +32,11 @@ interface PlatformForm {
 export default function NewPlatformPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const [formData, setFormData] = useState<PlatformForm>({
+  const addPlatform = usePlatformStore((state) => state.addPlatform)
+
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
-    units: {
-      distance: 'px',
-      typography: 'rem',
-      spacing: 'px',
-      dimensions: 'px'
-    },
-    layout: {
-      baseSize: 16,
-      gridColumns: 12,
-      gridGutter: 24,
-      containerPadding: 16
-    }
   })
 
   const handleSubmit = () => {
@@ -53,17 +44,12 @@ export default function NewPlatformPage() {
       return
     }
 
-    // Get existing platforms from localStorage
-    const existingPlatforms = JSON.parse(localStorage.getItem('platforms') || '[]')
-    
-    // Add new platform with all required properties and common defaults
-    const newPlatform = {
+    const newPlatform: Platform = {
       id: crypto.randomUUID(),
       name: formData.name,
       description: formData.description,
       createdAt: new Date().toISOString(),
       units: {
-        distance: 'px',
         typography: 'rem',
         spacing: 'px',
         dimensions: 'px'
@@ -76,8 +62,7 @@ export default function NewPlatformPage() {
       }
     }
     
-    localStorage.setItem('platforms', JSON.stringify([...existingPlatforms, newPlatform]))
-    
+    addPlatform(newPlatform)
     router.push('/platforms')
   }
 
