@@ -16,8 +16,12 @@ interface PlatformSettings {
   name: string
   description: string
   units: {
-    distance: 'px' | 'rem' | 'pt'
-    typography: 'px' | 'rem' | 'pt'
+    // Font sizing units
+    typography: 'rem' | 'em' | 'ch' | 'ex' | 'vw' | 'vh' | '%' | 'px' | 'pt' | 'pc'
+    // Spacing units
+    spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
+    // Dimension units
+    dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
   }
   layout: {
     baseSize: number
@@ -41,17 +45,17 @@ export default function PlatformPage({ params }: { params: { platformId: string 
   ]
 
   useEffect(() => {
-    // Load platform data from localStorage
     const platforms = JSON.parse(localStorage.getItem('platforms') || '[]')
     const currentPlatform = platforms.find((p: PlatformSettings) => p.id === params.platformId)
     
     if (currentPlatform) {
-      // Ensure all required properties exist
+      // Ensure all required properties exist with common defaults
       const platformWithDefaults = {
         ...currentPlatform,
-        units: currentPlatform.units || {
-          distance: 'px',
-          typography: 'px'
+        units: {
+          typography: currentPlatform.units?.typography || 'rem', // rem is most common for typography
+          spacing: currentPlatform.units?.spacing || 'px',      // px is most common for spacing
+          dimensions: currentPlatform.units?.dimensions || 'px'  // px is most common for dimensions
         },
         layout: currentPlatform.layout || {
           baseSize: 16,
@@ -157,7 +161,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                 </Card>
                 <Card className="p-6">
                   <h3 className="text-sm font-medium text-muted-foreground">Distance Unit</h3>
-                  <p className="text-2xl font-bold mt-2">{platform.units.distance}</p>
+                  <p className="text-2xl font-bold mt-2">{platform.units.dimensions}</p>
                 </Card>
                 <Card className="p-6">
                   <h3 className="text-sm font-medium text-muted-foreground">Typography Unit</h3>
@@ -171,35 +175,13 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                 <CardHeader>
                   <h3 className="font-semibold">Unit Settings</h3>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Distance Unit</Label>
-                      <Select
-                        value={platform.units.distance}
-                        onValueChange={(value: 'px' | 'rem' | 'pt') => 
-                          setPlatform(p => p ? {
-                            ...p,
-                            units: { ...p.units, distance: value }
-                          } : null)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="px">Pixels (px)</SelectItem>
-                          <SelectItem value="rem">REM</SelectItem>
-                          <SelectItem value="pt">Points (pt)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Typography Unit</Label>
+                      <Label>Typography Units</Label>
                       <Select
                         value={platform.units.typography}
-                        onValueChange={(value: 'px' | 'rem' | 'pt') => 
+                        onValueChange={(value: PlatformSettings['units']['typography']) => 
                           setPlatform(p => p ? {
                             ...p,
                             units: { ...p.units, typography: value }
@@ -207,14 +189,76 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
+                          <SelectValue placeholder="Select typography unit" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="px">Pixels (px)</SelectItem>
                           <SelectItem value="rem">REM</SelectItem>
+                          <SelectItem value="em">EM</SelectItem>
+                          <SelectItem value="ch">CH</SelectItem>
+                          <SelectItem value="ex">EX</SelectItem>
+                          <SelectItem value="vw">VW</SelectItem>
+                          <SelectItem value="vh">VH</SelectItem>
+                          <SelectItem value="%">Percentage (%)</SelectItem>
+                          <SelectItem value="px">Pixels (px)</SelectItem>
                           <SelectItem value="pt">Points (pt)</SelectItem>
+                          <SelectItem value="pc">Picas (pc)</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-sm text-muted-foreground">Used for font sizes and text-related measurements</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Spacing Units</Label>
+                      <Select
+                        value={platform.units.spacing}
+                        onValueChange={(value: PlatformSettings['units']['spacing']) => 
+                          setPlatform(p => p ? {
+                            ...p,
+                            units: { ...p.units, spacing: value }
+                          } : null)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select spacing unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rem">REM</SelectItem>
+                          <SelectItem value="em">EM</SelectItem>
+                          <SelectItem value="vw">VW</SelectItem>
+                          <SelectItem value="vh">VH</SelectItem>
+                          <SelectItem value="%">Percentage (%)</SelectItem>
+                          <SelectItem value="px">Pixels (px)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">Used for margins, padding, and general spacing</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Dimension Units</Label>
+                      <Select
+                        value={platform.units.dimensions}
+                        onValueChange={(value: PlatformSettings['units']['dimensions']) => 
+                          setPlatform(p => p ? {
+                            ...p,
+                            units: { ...p.units, dimensions: value }
+                          } : null)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select dimension unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="%">Percentage (%)</SelectItem>
+                          <SelectItem value="vw">Viewport Width (vw)</SelectItem>
+                          <SelectItem value="vh">Viewport Height (vh)</SelectItem>
+                          <SelectItem value="px">Pixels (px)</SelectItem>
+                          <SelectItem value="cm">Centimeters (cm)</SelectItem>
+                          <SelectItem value="mm">Millimeters (mm)</SelectItem>
+                          <SelectItem value="in">Inches (in)</SelectItem>
+                          <SelectItem value="m">Meters (m)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">Used for widths, heights, and fixed dimensions</p>
                     </div>
                   </div>
                 </CardContent>

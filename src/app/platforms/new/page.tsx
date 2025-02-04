@@ -17,6 +17,8 @@ interface PlatformForm {
   units: {
     distance: 'px' | 'rem' | 'pt'
     typography: 'px' | 'rem' | 'pt'
+    spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
+    dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
   }
   layout: {
     baseSize: number
@@ -34,7 +36,9 @@ export default function NewPlatformPage() {
     description: '',
     units: {
       distance: 'px',
-      typography: 'px'
+      typography: 'rem',
+      spacing: 'px',
+      dimensions: 'px'
     },
     layout: {
       baseSize: 16,
@@ -52,7 +56,7 @@ export default function NewPlatformPage() {
     // Get existing platforms from localStorage
     const existingPlatforms = JSON.parse(localStorage.getItem('platforms') || '[]')
     
-    // Add new platform with all required properties
+    // Add new platform with all required properties and common defaults
     const newPlatform = {
       id: crypto.randomUUID(),
       name: formData.name,
@@ -60,7 +64,9 @@ export default function NewPlatformPage() {
       createdAt: new Date().toISOString(),
       units: {
         distance: 'px',
-        typography: 'px'
+        typography: 'rem',
+        spacing: 'px',
+        dimensions: 'px'
       },
       layout: {
         baseSize: 16,
