@@ -6,6 +6,7 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { CardMenu } from "@/components/ui/card-menu"
 
 interface Brand {
   id: string
@@ -32,6 +33,35 @@ export default function BrandsPage() {
 
   const handleViewBrand = (brandId: string) => {
     router.push(`/brands/${brandId}`)
+  }
+
+  const handleDeleteBrand = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updatedBrands = brands.filter(b => b.id !== id)
+    localStorage.setItem('brands', JSON.stringify(updatedBrands))
+    setBrands(updatedBrands)
+  }
+
+  const handleDuplicateBrand = (brand: Brand, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newBrand = {
+      ...brand,
+      id: crypto.randomUUID(),
+      name: `${brand.name} (Copy)`,
+      createdAt: new Date().toISOString()
+    }
+    const updatedBrands = [...brands, newBrand]
+    localStorage.setItem('brands', JSON.stringify(updatedBrands))
+    setBrands(updatedBrands)
+  }
+
+  const handleEditBrand = (id: string, newName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updatedBrands = brands.map(b => 
+      b.id === id ? { ...b, name: newName } : b
+    )
+    localStorage.setItem('brands', JSON.stringify(updatedBrands))
+    setBrands(updatedBrands)
   }
 
   return (
@@ -74,15 +104,28 @@ export default function BrandsPage() {
             
             {/* Brand cards */}
             {brands.map((brand) => (
-              <Button
-                key={brand.id}
-                variant="outline"
-                className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent"
-                onClick={() => handleViewBrand(brand.id)}
-              >
-                <h3 className="font-semibold">{brand.name}</h3>
-                <p className="text-sm text-muted-foreground text-left line-clamp-2">{brand.description}</p>
-              </Button>
+              <div key={brand.id} className="relative group">
+                <Button
+                  variant="outline"
+                  className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent w-full"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleViewBrand(brand.id)
+                  }}
+                >
+                  <h3 className="font-semibold">{brand.name}</h3>
+                  <p className="text-sm text-muted-foreground text-left line-clamp-2">{brand.description}</p>
+                </Button>
+                <CardMenu
+                  onEdit={(e) => {
+                    const newName = prompt('Enter new name:', brand.name)
+                    if (newName) handleEditBrand(brand.id, newName, e)
+                  }}
+                  onDelete={(e) => handleDeleteBrand(brand.id, e)}
+                  onDuplicate={(e) => handleDuplicateBrand(brand, e)}
+                  onShare={() => {/* Implement sharing functionality */}}
+                />
+              </div>
             ))}
           </div>
         </div>

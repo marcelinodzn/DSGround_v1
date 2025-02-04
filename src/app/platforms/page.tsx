@@ -6,6 +6,7 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { CardMenu } from "@/components/ui/card-menu"
 
 interface Platform {
   id: string
@@ -56,6 +57,35 @@ export default function PlatformsPage() {
     router.push(`/platforms/${id}`)
   }
 
+  const handleDeletePlatform = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updatedPlatforms = platforms.filter(p => p.id !== id)
+    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
+    setPlatforms(updatedPlatforms)
+  }
+
+  const handleDuplicatePlatform = (platform: Platform, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newPlatform = {
+      ...platform,
+      id: crypto.randomUUID(),
+      name: `${platform.name} (Copy)`,
+      createdAt: new Date().toISOString()
+    }
+    const updatedPlatforms = [...platforms, newPlatform]
+    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
+    setPlatforms(updatedPlatforms)
+  }
+
+  const handleEditPlatform = (id: string, newName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updatedPlatforms = platforms.map(p => 
+      p.id === id ? { ...p, name: newName } : p
+    )
+    localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
+    setPlatforms(updatedPlatforms)
+  }
+
   return (
     <div className={cn(
       "h-full flex transition-all duration-300 ease-in-out",
@@ -96,17 +126,26 @@ export default function PlatformsPage() {
             
             {/* Platform cards */}
             {platforms.map((platform) => (
-              <Button
-                key={platform.id}
-                variant="outline"
-                className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent"
-                onClick={() => handleViewPlatform(platform.id)}
-              >
-                <h3 className="font-semibold">{platform.name}</h3>
-                <p className="text-sm text-muted-foreground text-left line-clamp-2">
-                  {platform.description}
-                </p>
-              </Button>
+              <div key={platform.id} className="relative group">
+                <Button
+                  variant="outline"
+                  className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent w-full"
+                  onClick={() => handleViewPlatform(platform.id)}
+                >
+                  <h3 className="font-semibold">{platform.name}</h3>
+                  <p className="text-sm text-muted-foreground text-left line-clamp-2">
+                    {platform.description}
+                  </p>
+                </Button>
+                <CardMenu
+                  onEdit={(e) => {
+                    const newName = prompt('Enter new name:', platform.name)
+                    if (newName) handleEditPlatform(platform.id, newName, e)
+                  }}
+                  onDelete={(e) => handleDeletePlatform(platform.id, e)}
+                  onDuplicate={(e) => handleDuplicatePlatform(platform, e)}
+                />
+              </div>
             ))}
           </div>
         </div>
