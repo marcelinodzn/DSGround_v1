@@ -12,18 +12,39 @@ interface Platform {
   name: string
   description: string
   createdAt: string
+  units: {
+    distance: 'px' | 'rem' | 'pt'
+    typography: 'px' | 'rem' | 'pt'
+  }
+  layout: {
+    baseSize: number
+    gridColumns: number
+    gridGutter: number
+    containerPadding: number
+  }
 }
 
 export default function PlatformsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
   const [platforms, setPlatforms] = useState<Platform[]>(() => {
-    // Initialize with Web platform
-    return [{
+    // Load platforms from localStorage
+    const savedPlatforms = JSON.parse(localStorage.getItem('platforms') || '[]')
+    return savedPlatforms.length > 0 ? savedPlatforms : [{
       id: 'web',
       name: 'Web Platform',
       description: 'Default web platform configuration',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      units: {
+        distance: 'rem',
+        typography: 'rem'
+      },
+      layout: {
+        baseSize: 16,
+        gridColumns: 12,
+        gridGutter: 24,
+        containerPadding: 16
+      }
     }]
   })
 

@@ -41,27 +41,44 @@ export default function PlatformPage({ params }: { params: { platformId: string 
   ]
 
   useEffect(() => {
-    // Load platform data
-    setPlatform({
-      id: params.platformId,
-      name: 'Web Platform',
-      description: 'Default web platform configuration',
-      units: {
-        distance: 'rem',
-        typography: 'rem'
-      },
-      layout: {
-        baseSize: 16,
-        gridColumns: 12,
-        gridGutter: 24,
-        containerPadding: 16
+    // Load platform data from localStorage
+    const platforms = JSON.parse(localStorage.getItem('platforms') || '[]')
+    const currentPlatform = platforms.find((p: PlatformSettings) => p.id === params.platformId)
+    
+    if (currentPlatform) {
+      // Ensure all required properties exist
+      const platformWithDefaults = {
+        ...currentPlatform,
+        units: currentPlatform.units || {
+          distance: 'px',
+          typography: 'px'
+        },
+        layout: currentPlatform.layout || {
+          baseSize: 16,
+          gridColumns: 12,
+          gridGutter: 24,
+          containerPadding: 16
+        }
       }
-    })
-    setPlatformName('Web Platform')
+      setPlatform(platformWithDefaults)
+      setPlatformName(platformWithDefaults.name)
+    }
   }, [params.platformId])
 
   const handleNameSave = () => {
     if (platformName.trim() && platform) {
+      // Get existing platforms
+      const platforms = JSON.parse(localStorage.getItem('platforms') || '[]')
+      
+      // Update the platform name while preserving other properties
+      const updatedPlatforms = platforms.map((p: PlatformSettings) => 
+        p.id === platform.id ? { ...platform, name: platformName } : p
+      )
+      
+      // Save back to localStorage
+      localStorage.setItem('platforms', JSON.stringify(updatedPlatforms))
+      
+      // Update local state
       setPlatform({ ...platform, name: platformName })
       setIsEditingName(false)
     }
