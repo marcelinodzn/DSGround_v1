@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
 import { Sparkles } from "lucide-react"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
+import { usePlatformStore } from "@/store/platform-store"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -190,16 +191,25 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
 }
 
 export function PropertiesPanel() {
-  const { 
+  const platforms = usePlatformStore((state) => state.platforms)
+  const {
     currentPlatform,
-    platforms,
     setCurrentPlatform,
     updatePlatform,
-    copyTypeStylesToAllPlatforms
+    copyTypeStylesToAllPlatforms,
+    platforms: typographyPlatforms,
+    initializePlatform
   } = useTypographyStore()
 
-  const currentSettings = platforms.find(p => p.id === currentPlatform)!
+  // DnD hooks
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
+  // State hooks
   const [selectedDevice, setSelectedDevice] = useState('')
   const [selectedContext, setSelectedContext] = useState('')
   const [selectedLocation, setSelectedLocation] = useState('')
@@ -212,17 +222,43 @@ export function PropertiesPanel() {
   const [imageAnalysis, setImageAnalysis] = useState<string | null>(null)
   const [activeViewTab, setActiveViewTab] = useState('scale')
   const [activeAnalysisTab, setActiveAnalysisTab] = useState('platform')
+
+  // Effect hooks
+  useEffect(() => {
+    if (platforms.length > 0) {
+      // Initialize typography settings for each platform if needed
+      platforms.forEach(platform => {
+        if (!typographyPlatforms.find(p => p.id === platform.id)) {
+          initializePlatform(platform.id)
+        }
+      })
+      
+      // Set current platform if none selected
+      if (!currentPlatform) {
+        setCurrentPlatform(platforms[0].id)
+      }
+    }
+  }, [platforms, typographyPlatforms, currentPlatform, initializePlatform, setCurrentPlatform])
+
+  // Find current settings
+  const currentSettings = typographyPlatforms.find(p => p.id === currentPlatform)
   
+  if (!currentSettings) {
+    return null
+  }
+
+  // Constants
   const viewTabs = [
     { id: 'scale', label: 'Scale View' },
     { id: 'styles', label: 'Styles View' }
-  ];
+  ]
 
   const analysisTabs = [
     { id: 'platform', label: 'Platform Analysis' },
     { id: 'image', label: 'Image Analysis' }
-  ];
+  ]
 
+  // Event handlers
   const handleScaleMethodChange = (method: ScaleMethod) => {
     updatePlatform(currentPlatform, { scaleMethod: method })
   }
@@ -323,13 +359,6 @@ export function PropertiesPanel() {
       copyTypeStylesToAllPlatforms(currentStyles);
     }
   };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   const handleAIScaleGeneration = async () => {
     try {

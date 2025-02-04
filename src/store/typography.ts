@@ -49,6 +49,7 @@ interface TypographyState {
   updatePlatform: (platformId: string, updates: Partial<Platform>) => void
   getScaleValues: (platformId: string) => { size: number; ratio: number; label: string }[]
   copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => void
+  initializePlatform: (platformId: string) => void
 }
 
 const defaultAccessibility = {
@@ -208,15 +209,43 @@ const initialPlatforms: Platform[] = [
   },
 ]
 
-export const useTypographyStore = create(
-  persist<TypographyState>(
+export const useTypographyStore = create<TypographyState>()(
+  persist(
     (set, get) => ({
-      currentPlatform: 'web',
-      platforms: initialPlatforms,
+      currentPlatform: '',
+      platforms: [],
       
-      setCurrentPlatform: (platformId) =>
-        set({ currentPlatform: platformId }),
-        
+      setCurrentPlatform: (platformId) => {
+        const state = get()
+        // Initialize platform if it doesn't exist
+        if (!state.platforms.find(p => p.id === platformId)) {
+          get().initializePlatform(platformId)
+        }
+        set({ currentPlatform: platformId })
+      },
+
+      // Add this new function to initialize typography settings for a platform
+      initializePlatform: (platformId) => {
+        set((state) => ({
+          platforms: [...state.platforms, {
+            id: platformId,
+            name: platformId,
+            scaleMethod: 'modular',
+            scale: { ...defaultScale },
+            distanceScale: {
+              viewingDistance: 50,
+              visualAcuity: 1,
+              meanLengthRatio: 1,
+              textType: 'continuous',
+              lighting: 'good',
+              ppi: 96
+            },
+            accessibility: { ...defaultAccessibility },
+            typeStyles: [...defaultTypeStyles]
+          }]
+        }))
+      },
+
       updatePlatform: (platformId, updates) => {
         set((state) => ({
           platforms: state.platforms.map((platform) => {
@@ -350,34 +379,7 @@ export const useTypographyStore = create(
       },
     }),
     {
-      name: 'typography-storage',
-      version: 1,
-      partialize: (state) => ({ 
-        platforms: state.platforms,
-        currentPlatform: state.currentPlatform 
-      }),
-      migrate: (persistedState: any, version: number) => {
-        if (version === 0) {
-          return {
-            ...persistedState,
-            platforms: persistedState.platforms.map((platform: Platform) => ({
-              ...platform,
-              typeStyles: platform.typeStyles || [...defaultTypeStyles]
-            }))
-          }
-        }
-        return persistedState
-      },
-      merge: (persistedState: any, currentState: TypographyState) => {
-        return {
-          ...currentState,
-          ...persistedState,
-          platforms: persistedState.platforms.map((platform: Platform) => ({
-            ...platform,
-            typeStyles: platform.typeStyles || [...defaultTypeStyles]
-          }))
-        }
-      }
+      name: 'typography-store',
     }
   )
 )

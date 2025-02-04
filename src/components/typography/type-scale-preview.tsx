@@ -118,15 +118,28 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps
 )), { ssr: false })
 
 export function TypeScalePreview() {
-  const { 
+  const {
     currentPlatform,
     platforms,
     getScaleValues
   } = useTypographyStore()
-
-  const currentSettings = platforms.find(p => p.id === currentPlatform)!
-  const { scaleMethod, scale, distanceScale } = currentSettings
   
+  const [view, setView] = useState<'scale' | 'styles'>('scale')
+
+  const viewTabs = [
+    { id: 'scale', label: 'Scale View' },
+    { id: 'styles', label: 'Styles View' }
+  ]
+
+  // Find current settings and handle the case where none are found
+  const currentSettings = platforms.find(p => p.id === currentPlatform)
+  
+  // If no settings found, show loading or return null
+  if (!currentSettings) {
+    return null
+  }
+
+  const { scaleMethod, scale, distanceScale } = currentSettings
   const scaleValues = getScaleValues(currentPlatform)
 
   // Calculate the correct base size based on scale method
@@ -141,13 +154,6 @@ export function TypeScalePreview() {
       distanceScale.ppi
     )
   }
-
-  const [view, setView] = useState<'scale' | 'styles'>('scale')
-
-  const viewTabs = [
-    { id: 'scale', label: 'Scale View' },
-    { id: 'styles', label: 'Styles View' }
-  ]
 
   return (
     <div className="relative w-full">
