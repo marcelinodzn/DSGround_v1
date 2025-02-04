@@ -122,11 +122,18 @@ export function RootLayoutClient({
               <Separator className="-mx-4 w-[calc(100%+32px)]" />
               <h3 className="px-4 mt-4 text-sm font-medium text-muted-foreground mb-2">Settings</h3>
               <Link 
-                href="/sync" 
+                href="/settings" 
                 className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
               >
                 <Settings className="w-4 h-4 mr-2" />
-                Sync Settings
+                Settings
+              </Link>
+              <Link 
+                href="/platforms" 
+                className="flex items-center px-4 py-2 text-xs hover:bg-accent rounded-md"
+              >
+                <Layers className="w-4 h-4 mr-2" />
+                Platforms
               </Link>
             </div>
           </div>

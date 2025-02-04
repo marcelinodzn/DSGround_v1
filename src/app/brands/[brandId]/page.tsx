@@ -2,7 +2,7 @@
 
 import { useLayout } from "@/contexts/layout-context"
 import { Button } from "@/components/ui/button"
-import { Maximize2, Minimize2, Pencil, Copy, Check, Type, Palette, Ruler, Layers, ArrowRight } from 'lucide-react'
+import { Maximize2, Minimize2, Pencil, Copy, Check, Type, Palette, Ruler, Layers, ArrowRight, Trash2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
@@ -41,6 +41,15 @@ interface TokenCollection {
   themes: Record<string, Token[]>
 }
 
+// Add new platform interface and state
+interface PlatformSettings {
+  id: string
+  name: string
+  distanceUnit: 'px' | 'rem' | 'pt'
+  baseSize: number
+  typeUnit: 'px' | 'rem' | 'pt'
+}
+
 export default function BrandPage({ params }: { params: { brandId: string } }) {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const [brand, setBrand] = useState<any>(null)
@@ -72,13 +81,22 @@ export default function BrandPage({ params }: { params: { brandId: string } }) {
   const [activeTokenTab, setActiveTokenTab] = useState('css')
   const [activeCoreTokenTab, setActiveCoreTokenTab] = useState('colors')
   const [activeSemanticTokenTab, setActiveSemanticTokenTab] = useState('light')
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings[]>([
+    {
+      id: 'web',
+      name: 'Web',
+      distanceUnit: 'rem',
+      baseSize: 16,
+      typeUnit: 'rem'
+    }
+  ])
 
   const mainTabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'foundations', label: 'Foundations' },
     { id: 'tokens', label: 'Tokens' },
-    { id: 'sync', label: 'Sync' },
     { id: 'settings', label: 'Settings' },
+    { id: 'platforms', label: 'Platforms' },
   ]
 
   const tokenTabs = [
@@ -275,6 +293,28 @@ export const typography = {
       console.error('Failed to sync with GitHub:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to sync with GitHub')
     }
+  }
+
+  // Add platform management functions
+  const handleAddPlatform = () => {
+    const newPlatform: PlatformSettings = {
+      id: crypto.randomUUID(),
+      name: 'New Platform',
+      distanceUnit: 'px',
+      baseSize: 16,
+      typeUnit: 'px'
+    }
+    setPlatformSettings([...platformSettings, newPlatform])
+  }
+
+  const handleUpdatePlatform = (id: string, updates: Partial<PlatformSettings>) => {
+    setPlatformSettings(platforms => 
+      platforms.map(p => p.id === id ? { ...p, ...updates } : p)
+    )
+  }
+
+  const handleDeletePlatform = (id: string) => {
+    setPlatformSettings(platforms => platforms.filter(p => p.id !== id))
   }
 
   return (
@@ -569,87 +609,96 @@ export const typography = {
               </div>
             )}
 
-            {activeMainTab === 'sync' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold">Figma Sync</h3>
-                    <p className="text-sm text-muted-foreground">Sync tokens with Figma</p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Status</p>
-                        <p className="text-sm text-muted-foreground">Not connected</p>
-                      </div>
-                      <Button variant="outline" size="sm">Connect to Figma</Button>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Figma File</Label>
-                      <Input placeholder="Enter Figma file URL" />
-                    </div>
-                    <Button className="w-full" disabled>Sync with Figma</Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold">Git Sync</h3>
-                    <p className="text-sm text-muted-foreground">Sync tokens to Git repository</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Repository Owner</Label>
-                        <Input 
-                          placeholder="e.g., your-username" 
-                          value={githubConfig.owner}
-                          onChange={(e) => setGithubConfig(prev => ({ ...prev, owner: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Repository Name</Label>
-                        <Input 
-                          placeholder="e.g., design-tokens" 
-                          value={githubConfig.repo}
-                          onChange={(e) => setGithubConfig(prev => ({ ...prev, repo: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Branch</Label>
-                        <Input 
-                          placeholder="e.g., main" 
-                          value={githubConfig.branch}
-                          onChange={(e) => setGithubConfig(prev => ({ ...prev, branch: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Commit Message</Label>
-                        <Input 
-                          placeholder="Update typography tokens" 
-                          value={githubConfig.commitMessage}
-                          onChange={(e) => setGithubConfig(prev => ({ ...prev, commitMessage: e.target.value }))}
-                        />
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={handleGitSync}
-                        disabled={!githubConfig.owner || !githubConfig.repo}
-                      >
-                        Sync with GitHub
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
             {activeMainTab === 'settings' && (
               <div className="space-y-6">
                 <Card className="p-6">
                   <h3 className="font-semibold mb-4">Brand Settings</h3>
                   {/* Brand settings form will go here */}
                 </Card>
+              </div>
+            )}
+
+            {activeMainTab === 'platforms' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Platforms</h3>
+                  <Button onClick={handleAddPlatform}>Add Platform</Button>
+                </div>
+                
+                <div className="grid gap-6">
+                  {platformSettings.map(platform => (
+                    <Card key={platform.id}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <Input
+                            value={platform.name}
+                            onChange={(e) => handleUpdatePlatform(platform.id, { name: e.target.value })}
+                            className="w-[200px] h-8"
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeletePlatform(platform.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-2">
+                            <Label>Distance Unit</Label>
+                            <Select
+                              value={platform.distanceUnit}
+                              onValueChange={(value: 'px' | 'rem' | 'pt') => 
+                                handleUpdatePlatform(platform.id, { distanceUnit: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="px">Pixels (px)</SelectItem>
+                                <SelectItem value="rem">REM</SelectItem>
+                                <SelectItem value="pt">Points (pt)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Base Size</Label>
+                            <Input
+                              type="number"
+                              value={platform.baseSize}
+                              onChange={(e) => handleUpdatePlatform(platform.id, { 
+                                baseSize: parseInt(e.target.value) 
+                              })}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Typography Unit</Label>
+                            <Select
+                              value={platform.typeUnit}
+                              onValueChange={(value: 'px' | 'rem' | 'pt') => 
+                                handleUpdatePlatform(platform.id, { typeUnit: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="px">Pixels (px)</SelectItem>
+                                <SelectItem value="rem">REM</SelectItem>
+                                <SelectItem value="pt">Points (pt)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             )}
           </div>
