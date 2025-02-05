@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import {
   Table,
   TableBody,
@@ -32,6 +32,8 @@ import { calculateScale, calculateDistanceBasedSize } from '@/lib/scale-calculat
 import { generatePDF } from '@/lib/generate-pdf'
 import { Platform, ScaleValue, TypeStyle } from '@/types/typography'
 import { useTypographyStore } from '@/store/typography'
+import { usePlatformStore } from "@/store/platform-store"
+import { Label } from "@/components/ui/label"
 
 export function DocumentationModal({
   isOpen,
@@ -40,17 +42,24 @@ export function DocumentationModal({
   isOpen: boolean
   onClose: () => void
 }) {
-  const { platforms, currentPlatform, getScaleValues } = useTypographyStore()
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('all')
+  const { platforms } = usePlatformStore()
+  const { 
+    platforms: typographyPlatforms, 
+    getScaleValues 
+  } = useTypographyStore()
   
-  useEffect(() => {
-    setSelectedPlatform('all')
-  }, [currentPlatform])
-
+  const [selectedPlatform, setSelectedPlatform] = useState('all')
+  const [activeTab, setActiveTab] = useState('overview')
+  
   const scaleMethodExplanations = {
     'modular': 'Modular scales use a mathematical ratio to create harmonious size relationships. Each step is multiplied by the ratio, creating exponential growth.',
     'linear': 'Linear scales add a fixed value to each step, creating consistent size increments. This results in more predictable, evenly-spaced type sizes.',
     'custom': 'Custom scales allow you to define specific values for each step, giving you complete control over your typography hierarchy.'
+  }
+
+  // Helper function to get typography data for a platform
+  const getTypographyData = (platformId: string) => {
+    return typographyPlatforms.find(p => p.id === platformId)
   }
 
   const generateScaleTable = () => {
@@ -59,9 +68,11 @@ export function DocumentationModal({
     }
 
     const platform = platforms.find(p => p.id === selectedPlatform)
-    if (!platform) return null
+    const typographyData = getTypographyData(selectedPlatform)
+    if (!platform || !typographyData) return null
 
     const scaleValues = getScaleValues(selectedPlatform)
+    if (!scaleValues) return null
     
     return (
       <Table>
@@ -77,9 +88,9 @@ export function DocumentationModal({
         </TableHeader>
         <TableBody>
           {scaleValues.map((value) => {
-            const stylesAtScale = platform.typeStyles.filter(
+            const stylesAtScale = typographyData.typeStyles?.filter(
               style => style.scaleStep === value.label
-            )
+            ) || []
             
             return (
               <TableRow key={value.label}>
@@ -102,13 +113,12 @@ export function DocumentationModal({
   }
 
   const renderTypeStyleTable = () => {
-    if (selectedPlatform === 'all') {
-      return null // Don't show type style table for all platforms view
-    }
+    if (selectedPlatform === 'all') return null;
 
-    const platform = platforms.find(p => p.id === selectedPlatform)
-    if (!platform) return null
-    
+    const platform = platforms.find(p => p.id === selectedPlatform);
+    const typographyData = getTypographyData(selectedPlatform);
+    if (!platform || !typographyData?.typeStyles) return null;
+
     return (
       <Table>
         <TableCaption>Type Styles for {platform.name}</TableCaption>
@@ -124,9 +134,9 @@ export function DocumentationModal({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {platform.typeStyles.map((style) => {
-            const scaleValue = platform.getScaleValues?.(platform.id)
-              ?.find(s => s.label === style.scaleStep)
+          {typographyData.typeStyles.map((style) => {
+            const scaleValue = getScaleValues(selectedPlatform)
+              ?.find(s => s.label === style.scaleStep);
 
             return (
               <TableRow key={style.id}>
@@ -140,11 +150,11 @@ export function DocumentationModal({
                 <TableCell>{style.scaleStep}</TableCell>
                 <TableCell>{style.opticalSize}</TableCell>
               </TableRow>
-            )
+            );
           })}
         </TableBody>
       </Table>
-    )
+    );
   }
 
   const renderPreviewTable = () => (
@@ -161,10 +171,13 @@ export function DocumentationModal({
       <TableBody>
         {platforms
           .filter(platform => selectedPlatform === 'all' || platform.id === selectedPlatform)
-          .flatMap(platform =>
-            platform.typeStyles.map(style => {
-              const scaleValue = platform.getScaleValues?.(platform.id)
-                .find(s => s.label === style.scaleStep)
+          .flatMap(platform => {
+            const typographyData = getTypographyData(platform.id)
+            if (!typographyData?.typeStyles) return []
+
+            return typographyData.typeStyles.map(style => {
+              const scaleValue = getScaleValues(platform.id)
+                ?.find(s => s.label === style.scaleStep)
 
               return (
                 <TableRow key={`${platform.id}-${style.id}`}>
@@ -194,15 +207,13 @@ export function DocumentationModal({
                 </TableRow>
               )
             })
-          )}
+          })}
       </TableBody>
     </Table>
   )
 
   // Platform comparison table with correct base size calculations
   const PlatformComparison = () => {
-    const { platforms, getScaleValues } = useTypographyStore()
-    
     return (
       <Table>
         <TableCaption>Platform Scale Settings</TableCaption>
@@ -219,17 +230,20 @@ export function DocumentationModal({
           {platforms
             .filter(platform => selectedPlatform === 'all' || platform.id === selectedPlatform)
             .map(platform => {
-              let displayBaseSize = platform.scale.baseSize
+              const typographyData = getTypographyData(platform.id)
+              if (!typographyData) return null
+
+              let displayBaseSize = typographyData.scale.baseSize
 
               // Calculate base size for distance-based platforms
-              if (platform.scaleMethod === 'distance' && platform.distanceScale) {
+              if (typographyData.scaleMethod === 'distance' && typographyData.distanceScale) {
                 displayBaseSize = calculateDistanceBasedSize(
-                  platform.distanceScale.viewingDistance,
-                  platform.distanceScale.visualAcuity,
-                  platform.distanceScale.meanLengthRatio,
-                  platform.distanceScale.textType,
-                  platform.distanceScale.lighting,
-                  platform.distanceScale.ppi
+                  typographyData.distanceScale.viewingDistance,
+                  typographyData.distanceScale.visualAcuity,
+                  typographyData.distanceScale.meanLengthRatio,
+                  typographyData.distanceScale.textType,
+                  typographyData.distanceScale.lighting,
+                  typographyData.distanceScale.ppi
                 )
               }
 
@@ -240,14 +254,14 @@ export function DocumentationModal({
                 <TableRow key={platform.id}>
                   <TableCell>{platform.name}</TableCell>
                   <TableCell>
-                    {platform.scaleMethod === 'distance' 
+                    {typographyData.scaleMethod === 'distance' 
                       ? `${Math.round(displayBaseSize)}px (distance-based)`
                       : `${displayBaseSize}px`
                     }
                   </TableCell>
-                  <TableCell>{platform.scaleMethod}</TableCell>
-                  <TableCell>{platform.scale.ratio}</TableCell>
-                  <TableCell>{platform.scale.stepsUp}/{platform.scale.stepsDown}</TableCell>
+                  <TableCell>{typographyData.scaleMethod}</TableCell>
+                  <TableCell>{typographyData.scale.ratio}</TableCell>
+                  <TableCell>{typographyData.scale.stepsUp}/{typographyData.scale.stepsDown}</TableCell>
                 </TableRow>
               )
             })}
@@ -275,204 +289,101 @@ export function DocumentationModal({
       <TableBody>
         {platforms
           .filter(platform => selectedPlatform === 'all' || platform.id === selectedPlatform)
-          .flatMap(platform =>
-            platform.typeStyles.map(style => {
-              const scaleValue = platform.getScaleValues?.(platform.id)
+          .flatMap(platform => {
+            const typographyData = getTypographyData(platform.id)
+            if (!typographyData?.typeStyles) return []
+
+            return typographyData.typeStyles.map(style => {
+              const scaleValue = getScaleValues(platform.id)
                 ?.find(s => s.label === style.scaleStep)
 
               return (
                 <TableRow key={`${platform.id}-${style.id}`}>
                   <TableCell className="font-medium">{platform.name}</TableCell>
                   <TableCell>{style.name}</TableCell>
-                  <TableCell>{scaleValue ? `${Math.round(scaleValue.size)}px` : '-'}</TableCell>
+                  <TableCell>
+                    {scaleValue 
+                      ? `${Math.round(scaleValue.size)}${typographyData.units.typography}` 
+                      : '-'}
+                  </TableCell>
                   <TableCell>{style.lineHeight}</TableCell>
                   <TableCell>{style.letterSpacing}em</TableCell>
                   <TableCell>{style.fontWeight}</TableCell>
                   <TableCell>{style.scaleStep}</TableCell>
-                  <TableCell>{style.opticalSize}</TableCell>
+                  <TableCell>{style.opticalSize}{typographyData.units.typography}</TableCell>
                 </TableRow>
               )
             })
-          )}
+          })}
       </TableBody>
     </Table>
   )
 
-  // Update the details tab content
-  const renderDetailsContent = () => {
-    if (selectedPlatform === 'all') {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          Please select a specific platform to view detailed settings
-        </div>
-      )
-    }
-
-    return (
-      <section className="space-y-8">
-        <h2 className="text-2xl font-bold mb-4">
-          {selectedPlatform.toUpperCase()} Details
-        </h2>
-        {generateScaleTable()}
-        {renderTypeStyleTable()}
-      </section>
-    )
-  }
-
-  // Update the code tab content
-  const renderCodeContent = () => {
-    if (selectedPlatform === 'all') {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          Please select a specific platform to view implementation code
-        </div>
-      )
-    }
-
-    const platform = platforms.find(p => p.id === selectedPlatform)
-    if (!platform) return null
-
-    return (
-      <section>
-        <h2 className="text-2xl font-bold mb-4">Implementation</h2>
-        <div className="space-y-4">
-          {platform.id === 'web' && (
-            <>
-              <div>
-                <h3 className="text-lg font-medium mb-2">CSS Variables</h3>
-                <pre className="bg-muted p-4 rounded-md">
-                  {platform.typeStyles.map(style => 
-                    `--font-size-${style.name}: ${Math.round(getScaleValues(platform.id)
-                      .find(s => s.label === style.scaleStep)?.size || platform.scale.baseSize)}px;`
-                  ).join('\n')}
-                </pre>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium mb-2">Tailwind Config</h3>
-                <pre className="bg-muted p-4 rounded-md">
-                  {`module.exports = {
-  theme: {
-    fontSize: {
-      ${platform.typeStyles.map(style => {
-        const size = getScaleValues(platform.id)
-          .find(s => s.label === style.scaleStep)?.size || platform.scale.baseSize
-        return `'${style.name}': ['${Math.round(size)}px', { lineHeight: '${style.lineHeight}' }]`
-      }).join(',\n      ')}
-    }
-  }
-}`}
-                </pre>
-              </div>
-            </>
-          )}
-
-          {platform.id === 'ios' && (
-            <div>
-              <h3 className="text-lg font-medium mb-2">Swift Constants</h3>
-              <pre className="bg-muted p-4 rounded-md">
-                {platform.typeStyles.map(style => {
-                  const size = getScaleValues(platform.id)
-                    .find(s => s.label === style.scaleStep)?.size || platform.scale.baseSize
-                  return `static let ${style.name}Size: CGFloat = ${Math.round(size)}`
-                }).join('\n')}
-              </pre>
-            </div>
-          )}
-
-          {platform.id === 'android' && (
-            <div>
-              <h3 className="text-lg font-medium mb-2">Android Dimensions</h3>
-              <pre className="bg-muted p-4 rounded-md">
-                {platform.typeStyles.map(style => {
-                  const size = getScaleValues(platform.id)
-                    .find(s => s.label === style.scaleStep)?.size || platform.scale.baseSize
-                  return `<dimen name="text_size_${style.name}">${Math.round(size)}sp</dimen>`
-                }).join('\n')}
-              </pre>
-            </div>
-          )}
-        </div>
-      </section>
-    )
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl h-[90vh] flex flex-col overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-2xl font-bold">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold">
             Typography Documentation
           </DialogTitle>
-          <DialogDescription className="text-lg">
-            Cross-platform typography system
-          </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="code">Code</TabsTrigger>
-            </TabsList>
+        <div className="space-y-4">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-6">
+              <AnimatedTabs 
+                tabs={[
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'preview', label: 'Preview' }
+                ]}
+                defaultTab="overview"
+                onChange={(tab) => setActiveTab(tab)}
+                layoutId="documentation-tabs"
+              />
 
-            <Select 
-              value={selectedPlatform} 
-              onValueChange={(value: string) => setSelectedPlatform(value)}
-            >
-              <SelectTrigger className="w-[180px] h-9 mr-4">
-                <SelectValue placeholder="Select platform" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Platforms</SelectItem>
-                {platforms.map(platform => (
-                  <SelectItem key={platform.id} value={platform.id}>
-                    {platform.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select platform" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Platforms</SelectItem>
+                  {platforms.map((platform) => (
+                    <SelectItem key={platform.id} value={platform.id}>
+                      {platform.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                {activeTab === 'overview' && (
+                  <div className="space-y-8">
+                    <section className="mt-6">
+                      <h2 className="text-xl font-semibold mb-4">Platform Settings</h2>
+                      <PlatformComparison />
+                    </section>
+                    <section>
+                      <h2 className="text-xl font-semibold mb-4">Type Styles</h2>
+                      <TypeStylesTable />
+                    </section>
+                  </div>
+                )}
+
+                {activeTab === 'preview' && renderPreviewTable()}
+              </ScrollArea>
+            </div>
           </div>
 
-          <div className="flex-1 min-h-0">
-            <ScrollArea className="h-full">
-              <TabsContent value="overview" className="m-0">
-                <div className="space-y-8">
-                  <section className="mt-6">
-                    <h2 className="text-xl font-semibold mb-4">Platform Settings</h2>
-                    <PlatformComparison />
-                  </section>
-                  <section>
-                    <h2 className="text-xl font-semibold mb-4">Type Styles</h2>
-                    <TypeStylesTable />
-                  </section>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="preview" className="m-0">
-                {renderPreviewTable()}
-              </TabsContent>
-
-              <TabsContent value="details" className="space-y-8 m-0">
-                {renderDetailsContent()}
-              </TabsContent>
-
-              <TabsContent value="code" className="space-y-8 m-0">
-                {renderCodeContent()}
-              </TabsContent>
-            </ScrollArea>
+          <div className="flex justify-end mt-4 pt-4 border-t flex-shrink-0">
+            <Button onClick={() => {
+              const doc = generatePDF(platforms)
+              doc.save('typography-documentation.pdf')
+            }}>
+              Export Documentation
+            </Button>
           </div>
-        </Tabs>
-
-        <div className="flex justify-end mt-4 pt-4 border-t flex-shrink-0">
-          <Button onClick={() => {
-            const doc = generatePDF(platforms)
-            doc.save('typography-documentation.pdf')
-          }}>
-            Export Documentation
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

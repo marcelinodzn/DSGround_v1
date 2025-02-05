@@ -642,7 +642,7 @@ ${reasoningMatch[1].trim()}`
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Base Size</Label>
+                  <Label className="text-xs">Base Size (px)</Label>
                   <Input
                     type="number"
                     value={currentSettings.scale.baseSize}
