@@ -1,4 +1,6 @@
 import { CLAUDE_API_KEY } from '@/config/env'
+import { convertUnits } from '@/lib/utils'
+import { Platform } from '@/store/platform-store'
 
 interface AIRecommendation {
   baseSize: number
@@ -20,6 +22,7 @@ interface ScaleAnalysisInput {
 
 const API_TIMEOUT = 120000 // Increase to 120 seconds
 
+// AI-based scale generation
 export async function generateTypeScale(input: ScaleAnalysisInput | string) {
   try {
     console.log('Starting generateTypeScale...')
@@ -105,4 +108,53 @@ export function parseAIRecommendation(content: string): AIRecommendation {
     console.error('Error parsing AI recommendation:', error)
     return defaults
   }
-} 
+}
+
+// Mathematical scale calculation
+export const calculateTypeScale = (
+  baseSize: number,
+  ratio: number,
+  stepsUp: number,
+  stepsDown: number,
+  unit: string,
+  platform: Platform
+): Array<{ label: string; size: number }> => {
+  const scale: Array<{ label: string; size: number }> = [];
+  
+  // Generate steps down
+  for (let i = stepsDown; i > 0; i--) {
+    const size = baseSize / Math.pow(ratio, i);
+    const convertedSize = convertUnits({
+      from: 'px',
+      to: unit,
+      value: size,
+      baseSize: platform.layout.baseSize
+    });
+    scale.push({ label: `f-${i}`, size: convertedSize });
+  }
+  
+  // Add base size
+  scale.push({ 
+    label: 'f0', 
+    size: convertUnits({
+      from: 'px',
+      to: unit,
+      value: baseSize,
+      baseSize: platform.layout.baseSize
+    })
+  });
+  
+  // Generate steps up
+  for (let i = 1; i <= stepsUp; i++) {
+    const size = baseSize * Math.pow(ratio, i);
+    const convertedSize = convertUnits({
+      from: 'px',
+      to: unit,
+      value: size,
+      baseSize: platform.layout.baseSize
+    });
+    scale.push({ label: `f${i}`, size: convertedSize });
+  }
+  
+  return scale;
+}; 

@@ -13,13 +13,21 @@ interface PlatformSelectProps {
 
 export function PlatformSelect({ value, onValueChange, label, className }: PlatformSelectProps) {
   const platforms = usePlatformStore((state) => state.platforms)
+  
+  // Find platform by ID to display current name
+  const currentPlatform = platforms.find(p => p.id === value)
 
   return (
     <div className={className}>
       {label && <Label className="mb-2">{label}</Label>}
-      <Select value={value} onValueChange={onValueChange}>
+      <Select 
+        value={value} 
+        onValueChange={onValueChange}
+      >
         <SelectTrigger>
-          <SelectValue placeholder="Select platform" />
+          <SelectValue>
+            {currentPlatform?.name || "Select platform"}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {platforms.map((platform) => (

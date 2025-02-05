@@ -12,13 +12,14 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { generateTypeScale, parseAIRecommendation } from "@/lib/claude"
+import { generateTypeScale, parseAIRecommendation, calculateTypeScale } from "@/lib/claude"
 import { convertToBase64 } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
 import { Sparkles } from "lucide-react"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { usePlatformStore } from "@/store/platform-store"
+import { convertUnits, formatWithUnit } from "@/lib/utils"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -117,11 +118,28 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
                   <SelectContent>
                     {props.getScaleValues().map((scale) => (
                       <SelectItem key={scale.label} value={scale.label}>
-                        {scale.label}
+                        {`${scale.label} (${formatWithUnit(scale.size, currentSettings.units.typography)})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Font Size</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    value={typeStyle.fontSize}
+                    onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { 
+                      fontSize: parseFloat(e.target.value) 
+                    })}
+                    className="text-xs h-8 pr-12"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    {currentSettings.units.typography}
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -234,7 +252,7 @@ export function PropertiesPanel() {
       })
       
       // Set current platform if none selected
-      if (!currentPlatform) {
+      if (!currentPlatform && platforms[0]) {
         setCurrentPlatform(platforms[0].id)
       }
     }
@@ -286,11 +304,38 @@ export function PropertiesPanel() {
   }
 
   const handleTypeStyleChange = (id: string, updates: Partial<TypeStyle>) => {
+    const platform = platforms.find(p => p.id === currentPlatform);
+    if (!platform) return;
+
+    // Convert values based on platform units
+    if ('fontSize' in updates) {
+      updates.fontSize = convertUnits({
+        from: 'px',
+        to: platform.units.typography,
+        value: updates.fontSize as number,
+        baseSize: platform.layout.baseSize
+      });
+    }
+
+    if ('lineHeight' in updates) {
+      // Line height is typically unitless in CSS, but can be converted if needed
+      updates.lineHeight = Number(updates.lineHeight);
+    }
+
+    if ('letterSpacing' in updates) {
+      updates.letterSpacing = convertUnits({
+        from: 'px',
+        to: platform.units.typography,
+        value: updates.letterSpacing as number,
+        baseSize: platform.layout.baseSize
+      });
+    }
+
     updatePlatform(currentPlatform, {
       typeStyles: currentSettings.typeStyles?.map((style) =>
         style.id === id ? { ...style, ...updates } : style
       )
-    })
+    });
   }
 
   const getScaleValues = () => {

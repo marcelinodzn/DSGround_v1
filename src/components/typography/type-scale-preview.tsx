@@ -54,26 +54,46 @@ const calculateDistanceBasedSize = (
   return Math.round(pixelSize)
 }
 
-// Add interface for component props
+// Update the ScaleViewProps interface with default values
 interface ScaleViewProps {
   scaleValues: Array<{
     label: string
     size: number
     ratio: number
   }>
+  units?: Platform['units']  // Make units optional
+  baseSize: number
 }
 
-interface StylesViewProps {
-  typeStyles: TypeStyle[]
-  scaleValues: Array<{
-    label: string
-    size: number
-    ratio: number
-  }>
+// Update the defaultUnits constant
+const defaultUnits = {
+  typography: 'px',
+  spacing: 'px',
+  dimensions: 'px'
+} as const
+
+// Add unit conversion helper
+const convertToUnit = (pixels: number, unit: string, baseSize: number = 16) => {
+  switch (unit) {
+    case 'rem':
+      return `${(pixels / baseSize).toFixed(3)}rem`
+    case 'em':
+      return `${(pixels / baseSize).toFixed(3)}em`
+    case 'pt':
+      return `${Math.round(pixels * 0.75)}pt`
+    case '%':
+      return `${(pixels / baseSize * 100).toFixed(1)}%`
+    case 'vw':
+      return `${(pixels / window.innerWidth * 100).toFixed(2)}vw`
+    case 'vh':
+      return `${(pixels / window.innerHeight * 100).toFixed(2)}vh`
+    default:
+      return `${Math.round(pixels)}px`
+  }
 }
 
 // Create a dynamic version of ScaleView with SSR disabled
-const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps) => (
+const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, units = defaultUnits, baseSize }: ScaleViewProps) => (
   <div className="w-full min-w-0">
     <Table>
       <TableHeader>
@@ -92,7 +112,7 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps
               <div className="min-w-0">
                 <div 
                   style={{ 
-                    fontSize: `${Math.round(item.size)}px`,
+                    fontSize: convertToUnit(item.size, units.typography, baseSize),
                     lineHeight: 1.2,
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word',
@@ -106,7 +126,9 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps
                 </div>
               </div>
             </TableCell>
-            <TableCell className="py-6 text-right">{Math.round(item.size)}px</TableCell>
+            <TableCell className="py-6 text-right">
+              {convertToUnit(item.size, units.typography, baseSize)}
+            </TableCell>
             <TableCell className="text-muted-foreground text-sm py-6 text-right">
               {item.ratio.toFixed(3)}x
             </TableCell>
@@ -117,80 +139,19 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues }: ScaleViewProps
   </div>
 )), { ssr: false })
 
-export function TypeScalePreview() {
-  const {
-    currentPlatform,
-    platforms,
-    getScaleValues
-  } = useTypographyStore()
-  
-  const [view, setView] = useState<'scale' | 'styles'>('scale')
-
-  const viewTabs = [
-    { id: 'scale', label: 'Scale View' },
-    { id: 'styles', label: 'Styles View' }
-  ]
-
-  // Find current settings and handle the case where none are found
-  const currentSettings = platforms.find(p => p.id === currentPlatform)
-  
-  // If no settings found, show loading or return null
-  if (!currentSettings) {
-    return null
-  }
-
-  const { scaleMethod, scale, distanceScale } = currentSettings
-  const scaleValues = getScaleValues(currentPlatform)
-
-  // Calculate the correct base size based on scale method
-  let displayBaseSize = scale.baseSize
-  if (scaleMethod === 'distance' && distanceScale) {
-    displayBaseSize = calculateDistanceBasedSize(
-      distanceScale.viewingDistance,
-      distanceScale.visualAcuity,
-      distanceScale.meanLengthRatio,
-      distanceScale.textType,
-      distanceScale.lighting,
-      distanceScale.ppi
-    )
-  }
-
-  return (
-    <div className="relative w-full">
-      <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
-        <Separator className="w-screen" />
-      </div>
-      
-      <div className="flex justify-between items-center pt-6">
-        <div className="py-4 text-sm text-muted-foreground">
-          Base Size: {Math.round(displayBaseSize)}px
-          {scaleMethod === 'distance' && ' (distance-based)'} • 
-          Scale Ratio: {scale.ratio} • 
-          Steps Up: {scale.stepsUp} • 
-          Steps Down: {scale.stepsDown}
-        </div>
-        <AnimatedTabs
-          tabs={viewTabs}
-          defaultTab="scale"
-          onChange={(value) => setView(value as 'scale' | 'styles')}
-          layoutId="preview-view-tabs"
-        />
-      </div>
-
-      <div className="py-4">
-        <div className="min-w-0 overflow-x-auto">
-          {view === 'scale' ? (
-            <ScaleView scaleValues={scaleValues} />
-          ) : (
-            <StylesView typeStyles={currentSettings.typeStyles} scaleValues={scaleValues} />
-          )}
-        </div>
-      </div>
-    </div>
-  )
+interface StylesViewProps {
+  typeStyles: TypeStyle[]
+  scaleValues: Array<{
+    label: string
+    size: number
+    ratio: number
+  }>
+  units?: Platform['units']  // Make units optional
+  baseSize: number
 }
 
-function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
+// Update the StylesView component with default units
+function StylesView({ typeStyles, scaleValues, units = defaultUnits, baseSize }: StylesViewProps) {
   const { platforms, currentPlatform } = useTypographyStore()
   const platform = platforms.find(p => p.id === currentPlatform)
   
@@ -220,7 +181,7 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
       <TableBody>
         {typeStyles.map(style => {
           const scaleValue = scaleValues.find(s => s.label === style.scaleStep)
-          const fontSize = scaleValue?.size || displayBaseSize // Use calculated base size if no scale value
+          const fontSize = scaleValue?.size || displayBaseSize
 
           return (
             <TableRow key={style.id}>
@@ -234,10 +195,10 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
                 <div className="min-w-0">
                   <div 
                     style={{ 
-                      fontSize: `${fontSize}px`,
+                      fontSize: convertToUnit(fontSize, units.typography, baseSize),
                       lineHeight: style.lineHeight,
                       fontWeight: style.fontWeight,
-                      letterSpacing: `${style.letterSpacing}em`,
+                      letterSpacing: `${style.letterSpacing}${units.spacing}`,
                       fontOpticalSizing: 'auto',
                       fontVariationSettings: `'opsz' ${style.opticalSize}`,
                       wordBreak: 'break-word',
@@ -253,13 +214,13 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
                 </div>
               </TableCell>
               <TableCell className="py-6 text-right">
-                {fontSize ? `${Math.round(fontSize)}px` : '-'}
+                {convertToUnit(fontSize, units.typography, baseSize)}
               </TableCell>
               <TableCell className="py-6 text-right">
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div>Weight: {style.fontWeight}</div>
                   <div>Line Height: {style.lineHeight}</div>
-                  <div>Letter Spacing: {style.letterSpacing}em</div>
+                  <div>Letter Spacing: {style.letterSpacing}{units.spacing}</div>
                   <div>Optical Size: {style.opticalSize}</div>
                 </div>
               </TableCell>
@@ -268,5 +229,89 @@ function StylesView({ typeStyles, scaleValues }: StylesViewProps) {
         })}
       </TableBody>
     </Table>
+  )
+}
+
+// Update the TypeScalePreview component with null checks
+export function TypeScalePreview() {
+  const {
+    currentPlatform,
+    platforms,
+    getScaleValues
+  } = useTypographyStore()
+  
+  const [view, setView] = useState<'scale' | 'styles'>('scale')
+
+  const viewTabs = [
+    { id: 'scale', label: 'Scale View' },
+    { id: 'styles', label: 'Styles View' }
+  ]
+
+  // Find current settings and handle the case where none are found
+  const currentSettings = platforms.find(p => p.id === currentPlatform)
+  
+  // If no settings found, show loading or return null
+  if (!currentSettings) {
+    return null
+  }
+
+  const { scaleMethod, scale, distanceScale } = currentSettings
+  const units = currentSettings.units || defaultUnits
+  const scaleValues = getScaleValues(currentPlatform)
+
+  // Calculate the correct base size based on scale method
+  let displayBaseSize = scale.baseSize
+  if (scaleMethod === 'distance' && distanceScale) {
+    displayBaseSize = calculateDistanceBasedSize(
+      distanceScale.viewingDistance,
+      distanceScale.visualAcuity,
+      distanceScale.meanLengthRatio,
+      distanceScale.textType,
+      distanceScale.lighting,
+      distanceScale.ppi
+    )
+  }
+
+  return (
+    <div className="relative w-full">
+      <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
+        <Separator className="w-screen" />
+      </div>
+      
+      <div className="flex justify-between items-center pt-6">
+        <div className="py-4 text-sm text-muted-foreground">
+          Base Size: {convertToUnit(displayBaseSize, units.typography, scale.baseSize)}
+          {scaleMethod === 'distance' && ' (distance-based)'} • 
+          Scale Ratio: {scale.ratio} • 
+          Steps Up: {scale.stepsUp} • 
+          Steps Down: {scale.stepsDown}
+        </div>
+        <AnimatedTabs
+          tabs={viewTabs}
+          defaultTab="scale"
+          onChange={(value) => setView(value as 'scale' | 'styles')}
+          layoutId="preview-view-tabs"
+        />
+      </div>
+
+      <div className="py-4">
+        <div className="min-w-0 overflow-x-auto">
+          {view === 'scale' ? (
+            <ScaleView 
+              scaleValues={scaleValues} 
+              units={units}
+              baseSize={scale.baseSize}
+            />
+          ) : (
+            <StylesView 
+              typeStyles={currentSettings.typeStyles} 
+              scaleValues={scaleValues}
+              units={units}
+              baseSize={scale.baseSize}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

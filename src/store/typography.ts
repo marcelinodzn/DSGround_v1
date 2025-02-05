@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { usePlatformStore } from "@/store/platform-store"
 
 export type ScaleMethod = 'modular' | 'distance' | 'ai'
 export type TextType = 'continuous' | 'isolated'
@@ -27,6 +28,11 @@ export interface Platform {
   name: string
   scaleMethod: ScaleMethod
   scale: ScaleConfig
+  units: {
+    typography: string
+    spacing: string
+    dimensions: string
+  }
   distanceScale: {
     viewingDistance: number
     visualAcuity: number
@@ -226,12 +232,22 @@ export const useTypographyStore = create<TypographyState>()(
 
       // Add this new function to initialize typography settings for a platform
       initializePlatform: (platformId) => {
+        const platformStore = usePlatformStore.getState()
+        const platformData = platformStore.platforms.find(p => p.id === platformId)
+        
+        if (!platformData) return
+
         set((state) => ({
           platforms: [...state.platforms, {
             id: platformId,
-            name: platformId,
+            name: platformData.name,
             scaleMethod: 'modular',
             scale: { ...defaultScale },
+            units: {
+              typography: platformData.units.typography,
+              spacing: platformData.units.spacing,
+              dimensions: platformData.units.dimensions
+            },
             distanceScale: {
               viewingDistance: 50,
               visualAcuity: 1,
@@ -247,15 +263,22 @@ export const useTypographyStore = create<TypographyState>()(
       },
 
       updatePlatform: (platformId, updates) => {
+        const platformStore = usePlatformStore.getState()
+        const platformData = platformStore.platforms.find(p => p.id === platformId)
+
         set((state) => ({
           platforms: state.platforms.map((platform) => {
             if (platform.id === platformId) {
+              // Sync units from platform store
+              const units = platformData ? platformData.units : platform.units
+
               // If updating scale, scaleMethod, or distance settings
               if (updates.scale || updates.scaleMethod || updates.distanceScale) {
                 // Keep type styles with their current scale steps
                 return {
                   ...platform,
                   ...updates,
+                  units, // Keep units in sync
                   typeStyles: platform.typeStyles
                 };
               }

@@ -80,3 +80,69 @@ const compressImage = (file: File, options: CompressOptions): Promise<Blob> => {
     }
   })
 }
+
+export const slugify = (text: string) => {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+}
+
+// Add these unit conversion utilities
+interface UnitConversion {
+  from: string
+  to: string
+  value: number
+  baseSize?: number
+}
+
+export const convertUnits = ({ from, to, value, baseSize = 16 }: UnitConversion): number => {
+  // First convert to pixels as intermediate
+  let px: number = value;
+  
+  // Convert from source unit to pixels
+  switch (from) {
+    case 'rem':
+      px = value * baseSize;
+      break;
+    case 'em':
+      px = value * baseSize;
+      break;
+    case 'pt':
+      px = value * (96 / 72); // 1pt = 1/72 inch, 1px = 1/96 inch
+      break;
+    case 'pc':
+      px = value * (96 / 6); // 1pc = 1/6 inch
+      break;
+    case '%':
+      px = (value / 100) * baseSize;
+      break;
+    case 'px':
+      px = value;
+      break;
+    // Add other unit conversions as needed
+  }
+  
+  // Convert pixels to target unit
+  switch (to) {
+    case 'rem':
+      return px / baseSize;
+    case 'em':
+      return px / baseSize;
+    case 'pt':
+      return px * (72 / 96);
+    case 'pc':
+      return px * (6 / 96);
+    case '%':
+      return (px / baseSize) * 100;
+    case 'px':
+      return px;
+    default:
+      return value; // Return original value if unit not supported
+  }
+}
+
+// Add a function to format value with unit
+export const formatWithUnit = (value: number, unit: string): string => {
+  return `${value}${unit}`;
+}

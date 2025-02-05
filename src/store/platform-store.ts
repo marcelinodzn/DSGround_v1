@@ -51,13 +51,34 @@ export const usePlatformStore = create<PlatformStore>()(
         }
       }],
       addPlatform: (platform) => 
-        set((state) => ({ platforms: [...state.platforms, platform] })),
+        set((state) => {
+          let uniqueName = platform.name
+          let counter = 1
+          while (state.platforms.some(p => p.name === uniqueName)) {
+            uniqueName = `${platform.name} ${counter}`
+            counter++
+          }
+          return { 
+            platforms: [...state.platforms, { ...platform, name: uniqueName }] 
+          }
+        }),
       updatePlatform: (id, updates) =>
-        set((state) => ({
-          platforms: state.platforms.map((p) =>
-            p.id === id ? { ...p, ...updates } : p
-          ),
-        })),
+        set((state) => {
+          if (updates.name) {
+            let uniqueName = updates.name
+            let counter = 1
+            while (state.platforms.some(p => p.id !== id && p.name === uniqueName)) {
+              uniqueName = `${updates.name} ${counter}`
+              counter++
+            }
+            updates = { ...updates, name: uniqueName }
+          }
+          return {
+            platforms: state.platforms.map((p) =>
+              p.id === id ? { ...p, ...updates } : p
+            ),
+          }
+        }),
       deletePlatform: (id) =>
         set((state) => ({
           platforms: state.platforms.filter((p) => p.id !== id),

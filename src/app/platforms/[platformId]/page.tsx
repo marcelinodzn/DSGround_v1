@@ -13,6 +13,13 @@ import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { usePlatformStore, Platform } from "@/store/platform-store"
 import { useRouter } from "next/navigation"
 
+const slugify = (text: string) => {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+}
+
 export default function PlatformPage({ params }: { params: { platformId: string } }) {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
@@ -21,7 +28,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
   const [activeMainTab, setActiveMainTab] = useState('overview')
 
   const { platforms, updatePlatform } = usePlatformStore()
-  const platform = platforms.find(p => p.id === params.platformId)
+  const platform = platforms.find(p => slugify(p.name) === params.platformId)
 
   const mainTabs = [
     { id: 'overview', label: 'Overview' },
@@ -61,6 +68,10 @@ export default function PlatformPage({ params }: { params: { platformId: string 
         layout: { ...platform.layout, [key]: value }
       })
     }
+  }
+
+  const handleViewPlatform = (platformName: string) => {
+    router.push(`/platforms/${slugify(platformName)}`)
   }
 
   return (

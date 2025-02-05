@@ -25,6 +25,14 @@ interface Platform {
   }
 }
 
+// Add slugify function
+const slugify = (text: string) => {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+}
+
 export default function PlatformsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
@@ -34,8 +42,8 @@ export default function PlatformsPage() {
     router.push('/platforms/new')
   }
 
-  const handleViewPlatform = (id: string) => {
-    router.push(`/platforms/${id}`)
+  const handleViewPlatform = (platformName: string) => {
+    router.push(`/platforms/${slugify(platformName)}`)
   }
 
   const handleDeletePlatform = (id: string, e: React.MouseEvent) => {
@@ -97,7 +105,7 @@ export default function PlatformsPage() {
                 <Button
                   variant="outline"
                   className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent w-full"
-                  onClick={() => handleViewPlatform(platform.id)}
+                  onClick={() => handleViewPlatform(platform.name)}
                 >
                   <h3 className="font-semibold">{platform.name}</h3>
                   <p className="text-sm text-muted-foreground text-left line-clamp-2">
