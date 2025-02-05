@@ -44,9 +44,10 @@ interface SortableTypeStyleProps {
   handleDeleteTypeStyle: (id: string) => void
   handleDuplicateStyle: (style: TypeStyle) => void
   getScaleValues: () => Array<{ label: string; size: number; ratio: number }>
+  typographyUnit: string
 }
 
-function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProps) {
+function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: SortableTypeStyleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const {
     attributes,
@@ -59,6 +60,13 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
   const styleProps = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  const handleScaleStepChange = (value: string) => {
+    console.log('Changing scale step to:', value); // Debug log
+    props.handleTypeStyleChange(typeStyle.id, { 
+      scaleStep: value
+    });
   };
 
   return (
@@ -110,36 +118,21 @@ function SortableTypeStyle({ style: typeStyle, ...props }: SortableTypeStyleProp
                 <Label className="text-xs">Scale Step</Label>
                 <Select
                   value={typeStyle.scaleStep}
-                  onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { scaleStep: value })}
+                  onValueChange={handleScaleStepChange}
                 >
-                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                    <SelectValue placeholder="Scale" />
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue>
+                      {typeStyle.scaleStep}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {props.getScaleValues().map((scale) => (
                       <SelectItem key={scale.label} value={scale.label}>
-                        {`${scale.label} (${formatWithUnit(scale.size, currentSettings.units.typography)})`}
+                        {`${scale.label} (${formatWithUnit(scale.size, typographyUnit)})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs">Font Size</Label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={typeStyle.fontSize}
-                    onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { 
-                      fontSize: parseFloat(e.target.value) 
-                    })}
-                    className="text-xs h-8 pr-12"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    {currentSettings.units.typography}
-                  </span>
-                </div>
               </div>
 
               <div>
@@ -304,39 +297,39 @@ export function PropertiesPanel() {
   }
 
   const handleTypeStyleChange = (id: string, updates: Partial<TypeStyle>) => {
-    const platform = platforms.find(p => p.id === currentPlatform);
-    if (!platform) return;
+    if (!currentPlatform || !currentSettings) return;
 
-    // Convert values based on platform units
-    if ('fontSize' in updates) {
-      updates.fontSize = convertUnits({
-        from: 'px',
-        to: platform.units.typography,
-        value: updates.fontSize as number,
-        baseSize: platform.layout.baseSize
-      });
-    }
-
-    if ('lineHeight' in updates) {
-      // Line height is typically unitless in CSS, but can be converted if needed
-      updates.lineHeight = Number(updates.lineHeight);
-    }
-
-    if ('letterSpacing' in updates) {
-      updates.letterSpacing = convertUnits({
-        from: 'px',
-        to: platform.units.typography,
-        value: updates.letterSpacing as number,
-        baseSize: platform.layout.baseSize
-      });
-    }
-
-    updatePlatform(currentPlatform, {
-      typeStyles: currentSettings.typeStyles?.map((style) =>
-        style.id === id ? { ...style, ...updates } : style
-      )
+    // Create a new array of type styles
+    const updatedTypeStyles = currentSettings.typeStyles.map(style => {
+      if (style.id === id) {
+        // If we're updating the scale step
+        if ('scaleStep' in updates) {
+          const scaleValues = getScaleValues();
+          const scaleValue = scaleValues.find(s => s.label === updates.scaleStep);
+          
+          if (scaleValue) {
+            return {
+              ...style,
+              scaleStep: updates.scaleStep,
+              fontSize: scaleValue.size
+            };
+          }
+        }
+        
+        // For other updates
+        return {
+          ...style,
+          ...updates
+        };
+      }
+      return style;
     });
-  }
+
+    // Update the platform with all changes
+    updatePlatform(currentPlatform, {
+      typeStyles: updatedTypeStyles
+    });
+  };
 
   const getScaleValues = () => {
     return useTypographyStore.getState().getScaleValues(currentPlatform)
@@ -1271,7 +1264,15 @@ ${reasoningMatch[1].trim()}`
               >
                 <div className="space-y-2">
                   {currentSettings.typeStyles?.map((style) => (
-                    <SortableTypeStyle key={style.id} style={style} handleTypeStyleChange={handleTypeStyleChange} handleDeleteTypeStyle={handleDeleteTypeStyle} handleDuplicateStyle={handleDuplicateStyle} getScaleValues={getScaleValues} />
+                    <SortableTypeStyle 
+                      key={style.id} 
+                      style={style} 
+                      handleTypeStyleChange={handleTypeStyleChange} 
+                      handleDeleteTypeStyle={handleDeleteTypeStyle} 
+                      handleDuplicateStyle={handleDuplicateStyle} 
+                      getScaleValues={getScaleValues}
+                      typographyUnit={currentSettings.units.typography}
+                    />
                   ))}
                 </div>
               </SortableContext>

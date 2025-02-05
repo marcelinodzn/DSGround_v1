@@ -19,8 +19,8 @@ export interface TypeStyle {
   scaleStep: string
   fontWeight: number
   lineHeight: number
-  opticalSize: number
   letterSpacing: number
+  opticalSize: number
 }
 
 export interface Platform {
@@ -267,46 +267,11 @@ export const useTypographyStore = create<TypographyState>()(
         const platformData = platformStore.platforms.find(p => p.id === platformId)
 
         set((state) => ({
-          platforms: state.platforms.map((platform) => {
-            if (platform.id === platformId) {
-              // Sync units from platform store
-              const units = platformData ? platformData.units : platform.units
-
-              // If updating scale, scaleMethod, or distance settings
-              if (updates.scale || updates.scaleMethod || updates.distanceScale) {
-                // Keep type styles with their current scale steps
-                return {
-                  ...platform,
-                  ...updates,
-                  units, // Keep units in sync
-                  typeStyles: platform.typeStyles
-                };
-              }
-              // If updating type styles
-              if (updates.typeStyles) {
-                const newTypeStyles = updates.typeStyles.map(style => {
-                  // Find existing style by ID
-                  const existingStyle = platform.typeStyles?.find(ts => ts.id === style.id);
-                  
-                  // If we're explicitly changing the scale step (from the dropdown)
-                  // or if it's a new style, use the new scale step
-                  const useNewScaleStep = !existingStyle || style.scaleStep !== existingStyle.scaleStep;
-                  
-                  return {
-                    ...style,
-                    scaleStep: useNewScaleStep ? style.scaleStep : existingStyle.scaleStep
-                  };
-                });
-                
-                return {
-                  ...platform,
-                  typeStyles: newTypeStyles
-                };
-              }
-              return { ...platform, ...updates };
-            }
-            return platform;
-          }),
+          platforms: state.platforms.map((platform) =>
+            platform.id === platformId
+              ? { ...platform, ...updates }
+              : platform
+          ),
         }))
       },
 
