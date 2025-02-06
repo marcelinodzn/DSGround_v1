@@ -6,7 +6,7 @@ import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/ty
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, GripVertical, Trash2, Copy, Upload, X } from "lucide-react"
+import { ChevronDown, GripVertical, Trash2, Copy, Upload, X, Codesandbox, ScanEye } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -592,7 +592,7 @@ ${reasoningMatch[1].trim()}`
                   htmlFor="distance"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><circle cx="7" cy="17" r="1"/><circle cx="17" cy="7" r="1"/><path d="M8 17 17 8"/></svg>
+                  <ScanEye className="h-6 w-6" />
                   <div className="mt-2 text-xs">Distance</div>
                 </Label>
               </div>
@@ -602,7 +602,7 @@ ${reasoningMatch[1].trim()}`
                   htmlFor="ai"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <Sparkles className="h-6 w-6" />
+                  <Codesandbox className="h-6 w-6" />
                   <div className="mt-2 text-xs">AI</div>
                 </Label>
               </div>
@@ -762,33 +762,33 @@ ${reasoningMatch[1].trim()}`
 
                 <div>
                   <Label className="text-xs mb-2">Text Type</Label>
-                  <Tabs 
-                    value={currentSettings.distanceScale.textType}
-                    onValueChange={(value) => 
+                  <AnimatedTabs 
+                    tabs={[
+                      { id: 'continuous', label: 'Continuous' },
+                      { id: 'isolated', label: 'Isolated' }
+                    ]}
+                    defaultTab={currentSettings.distanceScale.textType}
+                    onChange={(value) => 
                       handleDistanceScaleChange({ textType: value as 'continuous' | 'isolated' })
                     }
-                  >
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="continuous">Continuous</TabsTrigger>
-                      <TabsTrigger value="isolated">Isolated</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                    layoutId="text-type-tabs"
+                  />
                 </div>
 
                 <div>
                   <Label className="text-xs mb-2">Lighting Conditions</Label>
-                  <Tabs 
-                    value={currentSettings.distanceScale.lighting}
-                    onValueChange={(value) => 
+                  <AnimatedTabs 
+                    tabs={[
+                      { id: 'good', label: 'Good' },
+                      { id: 'moderate', label: 'Moderate' },
+                      { id: 'poor', label: 'Poor' }
+                    ]}
+                    defaultTab={currentSettings.distanceScale.lighting}
+                    onChange={(value) => 
                       handleDistanceScaleChange({ lighting: value as 'good' | 'moderate' | 'poor' })
                     }
-                  >
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="good">Good</TabsTrigger>
-                      <TabsTrigger value="moderate">Moderate</TabsTrigger>
-                      <TabsTrigger value="poor">Poor</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                    layoutId="lighting-tabs"
+                  />
                 </div>
 
                 <div>
