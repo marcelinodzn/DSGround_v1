@@ -850,29 +850,6 @@ ${reasoningMatch[1].trim()}`
                   <div className="space-y-4">
                     <div className="space-y-4">
                       <div>
-                        <Label className="text-xs">Platform</Label>
-                        <Select
-                          value={selectedDevice}
-                          onValueChange={setSelectedDevice}
-                        >
-                          <SelectTrigger className="text-xs h-8">
-                            <SelectValue placeholder="Select platform" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {platforms.map((platform) => (
-                              <SelectItem
-                                key={platform.id}
-                                value={platform.id}
-                                className="text-xs"
-                              >
-                                {platform.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
                         <Label className="text-xs">Context</Label>
                         <Select
                           value={selectedContext}
@@ -952,10 +929,7 @@ ${reasoningMatch[1].trim()}`
                               <div>Steps up: {currentSettings.scale.stepsUp}</div>
                               <div>Steps down: {currentSettings.scale.stepsDown}</div>
                             </div>
-                            <div>
-                              <div className="font-semibold mb-1">Reasoning:</div>
-                              <p className="whitespace-pre-wrap">{platformReasoning}</p>
-                            </div>
+                            <p className="whitespace-pre-wrap">{platformReasoning}</p>
                           </div>
                         </div>
                       )}
