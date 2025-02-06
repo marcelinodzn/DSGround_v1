@@ -17,8 +17,8 @@ interface AIRecommendation {
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
-// Get the model
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+// Use Gemini 2.0 Flash model
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
 
 export async function generateTypeScale(input: ScaleAnalysisInput | string) {
   try {
@@ -32,18 +32,16 @@ export async function generateTypeScale(input: ScaleAnalysisInput | string) {
       if (input.deviceType) parts.push(`Device type: ${input.deviceType}`)
       if (input.context) parts.push(`Context: ${input.context}`)
       if (input.location) parts.push(`Location: ${input.location}`)
-      if (input.image) parts.push(`Image provided`)
       analysisText = parts.filter(Boolean).join('\n')
     } else {
       throw new Error('Invalid input format')
     }
 
-    // Prepare the prompt
-    const prompt = `As a typography expert, analyze the following for ${input.deviceType || 'this platform'}:
+    const prompt = `As a typography expert, analyze the following context and image:
 
 ${analysisText}
 
-Provide a concise type scale recommendation in this format:
+Provide a type scale recommendation in this format:
 
 Scale Parameters:
 Base size: [number]
@@ -52,36 +50,28 @@ Steps up: [number]
 Steps down: [number]
 
 Reasoning:
-[Provide a brief, focused explanation considering the platform type and context]`
+[Brief explanation considering the platform type, context, and image analysis]`
 
-    // If there's an image, handle it
+    let result;
+    
     if (typeof input === 'object' && input.image) {
-      // Convert base64 to Uint8Array for Gemini
-      const imageData = atob(input.image.split(',')[1])
-      const arrayBuffer = new ArrayBuffer(imageData.length)
-      const uint8Array = new Uint8Array(arrayBuffer)
-      for (let i = 0; i < imageData.length; i++) {
-        uint8Array[i] = imageData.charCodeAt(i)
-      }
-
-      // Create image part for Gemini
-      const imagePart = {
-        inlineData: {
-          data: input.image.split(',')[1],
-          mimeType: 'image/jpeg'
+      // For image analysis using Gemini 2.0 Flash
+      result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            data: input.image.split(',')[1],
+            mimeType: 'image/jpeg'
+          }
         }
-      }
-
-      // Generate content with image
-      const result = await model.generateContent([prompt, imagePart])
-      const response = await result.response
-      return response.text()
+      ]);
     } else {
-      // Text-only generation
-      const result = await model.generateContent(prompt)
-      const response = await result.response
-      return response.text()
+      // For text-only analysis
+      result = await model.generateContent(prompt);
     }
+
+    const response = await result.response;
+    return response.text();
 
   } catch (error) {
     console.error('Error generating scale with Gemini:', error)

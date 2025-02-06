@@ -12,7 +12,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { generateTypeScale, parseAIRecommendation, calculateTypeScale } from "@/lib/claude"
+import { generateTypeScale, parseAIRecommendation } from "@/lib/gemini"
 import { convertToBase64 } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
@@ -405,16 +405,16 @@ export function PropertiesPanel() {
       setAiError(null)
 
       const analysisInput = {
-        deviceType: selectedDevice,
+        deviceType: platforms.find(p => p.id === currentPlatform)?.name,
         context: selectedContext,
         location: selectedLocation,
-        requirements: customRequirements // Add custom requirements
+        requirements: customRequirements
       }
 
+      // Call Gemini directly
       const result = await generateTypeScale(analysisInput)
       const recommendation = parseAIRecommendation(result)
       
-      // Update platform with recommendation
       updatePlatform(currentPlatform, {
         scale: {
           ...currentSettings.scale,
@@ -464,16 +464,12 @@ export function PropertiesPanel() {
         setProgress(prev => Math.min(prev + 10, 90))
       }, 500)
 
-      // Truncate base64 string if it's too long
-      const truncatedImage = base64Image.length > 1000000 
-        ? base64Image.substring(0, 1000000) 
-        : base64Image
-
+      // Call Gemini directly
       const recommendation = await generateTypeScale({
-        deviceType: currentPlatform,
+        deviceType: platforms.find(p => p.id === currentPlatform)?.name,
         context: selectedContext,
         location: selectedLocation,
-        image: truncatedImage
+        image: base64Image
       })
 
       clearInterval(progressInterval)
@@ -484,21 +480,18 @@ export function PropertiesPanel() {
       }
 
       const params = parseAIRecommendation(recommendation)
-      const reasoningMatch = recommendation.match(/Reasoning:([\s\S]+)$/i)
 
-      if (reasoningMatch) {
-        const analysisText = `Scale Parameters:
-• Base Size: ${params.baseSize}px
-• Scale Ratio: ${params.ratio}
-• Steps Up: ${params.stepsUp}
-• Steps Down: ${params.stepsDown}
+      // Format the analysis text
+      const analysisText = `Scale Parameters:
+Base size: ${params.baseSize}px
+Ratio: ${params.ratio}
+Steps up: ${params.stepsUp}
+Steps down: ${params.stepsDown}
 
-Reasoning:
-${reasoningMatch[1].trim()}`
+${recommendation}`
 
-        setImageAnalysis(analysisText)
-        setPlatformReasoning(analysisText)
-      }
+      setImageAnalysis(analysisText)
+      setPlatformReasoning(analysisText)
 
       updatePlatform(currentPlatform, {
         scale: {
