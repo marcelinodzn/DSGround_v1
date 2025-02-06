@@ -233,6 +233,7 @@ export function PropertiesPanel() {
   const [imageAnalysis, setImageAnalysis] = useState<string | null>(null)
   const [activeViewTab, setActiveViewTab] = useState('scale')
   const [activeAnalysisTab, setActiveAnalysisTab] = useState('platform')
+  const [customRequirements, setCustomRequirements] = useState('')
 
   // Effect hooks
   useEffect(() => {
@@ -400,55 +401,33 @@ export function PropertiesPanel() {
 
   const handleAIScaleGeneration = async () => {
     try {
-      setAiError(null)
       setIsGenerating(true)
-      setProgress(0)
-      setPlatformReasoning(null)
-      
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90))
-      }, 500)
-      
-      const recommendation = await generateTypeScale({
-        deviceType: currentPlatform,
+      setAiError(null)
+
+      const analysisInput = {
+        deviceType: selectedDevice,
         context: selectedContext,
-        location: selectedLocation
-      })
-      
-      clearInterval(progressInterval)
-      setProgress(100)
-      
-      const params = parseAIRecommendation(recommendation)
-      const reasoningMatch = recommendation.match(/Reasoning:([\s\S]+)$/i)
-      
-      if (reasoningMatch) {
-        const baseSize = params.baseSize
-        const scaleRatio = params.ratio
-        const stepsUp = params.stepsUp
-        const stepsDown = params.stepsDown
-        
-        const analysisText = `Scale Parameters:
-• Base Size: ${baseSize}px
-• Scale Ratio: ${scaleRatio}
-• Steps Up: ${stepsUp}
-• Steps Down: ${stepsDown}
-
-Reasoning:
-${reasoningMatch[1].trim()}`
-
-        setPlatformReasoning(analysisText)
+        location: selectedLocation,
+        requirements: customRequirements // Add custom requirements
       }
+
+      const result = await generateTypeScale(analysisInput)
+      const recommendation = parseAIRecommendation(result)
       
+      // Update platform with recommendation
       updatePlatform(currentPlatform, {
         scale: {
-          ...params
+          ...currentSettings.scale,
+          ...recommendation
         }
       })
+
+      setPlatformReasoning(result)
     } catch (error) {
+      console.error('Error:', error)
       setAiError(error instanceof Error ? error.message : 'Failed to generate scale')
     } finally {
       setIsGenerating(false)
-      setTimeout(() => setProgress(0), 500)
     }
   }
 
@@ -871,7 +850,30 @@ ${reasoningMatch[1].trim()}`
                   <div className="space-y-4">
                     <div className="space-y-4">
                       <div>
-                        <Label className="text-xs">Usage Context</Label>
+                        <Label className="text-xs">Platform</Label>
+                        <Select
+                          value={selectedDevice}
+                          onValueChange={setSelectedDevice}
+                        >
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Select platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {platforms.map((platform) => (
+                              <SelectItem
+                                key={platform.id}
+                                value={platform.id}
+                                className="text-xs"
+                              >
+                                {platform.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Context</Label>
                         <Select
                           value={selectedContext}
                           onValueChange={setSelectedContext}
@@ -913,6 +915,16 @@ ${reasoningMatch[1].trim()}`
                         </Select>
                       </div>
 
+                      <div className="space-y-2">
+                        <Label className="text-xs">Additional Requirements</Label>
+                        <Input
+                          placeholder="E.g., High contrast needed, Multilingual support..."
+                          value={customRequirements}
+                          onChange={(e) => setCustomRequirements(e.target.value)}
+                          className="text-xs h-8"
+                        />
+                      </div>
+
                       {aiError && (
                         <div className="text-sm text-red-500">
                           {aiError}
@@ -931,10 +943,20 @@ ${reasoningMatch[1].trim()}`
 
                       {platformReasoning && (
                         <div className="mt-4 p-4 bg-muted rounded-lg">
-                          <h4 className="text-xs font-medium mb-2">Platform Analysis Results</h4>
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                            {platformReasoning}
-                          </p>
+                          <h4 className="text-sm font-semibold mb-2">Scale Analysis</h4>
+                          <div className="text-xs text-muted-foreground space-y-4">
+                            <div>
+                              <div className="font-semibold mb-1">Scale Parameters:</div>
+                              <div>Base size: {currentSettings.scale.baseSize}px</div>
+                              <div>Ratio: {currentSettings.scale.ratio}</div>
+                              <div>Steps up: {currentSettings.scale.stepsUp}</div>
+                              <div>Steps down: {currentSettings.scale.stepsDown}</div>
+                            </div>
+                            <div>
+                              <div className="font-semibold mb-1">Reasoning:</div>
+                              <p className="whitespace-pre-wrap">{platformReasoning}</p>
+                            </div>
+                          </div>
                         </div>
                       )}
 
