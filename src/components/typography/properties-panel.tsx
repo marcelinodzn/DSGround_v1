@@ -1313,3 +1313,17 @@ ${recommendation}`
     </div>
   )
 }
+
+function TypeScaleTab({ platform }: { platform: Platform }) {
+  // ... existing code
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium">Type Scale ({platform.units.typography})</h3>
+        {/* ... rest of the component */}
+      </div>
+      {/* ... rest of the component */}
+    </div>
+  )
+}

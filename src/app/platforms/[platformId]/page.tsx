@@ -6,11 +6,59 @@ import { Button } from "@/components/ui/button"
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
-import { usePlatformStore } from "@/store/platform-store"
+import { usePlatformStore, Platform } from "@/store/platform-store"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { toast } from 'sonner'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+const UNIT_OPTIONS = {
+  typography: [
+    { value: 'rem', label: 'rem - Root EM' },
+    { value: 'em', label: 'em - EM' },
+    { value: 'ch', label: 'ch - Character Width' },
+    { value: 'ex', label: 'ex - x-Height' },
+    { value: 'vw', label: 'vw - Viewport Width' },
+    { value: 'vh', label: 'vh - Viewport Height' },
+    { value: '%', label: '% - Percentage' },
+    { value: 'px', label: 'px - Pixels' },
+    { value: 'pt', label: 'pt - Points (Print)' },
+    { value: 'pc', label: 'pc - Picas (Print)' }
+  ] as const,
+  spacing: [
+    { value: 'rem', label: 'rem - Root EM' },
+    { value: 'em', label: 'em - EM' },
+    { value: 'vw', label: 'vw - Viewport Width' },
+    { value: 'vh', label: 'vh - Viewport Height' },
+    { value: '%', label: '% - Percentage' },
+    { value: 'px', label: 'px - Pixels' }
+  ] as const,
+  dimensions: [
+    { value: 'px', label: 'px - Pixels' },
+    { value: '%', label: '% - Percentage' },
+    { value: 'vw', label: 'vw - Viewport Width' },
+    { value: 'vh', label: 'vh - Viewport Height' },
+    { value: 'cm', label: 'cm - Centimeters' },
+    { value: 'mm', label: 'mm - Millimeters' },
+    { value: 'in', label: 'in - Inches' },
+    { value: 'm', label: 'm - Meters' }
+  ] as const
+}
 
 export default function PlatformPage({ params }: { params: { platformId: string } }) {
   const { isFullscreen, setIsFullscreen } = useLayout()
@@ -80,9 +128,23 @@ export default function PlatformPage({ params }: { params: { platformId: string 
           isFullscreen ? "" : "pt-6 px-6"
         )}>
           <div>
-            <h1 className="text-[30px] font-bold">
-              {isEditing ? 'Edit Platform' : platform.name}
-            </h1>
+            <div className="flex flex-col gap-2">
+              <h1 className="text-[30px] font-bold">
+                {platform.name}
+              </h1>
+              {isEditing ? (
+                <Input
+                  value={editForm.description}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Add description"
+                  className="max-w-md"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground max-w-md">
+                  {platform.description || 'No description'}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-4">
             {isEditing ? (
@@ -113,76 +175,174 @@ export default function PlatformPage({ params }: { params: { platformId: string 
           </div>
         </div>
 
-        <div className="py-8 px-6 max-w-3xl">
-          <Card className="p-6 space-y-6">
-            {isEditing ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Platform Name</Label>
-                  <Input
-                    value={editForm.name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input
-                    value={editForm.description}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-                {/* Add more form fields for units and layout if needed */}
-              </>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Platform Name</Label>
-                  <p className="text-sm">{platform.name}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <p className="text-sm">{platform.description}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Units</Label>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium">Typography</p>
-                      <p>{platform.units.typography}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Spacing</p>
-                      <p>{platform.units.spacing}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Dimensions</p>
-                      <p>{platform.units.dimensions}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Layout</Label>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium">Base Size</p>
-                      <p>{platform.layout.baseSize}px</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Grid Columns</p>
-                      <p>{platform.layout.gridColumns}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Grid Gutter</p>
-                      <p>{platform.layout.gridGutter}px</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Container Padding</p>
-                      <p>{platform.layout.containerPadding}px</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+        <div className="py-8 px-6">
+          <Card className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Setting</TableHead>
+                  <TableHead>Value</TableHead>
+                  {isEditing && <TableHead>Edit</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Units Section */}
+                <TableRow>
+                  <TableCell className="font-medium">Typography Units</TableCell>
+                  <TableCell>{platform.units.typography}</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Select
+                        value={editForm.units.typography}
+                        onValueChange={(value: Platform['units']['typography']) => 
+                          setEditForm(prev => ({
+                            ...prev,
+                            units: { ...prev.units, typography: value }
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.typography.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  )}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Spacing Units</TableCell>
+                  <TableCell>{platform.units.spacing}</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Select
+                        value={editForm.units.spacing}
+                        onValueChange={(value: Platform['units']['spacing']) => 
+                          setEditForm(prev => ({
+                            ...prev,
+                            units: { ...prev.units, spacing: value }
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.spacing.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  )}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Dimension Units</TableCell>
+                  <TableCell>{platform.units.dimensions}</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Select
+                        value={editForm.units.dimensions}
+                        onValueChange={(value: Platform['units']['dimensions']) => 
+                          setEditForm(prev => ({
+                            ...prev,
+                            units: { ...prev.units, dimensions: value }
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.dimensions.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  )}
+                </TableRow>
+
+                {/* Layout Section */}
+                <TableRow>
+                  <TableCell className="font-medium">Base Size</TableCell>
+                  <TableCell>{platform.layout.baseSize}px</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={editForm.layout.baseSize}
+                        onChange={(e) => setEditForm(prev => ({
+                          ...prev,
+                          layout: { ...prev.layout, baseSize: parseInt(e.target.value) }
+                        }))}
+                        className="w-[180px]"
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Grid Columns</TableCell>
+                  <TableCell>{platform.layout.gridColumns}</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={editForm.layout.gridColumns}
+                        onChange={(e) => setEditForm(prev => ({
+                          ...prev,
+                          layout: { ...prev.layout, gridColumns: parseInt(e.target.value) }
+                        }))}
+                        className="w-[180px]"
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Grid Gutter</TableCell>
+                  <TableCell>{platform.layout.gridGutter}px</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={editForm.layout.gridGutter}
+                        onChange={(e) => setEditForm(prev => ({
+                          ...prev,
+                          layout: { ...prev.layout, gridGutter: parseInt(e.target.value) }
+                        }))}
+                        className="w-[180px]"
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Container Padding</TableCell>
+                  <TableCell>{platform.layout.containerPadding}px</TableCell>
+                  {isEditing && (
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={editForm.layout.containerPadding}
+                        onChange={(e) => setEditForm(prev => ({
+                          ...prev,
+                          layout: { ...prev.layout, containerPadding: parseInt(e.target.value) }
+                        }))}
+                        className="w-[180px]"
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+              </TableBody>
+            </Table>
           </Card>
         </div>
       </div>

@@ -29,12 +29,22 @@ import { cn } from '@/lib/utils'
 import { useLayout } from "@/contexts/layout-context"
 import { DocumentationModal } from '@/components/documentation-modal'
 import { BrandSelector } from "@/components/brand-selector"
+import { usePlatformStore, type Platform } from "@/store/platform-store"
 
-function getBreadcrumbItems(pathname: string) {
+function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
   const segments = pathname.split('/').filter(Boolean)
   const items = segments.map((segment, index) => {
     const href = `/${segments.slice(0, index + 1).join('/')}`
-    const label = segment.charAt(0).toUpperCase() + segment.slice(1)
+    let label = segment.charAt(0).toUpperCase() + segment.slice(1)
+    
+    // If this is a platform ID, replace it with the platform name
+    if (segment.length === 36) { // UUID length
+      const platform = platforms.find(p => p.id === segment)
+      if (platform) {
+        label = platform.name
+      }
+    }
+    
     return { href, label }
   })
   return items
@@ -46,8 +56,9 @@ export function RootLayoutClient({
   children: React.ReactNode
 }) {
   const { isFullscreen } = useLayout()
+  const { platforms } = usePlatformStore()
   const pathname = usePathname()
-  const breadcrumbItems = getBreadcrumbItems(pathname)
+  const breadcrumbItems = getBreadcrumbItems(pathname, platforms)
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false)
   const showDocumentation = pathname === '/foundations/typography'
 

@@ -11,9 +11,9 @@ export interface Platform {
   name: string
   description: string | null
   units: {
-    typography: 'rem' | 'em' | 'px'
-    spacing: 'rem' | 'em' | 'px'
-    dimensions: 'px' | '%' | 'vw' | 'vh'
+    typography: 'rem' | 'em' | 'ch' | 'ex' | 'vw' | 'vh' | '%' | 'px' | 'pt' | 'pc'
+    spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
+    dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
   }
   layout: {
     baseSize: number
