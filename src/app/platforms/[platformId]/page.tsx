@@ -1,77 +1,72 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useLayout } from "@/contexts/layout-context"
 import { Button } from "@/components/ui/button"
-import { Maximize2, Minimize2, Pencil } from 'lucide-react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
-import { Card, CardHeader, CardContent } from "@/components/ui/card"
-import { useState, useEffect } from "react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AnimatedTabs } from "@/components/ui/animated-tabs"
-import { usePlatformStore, Platform } from "@/store/platform-store"
 import { useRouter } from "next/navigation"
-
-const slugify = (text: string) => {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]+/g, '')
-}
+import { usePlatformStore } from "@/store/platform-store"
+import { Card } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { toast } from 'sonner'
 
 export default function PlatformPage({ params }: { params: { platformId: string } }) {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const [isEditingName, setIsEditingName] = useState(false)
-  const [platformName, setPlatformName] = useState('')
-  const [activeMainTab, setActiveMainTab] = useState('overview')
-
   const { platforms, updatePlatform } = usePlatformStore()
-  const platform = platforms.find(p => slugify(p.name) === params.platformId)
-
-  const mainTabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'units', label: 'Units' },
-    { id: 'size-layout', label: 'Size & Layout' },
-  ]
+  const [platform, setPlatform] = useState<Platform | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    units: {
+      typography: 'rem' as const,
+      spacing: 'px' as const,
+      dimensions: 'px' as const
+    },
+    layout: {
+      baseSize: 16,
+      gridColumns: 12,
+      gridGutter: 24,
+      containerPadding: 16
+    }
+  })
 
   useEffect(() => {
-    if (platform) {
-      setPlatformName(platform.name)
+    const currentPlatform = platforms.find(p => p.id === params.platformId)
+    if (currentPlatform) {
+      setPlatform(currentPlatform)
+      setEditForm({
+        name: currentPlatform.name,
+        description: currentPlatform.description || '',
+        units: currentPlatform.units,
+        layout: currentPlatform.layout
+      })
     }
-  }, [platform])
+  }, [params.platformId, platforms])
 
-  const handleNameSave = () => {
-    if (platformName.trim() && platform) {
-      updatePlatform(platform.id, { name: platformName })
-      setIsEditingName(false)
+  const handleSave = async () => {
+    if (!platform) return
+
+    try {
+      await updatePlatform(platform.id, {
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || null,
+        units: editForm.units,
+        layout: editForm.layout
+      })
+      setIsEditing(false)
+      toast.success('Platform updated successfully')
+    } catch (error) {
+      console.error('Update platform error:', error)
+      toast.error('Failed to update platform')
     }
   }
 
   if (!platform) {
-    router.push('/platforms')
-    return null
-  }
-
-  const handleUpdateUnits = (key: keyof Platform['units'], value: string) => {
-    if (platform) {
-      updatePlatform(platform.id, {
-        units: { ...platform.units, [key]: value }
-      })
-    }
-  }
-
-  const handleUpdateLayout = (key: keyof Platform['layout'], value: number) => {
-    if (platform) {
-      updatePlatform(platform.id, {
-        layout: { ...platform.layout, [key]: value }
-      })
-    }
-  }
-
-  const handleViewPlatform = (platformName: string) => {
-    router.push(`/platforms/${slugify(platformName)}`)
+    return <div>Loading...</div>
   }
 
   return (
@@ -84,203 +79,111 @@ export default function PlatformPage({ params }: { params: { platformId: string 
           "flex items-center justify-between mb-6",
           isFullscreen ? "" : "pt-6 px-6"
         )}>
-          <div className="group relative">
-            {isEditingName ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={platformName}
-                  onChange={(e) => setPlatformName(e.target.value)}
-                  className="text-[30px] font-bold h-auto"
-                  autoFocus
-                  onBlur={handleNameSave}
-                  onKeyDown={(e) => e.key === 'Enter' && handleNameSave()}
-                />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <h1 className="text-[30px] font-bold">{platform.name}</h1>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => setIsEditingName(true)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+          <div>
+            <h1 className="text-[30px] font-bold">
+              {isEditing ? 'Edit Platform' : platform.name}
+            </h1>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="ml-2"
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
+          <div className="flex items-center gap-4">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave}>
+                  Save Changes
+                </Button>
+              </>
             ) : (
-              <Maximize2 className="h-4 w-4" />
+              <Button onClick={() => setIsEditing(true)}>
+                Edit Platform
+              </Button>
             )}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="py-8 px-6 max-w-full overflow-x-hidden">
-          <div className="space-y-6">
-            <AnimatedTabs 
-              tabs={mainTabs}
-              defaultTab="overview"
-              onChange={setActiveMainTab}
-              layoutId="main-tabs"
-            />
-
-            {activeMainTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="p-6">
-                  <h3 className="text-sm font-medium text-muted-foreground">Base Size</h3>
-                  <p className="text-2xl font-bold mt-2">{platform.layout.baseSize}px</p>
-                </Card>
-                <Card className="p-6">
-                  <h3 className="text-sm font-medium text-muted-foreground">Grid Columns</h3>
-                  <p className="text-2xl font-bold mt-2">{platform.layout.gridColumns}</p>
-                </Card>
-                <Card className="p-6">
-                  <h3 className="text-sm font-medium text-muted-foreground">Distance Unit</h3>
-                  <p className="text-2xl font-bold mt-2">{platform.units.dimensions}</p>
-                </Card>
-                <Card className="p-6">
-                  <h3 className="text-sm font-medium text-muted-foreground">Typography Unit</h3>
-                  <p className="text-2xl font-bold mt-2">{platform.units.typography}</p>
-                </Card>
-              </div>
-            )}
-
-            {activeMainTab === 'units' && (
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Unit Settings</h3>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <Label>Typography Units</Label>
-                      <Select
-                        value={platform.units.typography}
-                        onValueChange={(value) => handleUpdateUnits('typography', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select typography unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="rem">REM</SelectItem>
-                          <SelectItem value="em">EM</SelectItem>
-                          <SelectItem value="ch">CH</SelectItem>
-                          <SelectItem value="ex">EX</SelectItem>
-                          <SelectItem value="vw">VW</SelectItem>
-                          <SelectItem value="vh">VH</SelectItem>
-                          <SelectItem value="%">Percentage (%)</SelectItem>
-                          <SelectItem value="px">Pixels (px)</SelectItem>
-                          <SelectItem value="pt">Points (pt)</SelectItem>
-                          <SelectItem value="pc">Picas (pc)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">Used for font sizes and text-related measurements</p>
+        <div className="py-8 px-6 max-w-3xl">
+          <Card className="p-6 space-y-6">
+            {isEditing ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Platform Name</Label>
+                  <Input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input
+                    value={editForm.description}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+                {/* Add more form fields for units and layout if needed */}
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Platform Name</Label>
+                  <p className="text-sm">{platform.name}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <p className="text-sm">{platform.description}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Units</Label>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium">Typography</p>
+                      <p>{platform.units.typography}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Spacing Units</Label>
-                      <Select
-                        value={platform.units.spacing}
-                        onValueChange={(value) => handleUpdateUnits('spacing', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select spacing unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="rem">REM</SelectItem>
-                          <SelectItem value="em">EM</SelectItem>
-                          <SelectItem value="vw">VW</SelectItem>
-                          <SelectItem value="vh">VH</SelectItem>
-                          <SelectItem value="%">Percentage (%)</SelectItem>
-                          <SelectItem value="px">Pixels (px)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">Used for margins, padding, and general spacing</p>
+                    <div>
+                      <p className="font-medium">Spacing</p>
+                      <p>{platform.units.spacing}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Dimension Units</Label>
-                      <Select
-                        value={platform.units.dimensions}
-                        onValueChange={(value) => handleUpdateUnits('dimensions', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select dimension unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="%">Percentage (%)</SelectItem>
-                          <SelectItem value="vw">Viewport Width (vw)</SelectItem>
-                          <SelectItem value="vh">Viewport Height (vh)</SelectItem>
-                          <SelectItem value="px">Pixels (px)</SelectItem>
-                          <SelectItem value="cm">Centimeters (cm)</SelectItem>
-                          <SelectItem value="mm">Millimeters (mm)</SelectItem>
-                          <SelectItem value="in">Inches (in)</SelectItem>
-                          <SelectItem value="m">Meters (m)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">Used for widths, heights, and fixed dimensions</p>
+                    <div>
+                      <p className="font-medium">Dimensions</p>
+                      <p>{platform.units.dimensions}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {activeMainTab === 'size-layout' && (
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Size & Layout Settings</h3>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Base Size</Label>
-                      <Input
-                        type="number"
-                        value={platform.layout.baseSize}
-                        onChange={(e) => handleUpdateLayout('baseSize', parseInt(e.target.value))}
-                      />
+                </div>
+                <div className="space-y-2">
+                  <Label>Layout</Label>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium">Base Size</p>
+                      <p>{platform.layout.baseSize}px</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Grid Columns</Label>
-                      <Input
-                        type="number"
-                        value={platform.layout.gridColumns}
-                        onChange={(e) => handleUpdateLayout('gridColumns', parseInt(e.target.value))}
-                      />
+                    <div>
+                      <p className="font-medium">Grid Columns</p>
+                      <p>{platform.layout.gridColumns}</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Grid Gutter</Label>
-                      <Input
-                        type="number"
-                        value={platform.layout.gridGutter}
-                        onChange={(e) => handleUpdateLayout('gridGutter', parseInt(e.target.value))}
-                      />
+                    <div>
+                      <p className="font-medium">Grid Gutter</p>
+                      <p>{platform.layout.gridGutter}px</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Container Padding</Label>
-                      <Input
-                        type="number"
-                        value={platform.layout.containerPadding}
-                        onChange={(e) => handleUpdateLayout('containerPadding', parseInt(e.target.value))}
-                      />
+                    <div>
+                      <p className="font-medium">Container Padding</p>
+                      <p>{platform.layout.containerPadding}px</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </>
             )}
-          </div>
+          </Card>
         </div>
       </div>
     </div>

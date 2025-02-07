@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { CardMenu } from "@/components/ui/card-menu"
 import { usePlatformStore } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
+import { toast } from 'sonner'
 
 interface Platform {
   id: string
@@ -45,8 +46,7 @@ export default function PlatformsPage() {
     error,
     fetchPlatforms,
     deletePlatform, 
-    duplicatePlatform, 
-    updatePlatform 
+    addPlatform 
   } = usePlatformStore()
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function PlatformsPage() {
 
   const handleAddPlatform = () => {
     if (!currentBrand) {
-      alert('Please select a brand first')
+      toast.error('Please select a brand first')
       return
     }
     router.push('/platforms/new')
@@ -71,31 +71,28 @@ export default function PlatformsPage() {
     e.stopPropagation()
     try {
       await deletePlatform(id)
+      toast.success('Platform deleted successfully')
     } catch (error) {
-      console.error('Failed to delete platform:', error)
+      toast.error('Failed to delete platform')
     }
   }
 
-  const handleDuplicatePlatform = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    try {
-      await duplicatePlatform(id)
-    } catch (error) {
-      console.error('Failed to duplicate platform:', error)
-    }
+  if (!currentBrand) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)]">
+        <h2 className="text-2xl font-bold mb-4">No Brand Selected</h2>
+        <p className="text-muted-foreground">Please select a brand to view platforms</p>
+      </div>
+    )
   }
 
-  const handleEditPlatform = async (id: string, newName: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    try {
-      await updatePlatform(id, { name: newName })
-    } catch (error) {
-      console.error('Failed to update platform:', error)
-    }
+  if (isLoading) {
+    return <div>Loading...</div>
   }
 
-  if (isLoading) return <div>Loading...</div>
-  if (error) return <div>Error: {error}</div>
+  if (error) {
+    return <div>Error: {error}</div>
+  }
 
   return (
     <div className={cn(
@@ -149,12 +146,7 @@ export default function PlatformsPage() {
                   </p>
                 </Button>
                 <CardMenu
-                  onEdit={(e) => {
-                    const newName = prompt('Enter new name:', platform.name)
-                    if (newName) handleEditPlatform(platform.id, newName, e)
-                  }}
                   onDelete={(e) => handleDeletePlatform(platform.id, e)}
-                  onDuplicate={(e) => handleDuplicatePlatform(platform.id, e)}
                 />
               </div>
             ))}

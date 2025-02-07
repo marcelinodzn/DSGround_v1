@@ -3,17 +3,17 @@
 // Create a new store for platforms
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { supabase, type Platform } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 export interface Platform {
   id: string
+  brand_id: string
   name: string
-  description: string
-  createdAt: string
+  description: string | null
   units: {
-    typography: 'rem' | 'em' | 'ch' | 'ex' | 'vw' | 'vh' | '%' | 'px' | 'pt' | 'pc'
-    spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
-    dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
+    typography: 'rem' | 'em' | 'px'
+    spacing: 'rem' | 'em' | 'px'
+    dimensions: 'px' | '%' | 'vw' | 'vh'
   }
   layout: {
     baseSize: number
@@ -21,6 +21,8 @@ export interface Platform {
     gridGutter: number
     containerPadding: number
   }
+  created_at: string
+  updated_at: string
 }
 
 interface PlatformStore {
@@ -29,10 +31,15 @@ interface PlatformStore {
   isLoading: boolean
   error: string | null
   fetchPlatforms: (brandId: string) => Promise<void>
-  addPlatform: (brandId: string, platform: Omit<Platform, 'id' | 'brand_id'>) => Promise<void>
-  updatePlatform: (id: string, updates: Partial<Platform>) => Promise<void>
+  addPlatform: (brandId: string, platform: {
+    name: string
+    description?: string | null
+    units: Platform['units']
+    layout: Platform['layout']
+  }) => Promise<void>
+  updatePlatform: (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => Promise<void>
   deletePlatform: (id: string) => Promise<void>
-  duplicatePlatform: (id: string) => Promise<void>
+  setCurrentPlatform: (id: string | null) => void
 }
 
 export const usePlatformStore = create<PlatformStore>((set, get) => ({
@@ -50,9 +57,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         .eq('brand_id', brandId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Fetch platforms error:', error)
+        throw error
+      }
       set({ platforms: data || [], error: null })
     } catch (error) {
+      console.error('Fetch platforms error:', error)
       set({ error: (error as Error).message })
     } finally {
       set({ isLoading: false })
@@ -63,20 +74,30 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('platforms')
-        .insert([{
-          ...platform,
+        .insert({
           brand_id: brandId,
-          created_at: new Date().toISOString()
-        }])
+          name: platform.name,
+          description: platform.description || null,
+          units: platform.units,
+          layout: platform.layout
+        })
         .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Add platform error:', error)
+        throw error
+      }
+
+      if (!data) throw new Error('No data returned from insert')
+
       set(state => ({ 
         platforms: [...state.platforms, data[0]],
         error: null 
       }))
     } catch (error) {
+      console.error('Add platform error:', error)
       set({ error: (error as Error).message })
+      throw error
     }
   },
 
@@ -91,13 +112,19 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         .eq('id', id)
         .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Update platform error:', error)
+        throw error
+      }
+
       set(state => ({
         platforms: state.platforms.map(p => p.id === id ? data[0] : p),
         error: null
       }))
     } catch (error) {
+      console.error('Update platform error:', error)
       set({ error: (error as Error).message })
+      throw error
     }
   },
 
@@ -108,38 +135,21 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Delete platform error:', error)
+        throw error
+      }
+
       set(state => ({
         platforms: state.platforms.filter(p => p.id !== id),
         error: null
       }))
     } catch (error) {
+      console.error('Delete platform error:', error)
       set({ error: (error as Error).message })
+      throw error
     }
   },
 
-  duplicatePlatform: async (id) => {
-    try {
-      const platform = get().platforms.find(p => p.id === id)
-      if (!platform) return
-
-      const { data, error } = await supabase
-        .from('platforms')
-        .insert([{
-          ...platform,
-          id: undefined, // Let Supabase generate new ID
-          name: `${platform.name} (Copy)`,
-          created_at: new Date().toISOString()
-        }])
-        .select()
-
-      if (error) throw error
-      set(state => ({ 
-        platforms: [...state.platforms, data[0]],
-        error: null 
-      }))
-    } catch (error) {
-      set({ error: (error as Error).message })
-    }
-  },
+  setCurrentPlatform: (id) => set({ currentPlatform: id })
 })) 

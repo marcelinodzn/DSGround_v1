@@ -10,7 +10,9 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
-import { usePlatformStore, Platform } from "@/store/platform-store"
+import { usePlatformStore } from "@/store/platform-store"
+import { useBrandStore } from "@/store/brand-store"
+import { toast } from 'sonner'
 
 interface PlatformForm {
   name: string
@@ -32,38 +34,50 @@ interface PlatformForm {
 export default function NewPlatformPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const addPlatform = usePlatformStore((state) => state.addPlatform)
+  const { currentBrand } = useBrandStore()
+  const { addPlatform } = usePlatformStore()
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PlatformForm>({
     name: '',
     description: '',
+    units: {
+      distance: 'px',
+      typography: 'rem',
+      spacing: 'px',
+      dimensions: 'px'
+    },
+    layout: {
+      baseSize: 16,
+      gridColumns: 12,
+      gridGutter: 24,
+      containerPadding: 16
+    }
   })
 
-  const handleSubmit = () => {
-    if (!formData.name.trim()) {
+  const handleCreate = async () => {
+    if (!currentBrand) {
+      toast.error('Please select a brand first')
       return
     }
 
-    const newPlatform: Platform = {
-      id: crypto.randomUUID(),
-      name: formData.name,
-      description: formData.description,
-      createdAt: new Date().toISOString(),
-      units: {
-        typography: 'rem',
-        spacing: 'px',
-        dimensions: 'px'
-      },
-      layout: {
-        baseSize: 16,
-        gridColumns: 12,
-        gridGutter: 24,
-        containerPadding: 16
-      }
+    if (!formData.name.trim()) {
+      toast.error('Please enter a platform name')
+      return
     }
-    
-    addPlatform(newPlatform)
-    router.push('/platforms')
+
+    try {
+      await addPlatform(currentBrand, {
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        units: formData.units,
+        layout: formData.layout
+      })
+      toast.success('Platform created successfully')
+      router.push('/platforms')
+    } catch (error) {
+      console.error('Create platform error:', error)
+      toast.error('Failed to create platform')
+    }
   }
 
   return (
@@ -117,7 +131,7 @@ export default function NewPlatformPage() {
               <Button variant="outline" onClick={() => router.back()}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit}>
+              <Button onClick={handleCreate}>
                 Create Platform
               </Button>
             </div>
