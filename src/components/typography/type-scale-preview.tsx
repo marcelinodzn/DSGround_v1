@@ -239,6 +239,7 @@ export function TypeScalePreview() {
     getScaleValues
   } = useTypographyStore()
   
+  const { platforms: platformSettings } = usePlatformStore()
   const [view, setView] = useState<'scale' | 'styles'>('scale')
 
   const viewTabs = [
@@ -248,14 +249,15 @@ export function TypeScalePreview() {
 
   // Find current settings and handle the case where none are found
   const currentSettings = platforms.find(p => p.id === currentPlatform)
+  const currentPlatformSettings = platformSettings.find(p => p.id === currentPlatform)
   
   // If no settings found, show loading or return null
-  if (!currentSettings) {
+  if (!currentSettings || !currentPlatformSettings) {
     return null
   }
 
   const { scaleMethod, scale, distanceScale } = currentSettings
-  const units = currentSettings.units || defaultUnits
+  const typographyUnit = currentPlatformSettings.units.typography
   const scaleValues = getScaleValues(currentPlatform)
 
   // Calculate the correct base size based on scale method
@@ -279,7 +281,7 @@ export function TypeScalePreview() {
       
       <div className="flex justify-between items-center pt-6">
         <div className="py-4 text-sm text-muted-foreground">
-          Base Size: {convertToUnit(displayBaseSize, units.typography, scale.baseSize)}
+          Base Size: {displayBaseSize}{typographyUnit}
           {scaleMethod === 'distance' && ' (distance-based)'} • 
           Scale Ratio: {scale.ratio} • 
           Steps Up: {scale.stepsUp} • 

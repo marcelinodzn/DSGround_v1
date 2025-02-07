@@ -6,7 +6,7 @@ import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/ty
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, GripVertical, Trash2, Copy, Upload, X, Codesandbox, ScanEye } from "lucide-react"
+import { ChevronDown, GripVertical, Trash2, Copy, Upload, X, Codesandbox, ScanEye, LineChart } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -211,6 +211,7 @@ export function PropertiesPanel() {
     platforms: typographyPlatforms,
     initializePlatform
   } = useTypographyStore()
+  const { platforms: platformSettings } = usePlatformStore()
 
   // DnD hooks
   const sensors = useSensors(
@@ -254,6 +255,7 @@ export function PropertiesPanel() {
 
   // Find current settings
   const currentSettings = typographyPlatforms.find(p => p.id === currentPlatform)
+  const currentPlatformSettings = platformSettings.find(p => p.id === currentPlatform)
   
   if (!currentSettings) {
     return null
@@ -554,7 +556,7 @@ ${recommendation}`
                   htmlFor="modular"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                  <LineChart className="h-6 w-6" />
                   <div className="mt-2 text-xs">Modular</div>
                 </Label>
               </div>
@@ -607,7 +609,9 @@ ${recommendation}`
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs">Base Size (px)</Label>
+                  <Label className="text-xs">
+                    Base Size ({currentPlatformSettings?.units.typography || 'px'})
+                  </Label>
                   <Input
                     type="number"
                     value={currentSettings.scale.baseSize}
@@ -662,43 +666,16 @@ ${recommendation}`
             {currentSettings.scaleMethod === 'distance' && (
               <div className="mt-4 space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-xs">Scale Type</Label>
-                  <Select
-                    value={currentSettings.scale.ratio.toString()}
-                    onValueChange={(value) => {
-                      handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
-                    }}
-                  >
-                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                      <SelectValue placeholder="Select scale type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
-                      <SelectItem value="1.125">Major Second (1.125)</SelectItem>
-                      <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
-                      <SelectItem value="1.25">Major Third (1.25)</SelectItem>
-                      <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
-                      <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
-                      <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
-                      <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs">Viewing Distance (cm)</Label>
+                  <Label className="text-xs">
+                    Base Size ({currentPlatformSettings?.units.typography || 'px'})
+                  </Label>
                   <Input
                     type="number"
-                    value={currentSettings.distanceScale.viewingDistance}
-                    onChange={(e) => {
-                      handleDistanceScaleChange({
-                        viewingDistance: parseFloat(e.target.value),
-                      })
-                    }}
+                    value={currentSettings.distanceScale?.calculatedBaseSize || 0}
+                    disabled
                     className="text-xs h-8"
                   />
                 </div>
-
                 <div>
                   <Label className="text-xs">Visual Acuity (decimal)</Label>
                   <Input
@@ -822,6 +799,17 @@ ${recommendation}`
 
             {currentSettings.scaleMethod === 'ai' && (
               <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    Base Size ({currentPlatformSettings?.units.typography || 'px'})
+                  </Label>
+                  <Input
+                    type="number"
+                    value={currentSettings.aiScale?.recommendedBaseSize || 0}
+                    disabled
+                    className="text-xs h-8"
+                  />
+                </div>
                 <AnimatedTabs
                   tabs={analysisTabs}
                   defaultTab="platform"
@@ -1322,6 +1310,67 @@ function TypeScaleTab({ platform }: { platform: Platform }) {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">Type Scale ({platform.units.typography})</h3>
         {/* ... rest of the component */}
+      </div>
+      {/* ... rest of the component */}
+    </div>
+  )
+}
+
+function ModularScaleTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
+        <Input
+          type="number"
+          value={platform.scale.baseSize}
+          onChange={(e) => {
+            handleScaleChange({
+              baseSize: Number(e.target.value)
+            })
+          }}
+          className="text-xs h-8"
+        />
+      </div>
+      {/* ... rest of the component */}
+    </div>
+  )
+}
+
+function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
+        <Input
+          type="number"
+          value={platform.distanceScale?.calculatedBaseSize || 0}
+          disabled
+          className="text-xs h-8"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Base size calculated from distance parameters
+        </p>
+      </div>
+      {/* ... rest of the component */}
+    </div>
+  )
+}
+
+function AIDistanceTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
+        <Input
+          type="number"
+          value={platform.aiScale?.recommendedBaseSize || 0}
+          disabled
+          className="text-xs h-8"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Base size recommended by AI analysis
+        </p>
       </div>
       {/* ... rest of the component */}
     </div>
