@@ -23,6 +23,13 @@ export interface TypeStyle {
   opticalSize: number
 }
 
+export interface AIScale {
+  recommendedBaseSize: number
+  originalSizeInPx: number
+  recommendations?: string
+  summaryTable?: string
+}
+
 export interface Platform {
   id: string
   name: string
@@ -46,6 +53,7 @@ export interface Platform {
     minContrastLarge: number
   }
   typeStyles: TypeStyle[]
+  aiScale?: AIScale
 }
 
 interface TypographyState {

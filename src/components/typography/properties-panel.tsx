@@ -401,37 +401,52 @@ export function PropertiesPanel() {
     }
   };
 
-  const handleAIScaleGeneration = async () => {
-    try {
-      setIsGenerating(true)
-      setAiError(null)
+  const handleGenerateScale = async () => {
+    if (isGenerating) return; // Prevent multiple clicks
+    
+    setIsGenerating(true);
+    setAiError(null);
+    setPlatformReasoning(null);
+    setProgress(0);
 
-      const analysisInput = {
-        deviceType: platforms.find(p => p.id === currentPlatform)?.name,
+    try {
+      const response = await generateTypeScale({
+        device: selectedDevice,
         context: selectedContext,
         location: selectedLocation,
-        requirements: customRequirements
-      }
+        customRequirements
+      });
 
-      // Call Gemini directly
-      const result = await generateTypeScale(analysisInput)
-      const recommendation = parseAIRecommendation(result)
-      
+      const recommendedSizeInPx = parseAIRecommendation(response.recommendation);
+      const convertedSize = convertUnits(
+        recommendedSizeInPx,
+        'px',
+        currentPlatformSettings?.units.typography || 'px',
+        currentSettings.scale.baseSize
+      );
+
+      // Update both aiScale and scale settings
       updatePlatform(currentPlatform, {
+        aiScale: {
+          recommendedBaseSize: convertedSize,
+          originalSizeInPx: recommendedSizeInPx,
+          recommendations: response.recommendation
+        },
         scale: {
           ...currentSettings.scale,
-          ...recommendation
+          baseSize: convertedSize
         }
-      })
+      });
 
-      setPlatformReasoning(result)
+      setPlatformReasoning(response.reasoning);
+      setProgress(100);
     } catch (error) {
-      console.error('Error:', error)
-      setAiError(error instanceof Error ? error.message : 'Failed to generate scale')
+      console.error('AI Scale generation error:', error);
+      setAiError(error instanceof Error ? error.message : 'Failed to generate scale');
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const handleImageAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -799,23 +814,11 @@ ${recommendation}`
 
             {currentSettings.scaleMethod === 'ai' && (
               <div className="mt-4 space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-xs">
-                    Base Size ({currentPlatformSettings?.units.typography || 'px'})
-                  </Label>
-                  <Input
-                    type="number"
-                    value={currentSettings.aiScale?.recommendedBaseSize || 0}
-                    disabled
-                    className="text-xs h-8"
-                  />
-                </div>
                 <AnimatedTabs
                   tabs={analysisTabs}
                   defaultTab="platform"
                   onChange={(value) => {
                     setActiveAnalysisTab(value);
-                    // Clear states when switching tabs
                     setAiError(null);
                     setPlatformReasoning(null);
                     setImageAnalysis(null);
@@ -900,117 +903,143 @@ ${recommendation}`
                       )}
 
                       {platformReasoning && (
-                        <div className="mt-4 p-4 bg-muted rounded-lg">
-                          <h4 className="text-sm font-semibold mb-2">Scale Analysis</h4>
-                          <div className="text-xs text-muted-foreground space-y-4">
-                            <div>
-                              <div className="font-semibold mb-1">Scale Parameters:</div>
-                              <div>Base size: {currentSettings.scale.baseSize}px</div>
-                              <div>Ratio: {currentSettings.scale.ratio}</div>
-                              <div>Steps up: {currentSettings.scale.stepsUp}</div>
-                              <div>Steps down: {currentSettings.scale.stepsDown}</div>
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-xs">AI Recommendations</Label>
+                            <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                              {currentSettings.aiScale?.recommendations}
                             </div>
-                            <p className="whitespace-pre-wrap">{platformReasoning}</p>
                           </div>
-                        </div>
-                      )}
 
-                      {(platformReasoning || imageAnalysis) && (
-                        <div className="mt-4 space-y-4 border-t pt-4">
-                          <h4 className="text-xs font-medium">Adjust Scale Parameters</h4>
-                          
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs">Base Size</Label>
-                              <Input
-                                type="number"
-                                value={currentSettings.scale.baseSize}
-                                onChange={(e) => {
-                                  updatePlatform(currentPlatform, {
-                                    scale: {
-                                      ...currentSettings.scale,
-                                      baseSize: parseFloat(e.target.value)
-                                    }
-                                  })
-                                }}
-                                className="text-xs h-8"
-                              />
+                          <div className="space-y-2">
+                            <Label className="text-xs">AI Reasoning</Label>
+                            <div className="text-xs text-muted-foreground whitespace-pre-wrap">
+                              {platformReasoning}
                             </div>
+                          </div>
 
+                          {currentSettings.aiScale?.summaryTable && (
                             <div className="space-y-2">
-                              <Label className="text-xs">Scale Type</Label>
-                              <Select
-                                value={currentSettings.scale.ratio.toString()}
-                                onValueChange={(value) => {
-                                  updatePlatform(currentPlatform, {
-                                    scale: {
-                                      ...currentSettings.scale,
-                                      ratio: parseFloat(value)
-                                    }
-                                  })
-                                }}
-                              >
-                                <SelectTrigger className="text-xs h-8">
-                                  <SelectValue placeholder="Select scale type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
-                                  <SelectItem value="1.125">Major Second (1.125)</SelectItem>
-                                  <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
-                                  <SelectItem value="1.25">Major Third (1.25)</SelectItem>
-                                  <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
-                                  <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
-                                  <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
-                                  <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <Label className="text-xs">Summary Table</Label>
+                              <div className="text-xs whitespace-pre-wrap font-mono bg-muted p-2 rounded">
+                                {currentSettings.aiScale.summaryTable}
+                              </div>
                             </div>
+                          )}
 
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="mt-4 space-y-4 border-t pt-4">
+                            <h4 className="text-xs font-medium">Adjust Scale Parameters</h4>
+                            
+                            <div className="space-y-4">
                               <div className="space-y-2">
-                                <Label className="text-xs">Steps Up</Label>
+                                <Label className="text-xs">
+                                  Base Size ({currentPlatformSettings?.units.typography || 'px'})
+                                </Label>
                                 <Input
                                   type="number"
-                                  min="0"
-                                  max="10"
-                                  value={currentSettings.scale.stepsUp}
+                                  value={currentSettings.aiScale?.recommendedBaseSize || 0}
                                   onChange={(e) => {
+                                    const newValue = parseFloat(e.target.value);
+                                    // Update both aiScale and scale
                                     updatePlatform(currentPlatform, {
+                                      aiScale: {
+                                        ...currentSettings.aiScale,
+                                        recommendedBaseSize: newValue,
+                                        originalSizeInPx: convertUnits(
+                                          newValue,
+                                          currentPlatformSettings?.units.typography || 'px',
+                                          'px',
+                                          currentSettings.scale.baseSize
+                                        )
+                                      },
                                       scale: {
                                         ...currentSettings.scale,
-                                        stepsUp: parseInt(e.target.value)
+                                        baseSize: newValue
                                       }
-                                    })
+                                    });
                                   }}
                                   className="text-xs h-8"
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Original AI suggestion: {currentSettings.aiScale?.originalSizeInPx || 0}px
+                                </p>
                               </div>
+
                               <div className="space-y-2">
-                                <Label className="text-xs">Steps Down</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="10"
-                                  value={currentSettings.scale.stepsDown}
-                                  onChange={(e) => {
+                                <Label className="text-xs">Scale Type</Label>
+                                <Select
+                                  value={currentSettings.scale.ratio.toString()}
+                                  onValueChange={(value) => {
                                     updatePlatform(currentPlatform, {
                                       scale: {
                                         ...currentSettings.scale,
-                                        stepsDown: parseInt(e.target.value)
+                                        ratio: parseFloat(value)
                                       }
-                                    })
+                                    });
                                   }}
-                                  className="text-xs h-8"
-                                />
+                                >
+                                  <SelectTrigger className="text-xs h-8">
+                                    <SelectValue placeholder="Select scale type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                                    <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                                    <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                                    <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                                    <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                                    <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                                    <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                                    <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Steps Up</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    value={currentSettings.scale.stepsUp}
+                                    onChange={(e) => {
+                                      updatePlatform(currentPlatform, {
+                                        scale: {
+                                          ...currentSettings.scale,
+                                          stepsUp: parseInt(e.target.value)
+                                        }
+                                      });
+                                    }}
+                                    className="text-xs h-8"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Steps Down</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    value={currentSettings.scale.stepsDown}
+                                    onChange={(e) => {
+                                      updatePlatform(currentPlatform, {
+                                        scale: {
+                                          ...currentSettings.scale,
+                                          stepsDown: parseInt(e.target.value)
+                                        }
+                                      });
+                                    }}
+                                    className="text-xs h-8"
+                                  />
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </>
                       )}
 
                       <Button 
                         className="w-full text-xs"
-                        onClick={handleAIScaleGeneration}
+                        onClick={handleGenerateScale}
                         disabled={!selectedContext || isGenerating}
                       >
                         {isGenerating ? 'Generating...' : 'Generate Scale'}
@@ -1092,7 +1121,9 @@ ${recommendation}`
                             
                             <div className="space-y-4">
                               <div className="space-y-2">
-                                <Label className="text-xs">Base Size</Label>
+                                <Label className="text-xs">
+                                  Base Size ({currentPlatformSettings?.units.typography || 'px'})
+                                </Label>
                                 <Input
                                   type="number"
                                   value={currentSettings.scale.baseSize}
@@ -1369,7 +1400,7 @@ function AIDistanceTab({ platform, currentSettings }: { platform: Platform; curr
           className="text-xs h-8"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Base size recommended by AI analysis
+          Recommended base size in {currentPlatformSettings?.units.typography || 'px'} based on AI analysis
         </p>
       </div>
       {/* ... rest of the component */}

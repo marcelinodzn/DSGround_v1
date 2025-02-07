@@ -96,49 +96,40 @@ interface UnitConversion {
   baseSize?: number
 }
 
-export const convertUnits = ({ from, to, value, baseSize = 16 }: UnitConversion): number => {
-  // First convert to pixels as intermediate
-  let px: number = value;
-  
-  // Convert from source unit to pixels
-  switch (from) {
-    case 'rem':
-      px = value * baseSize;
-      break;
-    case 'em':
-      px = value * baseSize;
-      break;
-    case 'pt':
-      px = value * (96 / 72); // 1pt = 1/72 inch, 1px = 1/96 inch
-      break;
-    case 'pc':
-      px = value * (96 / 6); // 1pc = 1/6 inch
-      break;
-    case '%':
-      px = (value / 100) * baseSize;
-      break;
-    case 'px':
-      px = value;
-      break;
-    // Add other unit conversions as needed
+export function convertUnits(
+  value: number, 
+  fromUnit: string, 
+  toUnit: string, 
+  baseSize: number = 16
+): number {
+  // First convert to pixels
+  let pixels = value;
+  if (fromUnit !== 'px') {
+    switch (fromUnit) {
+      case 'rem':
+        pixels = value * baseSize;
+        break;
+      case 'em':
+        pixels = value * baseSize;
+        break;
+      // Add other unit conversions as needed
+    }
   }
-  
-  // Convert pixels to target unit
-  switch (to) {
-    case 'rem':
-      return px / baseSize;
-    case 'em':
-      return px / baseSize;
-    case 'pt':
-      return px * (72 / 96);
-    case 'pc':
-      return px * (6 / 96);
-    case '%':
-      return (px / baseSize) * 100;
+
+  // Then convert pixels to target unit
+  switch (toUnit) {
     case 'px':
-      return px;
+      return Math.round(pixels * 100) / 100;
+    case 'rem':
+      return Math.round((pixels / baseSize) * 1000) / 1000;
+    case 'em':
+      return Math.round((pixels / baseSize) * 1000) / 1000;
+    case '%':
+      return Math.round((pixels / baseSize * 100) * 100) / 100;
+    case 'pt':
+      return Math.round((pixels * 0.75) * 100) / 100;
     default:
-      return value; // Return original value if unit not supported
+      return pixels;
   }
 }
 

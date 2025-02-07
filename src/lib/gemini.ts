@@ -5,6 +5,8 @@ interface ScaleAnalysisInput {
   context?: string
   location?: string
   image?: string
+  device?: string
+  customRequirements?: string
 }
 
 interface AIRecommendation {
@@ -20,58 +22,44 @@ const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '
 // Use Gemini 2.0 Flash model
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
 
-export async function generateTypeScale(input: ScaleAnalysisInput | string) {
+export async function generateTypeScale(input: ScaleAnalysisInput) {
   try {
     console.log('Starting Gemini type scale generation...')
-    let analysisText: string
+    let analysisText = [
+      input.device && `Device type: ${input.device}`,
+      input.context && `Context: ${input.context}`,
+      input.location && `Location: ${input.location}`,
+      input.customRequirements && `Requirements: ${input.customRequirements}`
+    ].filter(Boolean).join('\n')
 
-    if (typeof input === 'string') {
-      analysisText = input
-    } else if (typeof input === 'object' && input !== null) {
-      const parts = []
-      if (input.deviceType) parts.push(`Device type: ${input.deviceType}`)
-      if (input.context) parts.push(`Context: ${input.context}`)
-      if (input.location) parts.push(`Location: ${input.location}`)
-      analysisText = parts.filter(Boolean).join('\n')
-    } else {
-      throw new Error('Invalid input format')
-    }
-
-    const prompt = `As a typography expert, analyze the following context and image:
+    const prompt = `As a typography expert, analyze the following context:
 
 ${analysisText}
 
-Provide a type scale recommendation in this format:
+Please provide a typography recommendation in the following format:
 
-Scale Parameters:
-Base size: [number]
-Ratio: [number]
-Steps up: [number]
-Steps down: [number]
+RECOMMENDATIONS
+Base Size: [number]px
+Scale Factor: [number]
+Steps Up: [number]
+Steps Down: [number]
 
-Reasoning:
-[Brief explanation considering the platform type, context, and image analysis]`
+REASONING
+[Brief explanation of why these values are recommended for this context, considering the device and requirements]`;
 
-    let result;
-    
-    if (typeof input === 'object' && input.image) {
-      // For image analysis using Gemini 2.0 Flash
-      result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            data: input.image.split(',')[1],
-            mimeType: 'image/jpeg'
-          }
-        }
-      ]);
-    } else {
-      // For text-only analysis
-      result = await model.generateContent(prompt);
-    }
-
+    const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+
+    // Parse the structured response
+    const recommendations = text.match(/RECOMMENDATIONS\n([\s\S]*?)\n\nREASONING/)?.[1];
+    const reasoning = text.match(/REASONING\n([\s\S]*?)$/)?.[1];
+
+    return {
+      recommendation: recommendations?.trim() || '',
+      reasoning: reasoning?.trim() || '',
+      rawResponse: text // Keep the full response for debugging
+    };
 
   } catch (error) {
     console.error('Error generating scale with Gemini:', error)
@@ -79,28 +67,29 @@ Reasoning:
   }
 }
 
-export function parseAIRecommendation(content: string): AIRecommendation {
-  const defaults = {
-    baseSize: 16,
-    ratio: 1.25,
-    stepsUp: 3,
-    stepsDown: 2
-  }
-
+export function parseAIRecommendation(response: string): number {
   try {
-    const baseSize = content.match(/base size[:\s]+(\d+)/i)?.[1]
-    const ratio = content.match(/ratio[:\s]+([\d.]+)/i)?.[1]
-    const stepsUp = content.match(/steps up[:\s]+(\d+)/i)?.[1]
-    const stepsDown = content.match(/steps down[:\s]+(\d+)/i)?.[1]
-
-    return {
-      baseSize: baseSize ? parseInt(baseSize) : defaults.baseSize,
-      ratio: ratio ? parseFloat(ratio) : defaults.ratio,
-      stepsUp: stepsUp ? parseInt(stepsUp) : defaults.stepsUp,
-      stepsDown: stepsDown ? parseInt(stepsDown) : defaults.stepsDown
+    // Look for "Recommended base size: XXpx" format
+    const match = response.match(/Recommended base size:\s*(\d+(?:\.\d+)?)\s*px/i);
+    if (match) {
+      return parseFloat(match[1]);
     }
+
+    // Fallback: look for any number followed by px
+    const pxMatch = response.match(/(\d+(?:\.\d+)?)\s*px/);
+    if (pxMatch) {
+      return parseFloat(pxMatch[1]);
+    }
+
+    // Last resort: look for any number
+    const numberMatch = response.match(/(\d+(?:\.\d+)?)/);
+    if (numberMatch) {
+      return parseFloat(numberMatch[1]);
+    }
+
+    return 16; // Default if no number found
   } catch (error) {
-    console.error('Error parsing AI recommendation:', error)
-    return defaults
+    console.error('Error parsing AI recommendation:', error);
+    return 16;
   }
 } 
