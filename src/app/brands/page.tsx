@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { CardMenu } from "@/components/ui/card-menu"
+import { useBrandStore } from "@/store/brand-store"
+import { toast } from 'sonner'
 
 interface Brand {
   id: string
@@ -19,13 +21,11 @@ interface Brand {
 export default function BrandsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const [brands, setBrands] = useState<Brand[]>([])
+  const { brands, fetchBrands, deleteBrand, createBrand, updateBrand } = useBrandStore()
 
   useEffect(() => {
-    // Load brands from localStorage
-    const savedBrands = JSON.parse(localStorage.getItem('brands') || '[]')
-    setBrands(savedBrands)
-  }, [])
+    fetchBrands()
+  }, [fetchBrands])
 
   const handleAddBrand = () => {
     router.push('/brands/new')
@@ -35,33 +35,39 @@ export default function BrandsPage() {
     router.push(`/brands/${brandId}`)
   }
 
-  const handleDeleteBrand = (id: string, e: React.MouseEvent) => {
+  const handleDeleteBrand = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updatedBrands = brands.filter(b => b.id !== id)
-    localStorage.setItem('brands', JSON.stringify(updatedBrands))
-    setBrands(updatedBrands)
-  }
-
-  const handleDuplicateBrand = (brand: Brand, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const newBrand = {
-      ...brand,
-      id: crypto.randomUUID(),
-      name: `${brand.name} (Copy)`,
-      createdAt: new Date().toISOString()
+    try {
+      await deleteBrand(id)
+      toast.success('Brand deleted successfully')
+    } catch (error) {
+      toast.error('Failed to delete brand')
     }
-    const updatedBrands = [...brands, newBrand]
-    localStorage.setItem('brands', JSON.stringify(updatedBrands))
-    setBrands(updatedBrands)
   }
 
-  const handleEditBrand = (id: string, newName: string, e: React.MouseEvent) => {
+  const handleDuplicateBrand = async (brand: Brand, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updatedBrands = brands.map(b => 
-      b.id === id ? { ...b, name: newName } : b
-    )
-    localStorage.setItem('brands', JSON.stringify(updatedBrands))
-    setBrands(updatedBrands)
+    try {
+      const newBrand = {
+        name: `${brand.name} (Copy)`,
+        description: brand.description || '',
+        type: brand.type
+      }
+      await createBrand(newBrand)
+      toast.success('Brand duplicated successfully')
+    } catch (error) {
+      toast.error('Failed to duplicate brand')
+    }
+  }
+
+  const handleEditBrand = async (id: string, newName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await updateBrand(id, { name: newName })
+      toast.success('Brand updated successfully')
+    } catch (error) {
+      toast.error('Failed to update brand')
+    }
   }
 
   return (

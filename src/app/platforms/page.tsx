@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useLayout } from "@/contexts/layout-context"
 import { Button } from "@/components/ui/button"
 import { Maximize2, Minimize2 } from 'lucide-react'
@@ -7,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { CardMenu } from "@/components/ui/card-menu"
 import { usePlatformStore } from "@/store/platform-store"
+import { useBrandStore } from "@/store/brand-store"
 
 interface Platform {
   id: string
@@ -36,30 +38,64 @@ const slugify = (text: string) => {
 export default function PlatformsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const { platforms, deletePlatform, duplicatePlatform, updatePlatform } = usePlatformStore()
+  const { currentBrand } = useBrandStore()
+  const { 
+    platforms, 
+    isLoading,
+    error,
+    fetchPlatforms,
+    deletePlatform, 
+    duplicatePlatform, 
+    updatePlatform 
+  } = usePlatformStore()
+
+  useEffect(() => {
+    if (currentBrand) {
+      fetchPlatforms(currentBrand)
+    }
+  }, [currentBrand, fetchPlatforms])
 
   const handleAddPlatform = () => {
+    if (!currentBrand) {
+      alert('Please select a brand first')
+      return
+    }
     router.push('/platforms/new')
   }
 
-  const handleViewPlatform = (platformName: string) => {
-    router.push(`/platforms/${slugify(platformName)}`)
+  const handleViewPlatform = (platformId: string) => {
+    router.push(`/platforms/${platformId}`)
   }
 
-  const handleDeletePlatform = (id: string, e: React.MouseEvent) => {
+  const handleDeletePlatform = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    deletePlatform(id)
+    try {
+      await deletePlatform(id)
+    } catch (error) {
+      console.error('Failed to delete platform:', error)
+    }
   }
 
-  const handleDuplicatePlatform = (id: string, e: React.MouseEvent) => {
+  const handleDuplicatePlatform = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    duplicatePlatform(id)
+    try {
+      await duplicatePlatform(id)
+    } catch (error) {
+      console.error('Failed to duplicate platform:', error)
+    }
   }
 
-  const handleEditPlatform = (id: string, newName: string, e: React.MouseEvent) => {
+  const handleEditPlatform = async (id: string, newName: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    updatePlatform(id, { name: newName })
+    try {
+      await updatePlatform(id, { name: newName })
+    } catch (error) {
+      console.error('Failed to update platform:', error)
+    }
   }
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {error}</div>
 
   return (
     <div className={cn(
@@ -105,7 +141,7 @@ export default function PlatformsPage() {
                 <Button
                   variant="outline"
                   className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent w-full"
-                  onClick={() => handleViewPlatform(platform.name)}
+                  onClick={() => handleViewPlatform(platform.id)}
                 >
                   <h3 className="font-semibold">{platform.name}</h3>
                   <p className="text-sm text-muted-foreground text-left line-clamp-2">

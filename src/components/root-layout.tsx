@@ -28,6 +28,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useLayout } from "@/contexts/layout-context"
 import { DocumentationModal } from '@/components/documentation-modal'
+import { BrandSelector } from "@/components/brand-selector"
 
 function getBreadcrumbItems(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
@@ -64,6 +65,9 @@ export function RootLayoutClient({
         <nav className="p-4">
           <div className="mb-6">
             <Logo />
+          </div>
+          <div className="mb-4">
+            <BrandSelector />
           </div>
           <div className="space-y-6">
             <div className="space-y-1">

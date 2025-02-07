@@ -24,15 +24,15 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
         <TypeScaleProvider>
-          <LayoutProvider>
-            <StoreProvider>
+          <StoreProvider>
+            <LayoutProvider>
               <RootLayoutClient>
                 <main className="h-[calc(100vh-4rem)] overflow-y-auto">
                   {children}
                 </main>
               </RootLayoutClient>
-            </StoreProvider>
-          </LayoutProvider>
+            </LayoutProvider>
+          </StoreProvider>
         </TypeScaleProvider>
         <Toaster />
       </body>

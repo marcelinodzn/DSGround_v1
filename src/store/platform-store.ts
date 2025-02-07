@@ -3,6 +3,7 @@
 // Create a new store for platforms
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { supabase, type Platform } from '@/lib/supabase'
 
 export interface Platform {
   id: string
@@ -24,82 +25,121 @@ export interface Platform {
 
 interface PlatformStore {
   platforms: Platform[]
-  addPlatform: (platform: Platform) => void
-  updatePlatform: (id: string, updates: Partial<Platform>) => void
-  deletePlatform: (id: string) => void
-  duplicatePlatform: (id: string) => void
+  currentPlatform: string | null
+  isLoading: boolean
+  error: string | null
+  fetchPlatforms: (brandId: string) => Promise<void>
+  addPlatform: (brandId: string, platform: Omit<Platform, 'id' | 'brand_id'>) => Promise<void>
+  updatePlatform: (id: string, updates: Partial<Platform>) => Promise<void>
+  deletePlatform: (id: string) => Promise<void>
+  duplicatePlatform: (id: string) => Promise<void>
 }
 
-export const usePlatformStore = create<PlatformStore>()(
-  persist(
-    (set) => ({
-      platforms: [{
-        id: 'web',
-        name: 'Web Platform',
-        description: 'Default web platform configuration',
-        createdAt: new Date().toISOString(),
-        units: {
-          typography: 'rem',
-          spacing: 'px',
-          dimensions: 'px'
-        },
-        layout: {
-          baseSize: 16,
-          gridColumns: 12,
-          gridGutter: 24,
-          containerPadding: 16
-        }
-      }],
-      addPlatform: (platform) => 
-        set((state) => {
-          let uniqueName = platform.name
-          let counter = 1
-          while (state.platforms.some(p => p.name === uniqueName)) {
-            uniqueName = `${platform.name} ${counter}`
-            counter++
-          }
-          return { 
-            platforms: [...state.platforms, { ...platform, name: uniqueName }] 
-          }
-        }),
-      updatePlatform: (id, updates) =>
-        set((state) => {
-          if (updates.name) {
-            let uniqueName = updates.name
-            let counter = 1
-            while (state.platforms.some(p => p.id !== id && p.name === uniqueName)) {
-              uniqueName = `${updates.name} ${counter}`
-              counter++
-            }
-            updates = { ...updates, name: uniqueName }
-          }
-          return {
-            platforms: state.platforms.map((p) =>
-              p.id === id ? { ...p, ...updates } : p
-            ),
-          }
-        }),
-      deletePlatform: (id) =>
-        set((state) => ({
-          platforms: state.platforms.filter((p) => p.id !== id),
-        })),
-      duplicatePlatform: (id) =>
-        set((state) => {
-          const platform = state.platforms.find((p) => p.id === id)
-          if (!platform) return state
-          const newPlatform = {
-            ...platform,
-            id: crypto.randomUUID(),
-            name: `${platform.name} (Copy)`,
-            createdAt: new Date().toISOString()
-          }
-          return { platforms: [...state.platforms, newPlatform] }
-        }),
-    }),
-    {
-      name: 'platform-store',
-      storage: createJSONStorage(() => localStorage),
-      version: 1,
+export const usePlatformStore = create<PlatformStore>((set, get) => ({
+  platforms: [],
+  currentPlatform: null,
+  isLoading: false,
+  error: null,
+
+  fetchPlatforms: async (brandId) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('brand_id', brandId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      set({ platforms: data || [], error: null })
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
     }
-  )
-) 
+  },
+
+  addPlatform: async (brandId, platform) => {
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert([{
+          ...platform,
+          brand_id: brandId,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+
+      if (error) throw error
+      set(state => ({ 
+        platforms: [...state.platforms, data[0]],
+        error: null 
+      }))
+    } catch (error) {
+      set({ error: (error as Error).message })
+    }
+  },
+
+  updatePlatform: async (id, updates) => {
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+
+      if (error) throw error
+      set(state => ({
+        platforms: state.platforms.map(p => p.id === id ? data[0] : p),
+        error: null
+      }))
+    } catch (error) {
+      set({ error: (error as Error).message })
+    }
+  },
+
+  deletePlatform: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('platforms')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      set(state => ({
+        platforms: state.platforms.filter(p => p.id !== id),
+        error: null
+      }))
+    } catch (error) {
+      set({ error: (error as Error).message })
+    }
+  },
+
+  duplicatePlatform: async (id) => {
+    try {
+      const platform = get().platforms.find(p => p.id === id)
+      if (!platform) return
+
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert([{
+          ...platform,
+          id: undefined, // Let Supabase generate new ID
+          name: `${platform.name} (Copy)`,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+
+      if (error) throw error
+      set(state => ({ 
+        platforms: [...state.platforms, data[0]],
+        error: null 
+      }))
+    } catch (error) {
+      set({ error: (error as Error).message })
+    }
+  },
+})) 

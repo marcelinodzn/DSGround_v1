@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
+import { useBrandStore } from "@/store/brand-store"
+import { toast } from 'sonner'
 
 type BrandType = 'master' | 'sub'
 
@@ -21,6 +23,7 @@ interface BrandForm {
 export default function NewBrandPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
+  const { createBrand } = useBrandStore()
   
   const [formData, setFormData] = useState<BrandForm>({
     name: '',
@@ -32,26 +35,24 @@ export default function NewBrandPage() {
     router.back()
   }
 
-  const handleCreate = () => {
-    // Validate form
+  const handleCreate = async () => {
     if (!formData.name.trim()) {
-      alert('Please enter a brand name')
+      toast.error('Please enter a brand name')
       return
     }
 
-    // Here you would typically save to your backend
-    console.log('Creating brand:', formData)
-
-    // For now, we'll just store in localStorage as an example
-    const brands = JSON.parse(localStorage.getItem('brands') || '[]')
-    brands.push({
-      id: crypto.randomUUID(),
-      ...formData,
-      createdAt: new Date().toISOString()
-    })
-    localStorage.setItem('brands', JSON.stringify(brands))
-
-    router.push('/brands')
+    try {
+      await createBrand({
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        type: formData.type
+      })
+      toast.success('Brand created successfully')
+      router.push('/brands')
+    } catch (error) {
+      console.error('Create brand error:', error)
+      toast.error('Failed to create brand')
+    }
   }
 
   return (

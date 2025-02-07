@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Platform, TypeStyle } from '@/types/typography'
+import { supabase, type TypographySettings, type TypeStyle } from '@/lib/supabase'
 
 interface TypographyState {
   platforms: {
@@ -27,7 +27,7 @@ interface TypographyState {
   ) => void
 }
 
-export const useTypographyStore = create<TypographyState>((set) => ({
+export const useTypographyStore = create<TypographyState>((set, get) => ({
   platforms: {
     web: {
       styles: [],
@@ -78,5 +78,45 @@ export const useTypographyStore = create<TypographyState>((set) => ({
           settings
         }
       }
-    }))
+    })),
+  settings: null,
+  styles: [],
+  isLoading: false,
+  error: null,
+
+  fetchTypographySettings: async (platformId) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('typography_settings')
+        .select('*')
+        .eq('platform_id', platformId)
+        .single()
+
+      if (error && error.code !== 'PGRST116') throw error
+      set({ settings: data || null })
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  fetchTypeStyles: async (platformId) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('type_styles')
+        .select('*')
+        .eq('platform_id', platformId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      set({ styles: data })
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
+    }
+  }
 })) 
