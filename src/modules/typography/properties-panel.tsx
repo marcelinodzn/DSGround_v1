@@ -762,7 +762,14 @@ ${recommendation}`
                   </Label>
                   <Input
                     type="number"
-                    value={Math.round(currentSettings.distanceScale?.calculatedBaseSize * 100) / 100 || 0}
+                    value={Math.round(calculateDistanceBasedSize(
+                      currentSettings.distanceScale.viewingDistance,
+                      currentSettings.distanceScale.visualAcuity,
+                      currentSettings.distanceScale.meanLengthRatio,
+                      currentSettings.distanceScale.textType,
+                      currentSettings.distanceScale.lighting,
+                      currentSettings.distanceScale.ppi
+                    ) * 100) / 100}
                     disabled
                     className="text-xs h-8"
                   />
