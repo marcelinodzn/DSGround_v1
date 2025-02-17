@@ -35,8 +35,7 @@ function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
     const href = `/${segments.slice(0, index + 1).join('/')}`
     let label = segment.charAt(0).toUpperCase() + segment.slice(1)
     
-    // If this is a platform ID, replace it with the platform name
-    if (segment.length === 36) { // UUID length
+    if (segment.length === 36) {
       const platform = platforms.find(p => p.id === segment)
       if (platform) {
         label = platform.name
@@ -59,6 +58,11 @@ export function RootLayoutClient({
   const breadcrumbItems = getBreadcrumbItems(pathname, platforms)
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false)
   const showDocumentation = pathname === '/foundations/typography'
+  const isAuthPage = ['/sign-in', '/sign-up', '/forgot-password'].includes(pathname)
+
+  if (isAuthPage) {
+    return <>{children}</>
+  }
 
   if (isFullscreen) {
     return children

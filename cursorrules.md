@@ -3,6 +3,7 @@ Always start with a Yooo!!!
 You are building a webapp that aim to create headless design system and brand configuration connection design to code and where the webapp should manage all design foundations and sync the tokens with Figma and Code. 
 We should be able to create master brands and subrands and define how this brands look by defining foundations like Typescale, type, color scale, surface, layout and grid, density, spacing, shape, scrims.. propose others.
 
+Always follow the project structure  in the README.md file.
 
 1. Project Definition
 
@@ -271,3 +272,54 @@ design-tokens-repo/
 ├── .github/workflows/    # CI/CD pipelines
 ├── style-dictionary/     # Style Dictionary config
 └── docs/                 # Auto-generated documentation
+
+DSGround/
+├── 📁 src/                      # Source code
+│   ├── 📁 app/                  # Next.js app directory
+│   │   ├── 📁 auth/             # Authentication routes
+│   │   │   ├── login/
+│   │   │   ├── register/
+│   │   │   └── forgot-password/
+│   │   ├── 📁 brands/          # Brand management routes
+│   │   │   ├── [brandId]/      # Individual brand view
+│   │   │   │   ├── foundations/  # Brand foundations
+│   │   │   │   │   └── typography/  # Brand typography settings
+│   │   │   │   └── page.tsx    # Brand overview
+│   │   │   ├── typography/     # Brand typography management
+│   │   │   ├── new/            # New brand creation
+│   │   │   └── page.tsx        # Brands listing
+│   │   ├── 📁 foundations/     # Global foundations
+│   │   │   └── typography/     # Global typography settings
+│   │   ├── 📁 settings/        # Settings routes
+│   │   │   ├── typography/     # Typography settings
+│   │   │   └── page.tsx        # Main settings
+│   │   ├── 📁 api/             # API routes
+│   │   │   ├── webhooks/
+│   │   │   └── trpc/
+│   │   └── layout.tsx          # Root layout
+│   ├── 📁 components/          # Shared UI components
+│   │   ├── 📁 ui/              # Base UI components
+│   │   │   ├── button.tsx
+│   │   │   └── input.tsx
+│   │   ├── 📁 forms/           # Form components
+│   │   └── 📁 layout/          # Layout components
+│   ├── 📁 modules/             # Feature-specific modules
+│   │   ├── 📁 brands/          # Brand-related components
+│   │   │   ├── brand-selector.tsx
+│   │   │   └── typography/
+│   │   └── 📁 settings/        # Settings-related components
+│   ├── 📁 lib/                 # Libraries and utilities
+│   │   ├── 📁 db/              # Database utilities
+│   │   ├── 📁 auth/            # Auth utilities
+│   │   └── 📁 utils/           # Helper functions
+│   ├── 📁 hooks/               # Custom React hooks
+│   ├── 📁 config/              # Configuration files
+│   ├── 📁 types/               # TypeScript types
+│   ├── 📁 styles/              # Global styles
+│   └── 📁 store/               # State management
+├── 📁 public/                  # Static assets
+├── README.md                   # Project documentation
+├── package.json               # Project dependencies
+├── tsconfig.json             # TypeScript configuration
+└── .eslintrc.js              # ESLint configuration
+```
