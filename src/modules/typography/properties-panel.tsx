@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -21,7 +21,7 @@ import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { usePlatformStore } from "@/store/platform-store"
 import { convertUnits, formatWithUnit } from "@/lib/utils"
 import { useRouter } from 'next/navigation';
-import { useMemo } from "react";
+import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -312,10 +312,33 @@ export function PropertiesPanel() {
   }
 
   const handleDistanceScaleChange = (updates: Partial<Platform['distanceScale']>) => {
+    // Calculate the base size using the distance formula
+    const updatedDistanceScale = {
+      ...currentSettings.distanceScale,
+      ...updates
+    };
+    
+    // Distance-based size calculation formula
+    const calculatedBaseSize = calculateDistanceBasedSize(
+      updatedDistanceScale.viewingDistance,
+      updatedDistanceScale.visualAcuity,
+      updatedDistanceScale.meanLengthRatio,
+      updatedDistanceScale.textType,
+      updatedDistanceScale.lighting,
+      updatedDistanceScale.ppi
+    );
+
+    // Round to 2 decimal places for display
+    const roundedBaseSize = Math.round(calculatedBaseSize * 100) / 100;
+
     updatePlatform(activePlatform, {
-      distanceScale: { ...currentSettings.distanceScale, ...updates }
-    })
-  }
+      distanceScale: updatedDistanceScale,
+      scale: {
+        ...currentSettings.scale,
+        baseSize: roundedBaseSize // Update the main scale base size
+      }
+    });
+  };
 
   const handleAccessibilityChange = (updates: Partial<Platform['accessibility']>) => {
     updatePlatform(activePlatform, {
@@ -739,11 +762,28 @@ ${recommendation}`
                   </Label>
                   <Input
                     type="number"
-                    value={currentSettings.distanceScale?.calculatedBaseSize || 0}
+                    value={Math.round(currentSettings.distanceScale?.calculatedBaseSize * 100) / 100 || 0}
                     disabled
                     className="text-xs h-8"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Viewing Distance (cm)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={currentSettings.distanceScale.viewingDistance}
+                    onChange={(e) => {
+                      handleDistanceScaleChange({
+                        viewingDistance: Number(e.target.value),
+                      })
+                    }}
+                    className="text-xs h-8"
+                  />
+                </div>
+
                 <div>
                   <Label className="text-xs">Visual Acuity (decimal)</Label>
                   <Input
@@ -1422,13 +1462,27 @@ function ModularScaleTab({ platform, currentSettings }: { platform: Platform; cu
 }
 
 function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+  // Calculate the base size using the distance formula
+  const calculatedBaseSize = useMemo(() => {
+    if (!platform.distanceScale) return 0;
+    
+    return calculateDistanceBasedSize(
+      platform.distanceScale.viewingDistance,
+      platform.distanceScale.visualAcuity,
+      platform.distanceScale.meanLengthRatio,
+      platform.distanceScale.textType,
+      platform.distanceScale.lighting,
+      platform.distanceScale.ppi
+    );
+  }, [platform.distanceScale]);
+
   return (
     <div className="space-y-4">
       <div>
         <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
         <Input
           type="number"
-          value={platform.distanceScale?.calculatedBaseSize || 0}
+          value={Math.round(calculatedBaseSize * 100) / 100}
           disabled
           className="text-xs h-8"
         />
@@ -1436,7 +1490,23 @@ function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; c
           Base size calculated from distance parameters
         </p>
       </div>
-      {/* ... rest of the component */}
+
+      <div>
+        <Label className="text-xs">Viewing Distance (cm)</Label>
+        <Input
+          type="number"
+          min="1"
+          step="1"
+          value={platform.distanceScale?.viewingDistance || 0}
+          onChange={(e) => {
+            handleDistanceScaleChange({
+              viewingDistance: Number(e.target.value)
+            })
+          }}
+          className="text-xs h-8"
+        />
+      </div>
+      {/* ... rest of the distance inputs ... */}
     </div>
   )
 }

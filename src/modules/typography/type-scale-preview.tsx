@@ -17,45 +17,7 @@ import dynamic from 'next/dynamic'
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { useFontStore } from "@/store/font-store"
 import { Badge } from "@/components/ui/badge"
-
-const calculateDistanceBasedSize = (
-  distance: number,
-  visualAcuity: number,
-  meanLengthRatio: number,
-  textType: 'continuous' | 'isolated',
-  lighting: 'good' | 'moderate' | 'poor',
-  ppi: number
-): number => {
-  // Constants from leserlich.info calculation
-  const MIN_VISUAL_ANGLE = 0.21 // Minimum visual angle in degrees
-  const LIGHTING_FACTORS = {
-    good: 1,
-    moderate: 1.25,
-    poor: 1.5
-  }
-  const TEXT_TYPE_FACTORS = {
-    continuous: 1,
-    isolated: 1.5
-  }
-
-  // Convert distance from cm to mm
-  const distanceInMm = distance * 10
-
-  // Calculate base size using visual angle formula
-  const visualAngleRad = (MIN_VISUAL_ANGLE * Math.PI) / 180
-  let baseSize = 2 * distanceInMm * Math.tan(visualAngleRad / 2)
-
-  // Apply visual acuity adjustment
-  baseSize = baseSize / visualAcuity
-
-  // Apply mean length ratio
-  baseSize = baseSize * meanLengthRatio
-
-  // Apply lighting and text type factors
-  baseSize = baseSize * LIGHTING_FACTORS[lighting] * TEXT_TYPE_FACTORS[textType]
-
-  return baseSize
-}
+import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 
 interface ScaleViewProps {
   scaleValues: Array<{
@@ -298,7 +260,7 @@ export function TypeScalePreview() {
   // Calculate the correct base size based on scale method
   let displayBaseSize = scale.baseSize
   if (scaleMethod === 'distance' && distanceScale) {
-    displayBaseSize = calculateDistanceBasedSize(
+    const calculated = calculateDistanceBasedSize(
       distanceScale.viewingDistance,
       distanceScale.visualAcuity,
       distanceScale.meanLengthRatio,
@@ -306,6 +268,9 @@ export function TypeScalePreview() {
       distanceScale.lighting,
       distanceScale.ppi
     )
+    displayBaseSize = Math.round(calculated * 100) / 100
+  } else {
+    displayBaseSize = Math.round(scale.baseSize * 100) / 100
   }
 
   return (

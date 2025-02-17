@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { usePlatformStore } from "@/store/platform-store"
 import { supabase } from '@/lib/supabase'
+import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 
 export type ScaleMethod = 'modular' | 'distance' | 'ai'
 export type TextType = 'continuous' | 'isolated'
@@ -294,34 +295,27 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     const platform = get().platforms.find(p => p.id === platformId);
     if (!platform) return [];
 
-    const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
+    let effectiveBaseSize = platform.scale.baseSize;
+    
+    // Calculate base size for distance method
+    if (platform.scaleMethod === 'distance' && platform.distanceScale) {
+      effectiveBaseSize = calculateDistanceBasedSize(
+        platform.distanceScale.viewingDistance,
+        platform.distanceScale.visualAcuity,
+        platform.distanceScale.meanLengthRatio,
+        platform.distanceScale.textType,
+        platform.distanceScale.lighting,
+        platform.distanceScale.ppi
+      );
+    }
+
+    // Round the base size consistently
+    effectiveBaseSize = Math.round(effectiveBaseSize * 100) / 100;
+
+    // Generate scale values using the effective base size
     const scaleValues = [];
 
-    // Calculate base size for distance method
-    let effectiveBaseSize = Math.round(baseSize); // Ensure consistent rounding
-    if (platform.scaleMethod === 'distance') {
-      const { viewingDistance, visualAcuity, meanLengthRatio, textType, lighting, ppi } = platform.distanceScale;
-      
-      // Constants
-      const MIN_VISUAL_ANGLE = 0.21;
-      const LIGHTING_FACTORS = { good: 1, moderate: 1.25, poor: 1.5 };
-      const TEXT_TYPE_FACTORS = { continuous: 1, isolated: 1.5 };
-
-      // Convert distance from cm to mm
-      const distanceInMm = viewingDistance * 10;
-
-      // Calculate base size using visual angle formula
-      const visualAngleRad = (MIN_VISUAL_ANGLE * Math.PI) / 180;
-      let calculatedSize = 2 * distanceInMm * Math.tan(visualAngleRad / 2);
-
-      // Apply adjustments
-      calculatedSize = calculatedSize / visualAcuity;
-      calculatedSize = calculatedSize * meanLengthRatio;
-      calculatedSize = calculatedSize * LIGHTING_FACTORS[lighting] * TEXT_TYPE_FACTORS[textType];
-
-      // Convert mm to pixels and ensure consistent rounding
-      effectiveBaseSize = Math.round((calculatedSize * ppi) / 25.4);
-    }
+    const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
 
     // Generate decreasing values (f-n to f-1)
     for (let i = stepsDown; i > 0; i--) {
