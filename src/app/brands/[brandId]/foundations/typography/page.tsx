@@ -71,13 +71,8 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
     try {
       const updatedTypography = {
         brand_id: brandId,
-        [`${type}_font_id`]: fontId,
+        [`${type}_font_id`]: fontId === 'none' ? null : fontId,
         updated_at: new Date().toISOString()
-      }
-
-      if (fontId === null) {
-        // If setting to none, make sure we're sending a valid null value
-        updatedTypography[`${type}_font_id`] = null
       }
 
       await saveBrandTypography(brandId, updatedTypography)
@@ -102,20 +97,19 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
 
   // Update the getFontProperties function
   const getFontProperties = (fontId: string | null | undefined) => {
-    if (!fontId || fontId === 'none') return { weight: '400', style: 'normal', format: 'TTF', variable: false }
-    const font = fonts.find(f => f.id === fontId)
+    // Return null if no font is selected
+    if (!fontId || fontId === 'none') return null
     
-    // Add debug logging to see font properties
-    console.log('Font properties:', font)
+    const font = fonts.find(f => f.id === fontId)
+    if (!font) return null
     
     return {
-      weight: font?.is_variable ? '1-1000' : (font?.weight?.toString() || '400'),
-      style: font?.style || 'normal',
-      format: font?.format?.toUpperCase() || 'TTF',
-      // Check both is_variable flag and format for variable fonts
-      variable: font?.is_variable || 
-               (font?.format?.toLowerCase().includes('variable') || 
-                font?.format?.toLowerCase().includes('var')) || 
+      weight: font.is_variable ? '1-1000' : (font.weight?.toString() || '400'),
+      style: font.style || 'normal',
+      format: font.format?.toUpperCase() || 'TTF',
+      variable: font.is_variable || 
+               (font.format?.toLowerCase().includes('variable') || 
+                font.format?.toLowerCase().includes('var')) || 
                false
     }
   }
@@ -171,7 +165,7 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                 <div className="col-span-2">
                   <Select
                     value={currentTypography?.primary_font_id || 'none'}
-                    onValueChange={(value) => handleFontChange(value === 'none' ? null : value, 'primary')}
+                    onValueChange={(value) => handleFontChange(value, 'primary')}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select primary font" />
@@ -187,36 +181,45 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                   </Select>
                 </div>
                 <div className="col-span-6">
-                  <div 
-                    className="text-2xl md:text-3xl py-6"
-                    style={{
-                      fontFamily: getFontFamily(currentTypography?.primary_font_id)
-                    }}
-                  >
-                    The quick brown fox jumps over the lazy dog
-                  </div>
+                  {currentTypography?.primary_font_id && (
+                    <div 
+                      className="text-2xl md:text-3xl py-6"
+                      style={{
+                        fontFamily: getFontFamily(currentTypography?.primary_font_id)
+                      }}
+                    >
+                      The quick brown fox jumps over the lazy dog
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-1 text-xs text-right">
                   {(() => {
                     const props = getFontProperties(currentTypography?.primary_font_id)
-                    return (
+                    return props ? (
                       <>
                         <div>{props.weight}</div>
                         <div>{props.style}</div>
                       </>
-                    )
+                    ) : null
                   })()}
                 </div>
                 <div className="col-span-1 flex flex-col items-end gap-1">
-                  <div className="text-sm font-medium">{getFontProperties(currentTypography?.primary_font_id).format}</div>
-                  <div className={cn(
-                    "text-xs px-2 py-1 rounded",
-                    getFontProperties(currentTypography?.primary_font_id).variable
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-900"
-                  )}>
-                    {getFontProperties(currentTypography?.primary_font_id).variable ? 'Variable' : 'Static'}
-                  </div>
+                  {(() => {
+                    const props = getFontProperties(currentTypography?.primary_font_id)
+                    return props ? (
+                      <>
+                        <div className="text-sm font-medium">{props.format}</div>
+                        <div className={cn(
+                          "text-xs px-2 py-1 rounded",
+                          props.variable
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-900"
+                        )}>
+                          {props.variable ? 'Variable' : 'Static'}
+                        </div>
+                      </>
+                    ) : null
+                  })()}
                 </div>
               </div>
 
@@ -228,8 +231,8 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                 </div>
                 <div className="col-span-2">
                   <Select
-                    value={currentTypography?.secondary_font_id || undefined}
-                    onValueChange={(value) => handleFontChange(value || null, 'secondary')}
+                    value={currentTypography?.secondary_font_id || 'none'}
+                    onValueChange={(value) => handleFontChange(value, 'secondary')}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select secondary font" />
@@ -245,36 +248,45 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                   </Select>
                 </div>
                 <div className="col-span-6">
-                  <div 
-                    className="text-2xl md:text-3xl py-6"
-                    style={{
-                      fontFamily: getFontFamily(currentTypography?.secondary_font_id)
-                    }}
-                  >
-                    The quick brown fox jumps over the lazy dog
-                  </div>
+                  {currentTypography?.secondary_font_id && (
+                    <div 
+                      className="text-2xl md:text-3xl py-6"
+                      style={{
+                        fontFamily: getFontFamily(currentTypography?.secondary_font_id)
+                      }}
+                    >
+                      The quick brown fox jumps over the lazy dog
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-1 text-xs text-right">
                   {(() => {
                     const props = getFontProperties(currentTypography?.secondary_font_id)
-                    return (
+                    return props ? (
                       <>
                         <div>{props.weight}</div>
                         <div>{props.style}</div>
                       </>
-                    )
+                    ) : null
                   })()}
                 </div>
                 <div className="col-span-1 flex flex-col items-end gap-1">
-                  <div className="text-sm font-medium">{getFontProperties(currentTypography?.secondary_font_id).format}</div>
-                  <div className={cn(
-                    "text-xs px-2 py-1 rounded",
-                    getFontProperties(currentTypography?.secondary_font_id).variable
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-900"
-                  )}>
-                    {getFontProperties(currentTypography?.secondary_font_id).variable ? 'Variable' : 'Static'}
-                  </div>
+                  {(() => {
+                    const props = getFontProperties(currentTypography?.secondary_font_id)
+                    return props ? (
+                      <>
+                        <div className="text-sm font-medium">{props.format}</div>
+                        <div className={cn(
+                          "text-xs px-2 py-1 rounded",
+                          props.variable
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-900"
+                        )}>
+                          {props.variable ? 'Variable' : 'Static'}
+                        </div>
+                      </>
+                    ) : null
+                  })()}
                 </div>
               </div>
 
@@ -286,8 +298,8 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                 </div>
                 <div className="col-span-2">
                   <Select
-                    value={currentTypography?.tertiary_font_id || undefined}
-                    onValueChange={(value) => handleFontChange(value || null, 'tertiary')}
+                    value={currentTypography?.tertiary_font_id || 'none'}
+                    onValueChange={(value) => handleFontChange(value, 'tertiary')}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select tertiary font" />
@@ -303,36 +315,45 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
                   </Select>
                 </div>
                 <div className="col-span-6">
-                  <div 
-                    className="text-2xl md:text-3xl py-6"
-                    style={{
-                      fontFamily: getFontFamily(currentTypography?.tertiary_font_id)
-                    }}
-                  >
-                    The quick brown fox jumps over the lazy dog
-                  </div>
+                  {currentTypography?.tertiary_font_id && (
+                    <div 
+                      className="text-2xl md:text-3xl py-6"
+                      style={{
+                        fontFamily: getFontFamily(currentTypography?.tertiary_font_id)
+                      }}
+                    >
+                      The quick brown fox jumps over the lazy dog
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-1 text-xs text-right">
                   {(() => {
                     const props = getFontProperties(currentTypography?.tertiary_font_id)
-                    return (
+                    return props ? (
                       <>
                         <div>{props.weight}</div>
                         <div>{props.style}</div>
                       </>
-                    )
+                    ) : null
                   })()}
                 </div>
                 <div className="col-span-1 flex flex-col items-end gap-1">
-                  <div className="text-sm font-medium">{getFontProperties(currentTypography?.tertiary_font_id).format}</div>
-                  <div className={cn(
-                    "text-xs px-2 py-1 rounded",
-                    getFontProperties(currentTypography?.tertiary_font_id).variable
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-900"
-                  )}>
-                    {getFontProperties(currentTypography?.tertiary_font_id).variable ? 'Variable' : 'Static'}
-                  </div>
+                  {(() => {
+                    const props = getFontProperties(currentTypography?.tertiary_font_id)
+                    return props ? (
+                      <>
+                        <div className="text-sm font-medium">{props.format}</div>
+                        <div className={cn(
+                          "text-xs px-2 py-1 rounded",
+                          props.variable
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-900"
+                        )}>
+                          {props.variable ? 'Variable' : 'Static'}
+                        </div>
+                      </>
+                    ) : null
+                  })()}
                 </div>
               </div>
             </div>
