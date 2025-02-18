@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,13 +21,23 @@ import {
   Ruler,
   Layers,
   Settings,
-  Home
+  Home,
+  ArrowUpDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLayout } from "@/contexts/layout-context"
 import { DocumentationModal } from '@/components/documentation-modal'
 import { BrandSelector } from '@/components/brand-selector'
 import { usePlatformStore, type Platform } from "@/store/platform-store"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useBrandStore } from "@/store/brand-store"
+import * as SelectPrimitive from "@radix-ui/react-select"
 
 function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
   const segments = pathname.split('/').filter(Boolean)
@@ -47,6 +57,65 @@ function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
   return items
 }
 
+const BrandDropdown = () => {
+  const { brands, currentBrand, setCurrentBrand, fetchBrands } = useBrandStore()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    fetchBrands()
+  }, [fetchBrands])
+
+  const handleBrandChange = async (brandId: string) => {
+    try {
+      await setCurrentBrand(brandId)
+      if (pathname.includes('/brands/')) {
+        const newPath = pathname.replace(/\/brands\/[^\/]+/, `/brands/${brandId}`)
+        router.push(newPath)
+      }
+    } catch (error) {
+      console.error('Error changing brand:', error)
+    }
+  }
+
+  return (
+    <Select
+      value={currentBrand?.id}
+      onValueChange={handleBrandChange}
+    >
+      <SelectTrigger 
+        className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-white"
+      >
+        <SelectValue 
+          className="text-sm font-medium m-0 p-0"
+          placeholder="Select brand" 
+        />
+      </SelectTrigger>
+      <SelectContent className="border-0 shadow-md">
+        <div className="p-2 space-y-1">
+          {brands?.map((brand) => (
+            <SelectItem 
+              key={brand.id} 
+              value={brand.id}
+              className="rounded-md cursor-pointer hover:bg-accent focus:bg-accent focus:text-accent-foreground"
+            >
+              {brand.name}
+            </SelectItem>
+          ))}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start text-left mt-2"
+            onClick={() => router.push('/brands/new')}
+          >
+            + Add new brand
+          </Button>
+        </div>
+      </SelectContent>
+    </Select>
+  )
+}
+
 export function RootLayoutClient({
   children,
 }: {
@@ -59,6 +128,10 @@ export function RootLayoutClient({
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false)
   const showDocumentation = pathname === '/foundations/typography'
   const isAuthPage = ['/sign-in', '/sign-up', '/forgot-password'].includes(pathname)
+  const showBrandSelector = !pathname.startsWith('/brands') && 
+    !pathname.startsWith('/settings') && 
+    pathname !== '/' // Hide on overview page
+  const router = useRouter()
 
   if (isAuthPage) {
     return <>{children}</>
@@ -79,10 +152,7 @@ export function RootLayoutClient({
           <div className="mb-6">
             <Logo />
           </div>
-          <div className="mb-4">
-            <BrandSelector />
-          </div>
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="space-y-1">
               <Link 
                 href="/" 
@@ -163,28 +233,32 @@ export function RootLayoutClient({
       )}>
         {/* Header */}
         <header className={cn(
-          "h-16 bg-card border-b flex items-center justify-between px-6 fixed top-0 z-10 transition-all",
+          "h-16 bg-card border-b flex items-center justify-between px-4 fixed top-0 z-10 transition-all",
           isFullscreen ? "left-0" : "left-64",
           "right-0"
         )}>
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/">Design System Ground</BreadcrumbLink>
-              </BreadcrumbItem>
-              {breadcrumbItems.map((item, index) => (
-                <BreadcrumbItem key={item.href}>
-                  <BreadcrumbSeparator />
-                  {index === breadcrumbItems.length - 1 ? (
-                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
-                  )}
+          <div className="flex items-center space-x-6">
+            {showBrandSelector && <BrandDropdown />}
+            <Breadcrumb className="pl-[4px]">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/">Design System Ground</BreadcrumbLink>
                 </BreadcrumbItem>
-              ))}
-            </BreadcrumbList>
-          </Breadcrumb>
-          <div className="flex items-center space-x-4">
+                {breadcrumbItems.map((item, index) => (
+                  <BreadcrumbItem key={item.href}>
+                    <BreadcrumbSeparator />
+                    {index === breadcrumbItems.length - 1 ? (
+                      <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          <div className="flex items-center">
             {showDocumentation && (
               <Button 
                 variant="outline" 

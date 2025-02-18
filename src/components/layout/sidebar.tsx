@@ -24,5 +24,29 @@ export function Sidebar() {
     ]
   }, [currentBrand?.id])
 
-  // ... rest of the component
+  return (
+    <div className="pb-12">
+      <div className="space-y-4 py-4">
+        {brandRoutes.map((section) => (
+          <div key={section.title} className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
+              {section.title}
+            </h2>
+            <div className="space-y-1">
+              {section.items.map((item) => (
+                <a
+                  key={item.title}
+                  href={item.href}
+                  className="flex items-center rounded-lg px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                >
+                  {item.icon && <item.icon className="mr-2 h-4 w-4" />}
+                  {item.title}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 } 

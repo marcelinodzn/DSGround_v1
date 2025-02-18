@@ -106,6 +106,25 @@ const SelectSeparator = React.forwardRef<
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
+// Add these styles to your existing select styles
+const selectTriggerStyles = {
+  '&:focus': {
+    outline: 'none',
+    boxShadow: 'none'
+  },
+  '&[data-placeholder]': {
+    color: 'var(--muted-foreground)'
+  }
+}
+
+const selectContentStyles = {
+  padding: '8px',
+  border: '1px solid var(--border)',
+  borderRadius: '6px',
+  backgroundColor: 'var(--background)',
+  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
+}
+
 export {
   Select,
   SelectGroup,

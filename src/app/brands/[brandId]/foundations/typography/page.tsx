@@ -125,7 +125,7 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
           isFullscreen ? "" : "pt-6 px-6"
         )}>
           <div>
-            <h1 className="text-[30px] font-bold">{currentBrand.name} - Typography</h1>
+            <h1 className="text-[30px] font-bold">Typography</h1>
           </div>
           <Button
             variant="ghost"
