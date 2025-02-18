@@ -112,13 +112,13 @@ const BrandDropdown = () => {
       onValueChange={handleBrandChange}
     >
       <SelectTrigger 
-        className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-white"
+        className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-background"
       >
         <span className="text-sm font-medium">
           {selectedBrand?.name || brands[0].name}
         </span>
       </SelectTrigger>
-      <SelectContent className="border-0 shadow-md">
+      <SelectContent className="border-0 shadow-md bg-background">
         <div className="p-2 space-y-1">
           {brands.map((brand) => (
             <SelectItem 
