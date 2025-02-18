@@ -12,12 +12,7 @@ interface ProvidersProps extends ThemeProviderProps {
 export function Providers({ children, ...props }: ProvidersProps) {
   return (
     <AuthProvider>
-      <NextThemesProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        {...props}
-      >
+      <NextThemesProvider {...props}>
         {children}
       </NextThemesProvider>
     </AuthProvider>

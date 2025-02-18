@@ -279,9 +279,21 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   },
 
   updatePlatform: (platformId, updates) => {
-    const platformStore = usePlatformStore.getState()
-    const platformData = platformStore.platforms.find(p => p.id === platformId)
+    const session = supabase.auth.getSession()
+    
+    if (!session) {
+      // Instead of redirecting, we'll update the local state
+      set((state) => ({
+        platforms: state.platforms.map((platform) =>
+          platform.id === platformId
+            ? { ...platform, ...updates }
+            : platform
+        ),
+      }))
+      return
+    }
 
+    // If authenticated, proceed with the update
     set((state) => ({
       platforms: state.platforms.map((platform) =>
         platform.id === platformId
@@ -289,6 +301,11 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
           : platform
       ),
     }))
+
+    // Save to Supabase if authenticated
+    if (session) {
+      get().saveTypographySettings(platformId, updates)
+    }
   },
 
   getScaleValues: (platformId) => {

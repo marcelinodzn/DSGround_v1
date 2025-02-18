@@ -6,6 +6,7 @@ import { TypeScaleProvider } from "@/contexts/type-scale-context"
 import { StoreProvider } from "@/providers/store-provider"
 import { RootLayoutClient } from "@/components/root-layout-client"
 import { cn } from "@/lib/utils"
+import { Providers } from '@/components/providers'
 
 import "@/styles/globals.css"
 
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        <ThemeProvider
+        <Providers
           attribute="class"
           defaultTheme="system"
           enableSystem
@@ -40,7 +41,7 @@ export default function RootLayout({
             </StoreProvider>
           </TypeScaleProvider>
           <Toaster />
-        </ThemeProvider>
+        </Providers>
       </body>
     </html>
   )
