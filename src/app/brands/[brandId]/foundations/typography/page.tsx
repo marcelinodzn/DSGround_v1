@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useBrandStore } from "@/store/brand-store"
-import { usePlatformStore } from "@/store/platform-store"
-import { useTypographyStore } from "@/store/typography"
 import { useFontStore } from "@/store/font-store"
-import { BrandTypography } from "@/modules/foundations/typography/brand-typography"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from "sonner"
+import { useRouter } from 'next/navigation'
+import { supabase } from "@/lib/supabase"
+
+// Make sure this is the correct route being accessed
+console.log('Rendering typography page at: /brands/[brandId]/foundations/typography')
 
 interface BrandFoundationsTypographyPageProps {
   params: {
@@ -17,61 +21,80 @@ interface BrandFoundationsTypographyPageProps {
   }
 }
 
+const fontTypes = ['primary', 'secondary', 'tertiary'] as const
+type FontType = typeof fontTypes[number]
+
 export default function BrandFoundationsTypographyPage({ params }: BrandFoundationsTypographyPageProps) {
   const { brandId } = params
+  const router = useRouter()
   const { isFullscreen, setIsFullscreen } = useLayout()
   const { currentBrand, fetchBrand } = useBrandStore()
-  const { platforms, currentPlatform, setCurrentPlatform, fetchPlatforms } = usePlatformStore()
-  const { platforms: typographyPlatforms } = useTypographyStore()
-  const { fonts, loadFonts } = useFontStore()
+  const { fonts, loadFonts, brandTypography, saveBrandTypography, loadBrandTypography } = useFontStore()
+
+  console.log('Current route:', window.location.pathname)
+  console.log('Brand ID from params:', brandId)
+  console.log('Current brand:', currentBrand)
 
   useEffect(() => {
-    fetchBrand(brandId)
-  }, [brandId, fetchBrand])
-
-  useEffect(() => {
-    loadFonts()
-  }, [loadFonts])
-
-  // When the page loads, ensure a platform is selected
-  useEffect(() => {
-    if (!currentPlatform && platforms.length > 0) {
-      // Find the "Always active" platform or use the first one
-      const alwaysActivePlatform = platforms.find(p => p.name === "Always active")
-      const platformToSelect = alwaysActivePlatform || platforms[0]
-      setCurrentPlatform(platformToSelect.id)
-    }
-  }, [currentPlatform, platforms, setCurrentPlatform])
-
-  // When brand changes, fetch platforms and select a platform
-  useEffect(() => {
-    const fetchAndSelectPlatform = async () => {
-      if (!currentBrand) {
-        setCurrentPlatform(null);
-        return;
-      }
-      try {
-        // Clear any stale platform selection
-        setCurrentPlatform(null);
-        await fetchPlatforms(currentBrand.id);
-        // Get fresh platforms after fetch
-        const currentPlatforms = platforms;
-        if (currentPlatforms && currentPlatforms.length > 0) {
-          // Always select the first platform in the list
-          setCurrentPlatform(currentPlatforms[0].id);
-        } else {
-          setCurrentPlatform(null);
+    const initPage = async () => {
+      if (brandId) {
+        try {
+          await Promise.all([
+            fetchBrand(brandId),
+            loadFonts(),
+            loadBrandTypography(brandId)
+          ])
+        } catch (error) {
+          console.error('Error initializing page:', error)
+          toast.error('Failed to load typography settings')
         }
-      } catch (error) {
-        console.error('Error fetching platforms:', error);
       }
-    };
-    fetchAndSelectPlatform();
-  }, [currentBrand, fetchPlatforms, platforms, setCurrentPlatform])
+    }
+    initPage()
+  }, [brandId, fetchBrand, loadFonts, loadBrandTypography])
+
+  useEffect(() => {
+    console.log('Route Debug:', {
+      currentURL: window.location.pathname,
+      expectedPattern: '/brands/[brandId]/foundations/typography',
+      actualBrandId: brandId,
+      params: params
+    })
+  }, [brandId, params])
+
+  const handleFontChange = async (fontId: string | null, type: FontType) => {
+    if (!brandId) return
+
+    try {
+      const updatedTypography = {
+        brand_id: brandId,
+        [`${type}_font_id`]: fontId,
+        updated_at: new Date().toISOString()
+      }
+
+      await saveBrandTypography(brandId, updatedTypography)
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} font updated successfully`)
+    } catch (error) {
+      console.error('Error saving typography:', error)
+      toast.error('Failed to update font selection')
+    }
+  }
 
   if (!currentBrand) {
     return <div>Loading...</div>
   }
+
+  const currentTypography = brandTypography[brandId]
+
+  const debugInfo = {
+    brandId,
+    currentBrand: currentBrand?.id,
+    hasTypography: !!currentTypography,
+    typographyState: currentTypography,
+    availableFonts: fonts.length
+  }
+
+  console.log('🔍 Current state:', debugInfo)
 
   return (
     <div className={cn(
@@ -84,7 +107,10 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
           isFullscreen ? "" : "pt-6 px-6"
         )}>
           <div>
-            <h1 className="text-[30px] font-bold">{currentBrand.name} - Typography</h1>
+            <h1 className="text-[30px] font-bold">Brand Typography Settings</h1>
+            <p className="text-muted-foreground mt-2">
+              Select the primary, secondary, and tertiary fonts for {currentBrand?.name}
+            </p>
           </div>
           <Button
             variant="ghost"
@@ -101,8 +127,43 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
         </div>
 
         <div className="py-8 px-6">
-          <BrandTypography fonts={fonts} />
+          <div className="space-y-6">
+            <div className="grid grid-cols-3 gap-6">
+              {fontTypes.map((type) => (
+                <div key={`${type}-font-select`} className="space-y-2 p-4 border rounded-lg">
+                  <label className="text-sm font-medium capitalize">{type} Font</label>
+                  <Select
+                    value={currentTypography?.[`${type}_font_id`] || undefined}
+                    onValueChange={(value) => handleFontChange(value || null, type)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${type} font`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {fonts.map((font) => (
+                        <SelectItem key={font.id} value={font.id}>
+                          {font.family}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {currentTypography?.[`${type}_font_id`] && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Selected: {fonts.find(f => f.id === currentTypography[`${type}_font_id`])?.family}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-8 p-4 border rounded bg-muted">
+            <pre className="text-xs">{JSON.stringify(debugInfo, null, 2)}</pre>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -15,7 +15,7 @@ export interface Brand {
 
 interface BrandStore {
   brands: Brand[]
-  currentBrand: string | null
+  currentBrand: Brand | null
   isLoading: boolean
   error: string | null
   fetchBrands: () => Promise<void>
@@ -27,6 +27,7 @@ interface BrandStore {
   updateBrand: (id: string, updates: Partial<Brand>) => Promise<void>
   deleteBrand: (id: string) => Promise<void>
   setCurrentBrand: (id: string | null) => Promise<void>
+  fetchBrand: (brandId: string) => Promise<void>
 }
 
 export const useBrandStore = create<BrandStore>((set, get) => ({
@@ -160,6 +161,28 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         console.log("No platforms found for brand id:", id)
         platformStore.setCurrentPlatform('') // Clear the current platform
       }
+    }
+  },
+
+  fetchBrand: async (brandId) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('id', brandId)
+        .single()
+
+      if (error) throw error
+      
+      set({ 
+        currentBrand: data,
+        error: null 
+      })
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
     }
   }
 }))

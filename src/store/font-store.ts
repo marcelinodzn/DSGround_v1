@@ -2,8 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { Font, FontFamily, uploadFont, createFontFamily, getFontFamilies, getFontsByFamily, getFonts, deleteFont } from '@/lib/fonts'
 import { useAuth } from '@/providers/auth-provider'
+import { supabase } from '@/lib/supabase'
 
-const supabase = createClient(
+const supabaseClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
@@ -22,6 +23,15 @@ interface UploadFontParams {
   tags: string[]
 }
 
+interface BrandTypography {
+  brand_id: string;
+  primary_font_id: string | null;
+  secondary_font_id: string | null;
+  tertiary_font_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface FontState {
   fonts: Font[]
   families: FontFamily[]
@@ -33,12 +43,10 @@ interface FontState {
   fetchFontsByFamily: (familyName: string) => Promise<void>
   loadFonts: () => Promise<void>
   deleteFont: (fontId: string) => Promise<void>
-  brandTypography: {
-    primary?: string;
-    secondary?: string;
-    tertiary?: string;
-  };
-  setBrandTypography: (type: 'primary' | 'secondary' | 'tertiary', fontId: string) => void;
+  brandTypography: Record<string, BrandTypography>
+  setBrandTypography: (type: 'primary' | 'secondary' | 'tertiary', fontId: string) => void
+  saveBrandTypography: (brandId: string, typography: Partial<BrandTypography>) => Promise<void>
+  loadBrandTypography: (brandId: string) => Promise<void>
 }
 
 export const useFontStore = create<FontState>((set, get) => ({
@@ -50,12 +58,6 @@ export const useFontStore = create<FontState>((set, get) => ({
 
   uploadFont: async (file: File, metadata: Partial<Font>) => {
     try {
-      const { data: session } = await supabase.auth.getSession()
-      
-      if (!session?.session) {
-        throw new Error('Authentication required')
-      }
-
       set({ isLoading: true, error: null })
       
       // Start with basic metadata
@@ -66,22 +68,6 @@ export const useFontStore = create<FontState>((set, get) => ({
       }
       
       const result = await uploadFont(file, fontData)
-
-      // Try to update with user_id
-      try {
-        const { error: updateError } = await supabase
-          .from('fonts')
-          .update({
-            user_id: session.session.user.id
-          })
-          .eq('id', result.id)
-
-        if (updateError) {
-          console.warn('Could not update user_id:', updateError)
-        }
-      } catch (updateError) {
-        console.warn('user_id column not supported:', updateError)
-      }
 
       await get().loadFonts()
       return result
@@ -96,14 +82,8 @@ export const useFontStore = create<FontState>((set, get) => ({
 
   createFamily: async (family: Partial<FontFamily>) => {
     try {
-      const { data: session } = await supabase.auth.getSession()
-      
-      if (!session?.session) {
-        throw new Error('Authentication required')
-      }
-
       // Create basic family first with required fields only
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('font_families')
         .insert({
           id: family.id,
@@ -119,7 +99,7 @@ export const useFontStore = create<FontState>((set, get) => ({
       if (error) {
         if (error.code === '23505') {
           // Handle duplicate family name
-          const { data: existingFamily } = await supabase
+          const { data: existingFamily } = await supabaseClient
             .from('font_families')
             .select()
             .eq('name', family.name)
@@ -132,10 +112,9 @@ export const useFontStore = create<FontState>((set, get) => ({
 
       // Try to update with additional properties
       try {
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseClient
           .from('font_families')
           .update({
-            user_id: session.session.user.id,
             is_variable: family.is_variable || false,
             variable_mode: family.variable_mode
           })
@@ -215,4 +194,83 @@ export const useFontStore = create<FontState>((set, get) => ({
         [type]: fontId
       }
     })),
+
+  saveBrandTypography: async (brandId: string, typography: Partial<BrandTypography>) => {
+    try {
+      const { data: existingData } = await supabase
+        .from('brand_typography')
+        .select('*')
+        .eq('brand_id', brandId)
+        .single()
+
+      const updateData = {
+        brand_id: brandId,
+        ...existingData,
+        ...typography,
+        updated_at: new Date().toISOString(),
+        created_at: existingData ? existingData.created_at : new Date().toISOString()
+      }
+
+      const { error } = await supabase
+        .from('brand_typography')
+        .upsert(updateData)
+
+      if (error) throw error
+
+      // Update local state
+      set(state => ({
+        brandTypography: {
+          ...state.brandTypography,
+          [brandId]: {
+            ...state.brandTypography[brandId],
+            ...typography
+          }
+        }
+      }))
+    } catch (error) {
+      console.error('Error saving brand typography:', error)
+      throw error
+    }
+  },
+
+  loadBrandTypography: async (brandId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('brand_typography')
+        .select('*')
+        .eq('brand_id', brandId)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Initialize with empty values if no record exists
+          set(state => ({
+            brandTypography: {
+              ...state.brandTypography,
+              [brandId]: {
+                brand_id: brandId,
+                primary_font_id: null,
+                secondary_font_id: null,
+                tertiary_font_id: null
+              }
+            }
+          }))
+          return
+        }
+        throw error
+      }
+
+      if (data) {
+        set(state => ({
+          brandTypography: {
+            ...state.brandTypography,
+            [brandId]: data
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading brand typography:', error)
+      throw error
+    }
+  }
 }))

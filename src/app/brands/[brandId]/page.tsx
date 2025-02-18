@@ -118,9 +118,21 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
   ]
 
   const coreTokenTabs = [
-    { id: 'colors', label: 'Colors' },
-    { id: 'spacing', label: 'Spacing' },
-    { id: 'typography', label: 'Typography' }
+    { 
+      id: 'colors', 
+      label: 'Colors',
+      href: `/brands/${params.brandId}/foundations/colors`
+    },
+    { 
+      id: 'spacing', 
+      label: 'Spacing',
+      href: `/brands/${params.brandId}/foundations/spacing`
+    },
+    { 
+      id: 'typography', 
+      label: 'Typography',
+      href: `/brands/${params.brandId}/foundations/typography`
+    }
   ]
 
   const semanticTokenTabs = [
@@ -128,8 +140,8 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
     { id: 'dark', label: 'Dark Theme' }
   ]
 
-  const handleTabChange = (tabId: string) => {
-    setActiveMainTab(tabId)
+  const handleTabChange = (href: string) => {
+    router.push(href)
   }
 
   useEffect(() => {
@@ -438,7 +450,7 @@ export const typography = {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card 
                   className="cursor-pointer hover:bg-accent" 
-                  onClick={() => router.push(`/brands/typography`)}
+                  onClick={() => router.push(`/brands/${params.brandId}/foundations/typography`)}
                 >
                   <div className="flex items-center justify-between w-full p-6">
                     <div>
