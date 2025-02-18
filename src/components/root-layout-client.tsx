@@ -63,8 +63,30 @@ const BrandDropdown = () => {
   const pathname = usePathname()
 
   useEffect(() => {
-    fetchBrands()
-  }, [fetchBrands])
+    const initializeBrands = async () => {
+      try {
+        const brands = await fetchBrands()
+        if (!brands?.length) return
+        
+        // Try to get brand from URL first
+        const brandIdFromUrl = pathname.match(/\/brands\/([^\/]+)/)?.[1]
+        const brandFromUrl = brands.find(b => b.id === brandIdFromUrl)
+        
+        // Only set initial brand if we don't have one
+        if (!currentBrand) {
+          if (brandFromUrl) {
+            await setCurrentBrand(brandFromUrl.id)
+          } else {
+            await setCurrentBrand(brands[0].id)
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing brands:', error)
+      }
+    }
+
+    initializeBrands()
+  }, [pathname])
 
   const handleBrandChange = async (brandId: string) => {
     try {
@@ -78,6 +100,9 @@ const BrandDropdown = () => {
     }
   }
 
+  // Wait for brands to load
+  if (!brands?.length) return null
+
   return (
     <Select
       value={currentBrand?.id}
@@ -86,14 +111,13 @@ const BrandDropdown = () => {
       <SelectTrigger 
         className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-white"
       >
-        <SelectValue 
-          className="text-sm font-medium m-0 p-0"
-          placeholder="Select brand" 
-        />
+        <SelectValue>
+          {brands.find(b => b.id === currentBrand?.id)?.name}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent className="border-0 shadow-md">
         <div className="p-2 space-y-1">
-          {brands?.map((brand) => (
+          {brands.map((brand) => (
             <SelectItem 
               key={brand.id} 
               value={brand.id}
