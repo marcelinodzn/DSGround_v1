@@ -86,7 +86,7 @@ const BrandDropdown = () => {
     }
 
     initializeBrands()
-  }, [pathname])
+  }, [pathname, currentBrand, setCurrentBrand, fetchBrands])
 
   const handleBrandChange = async (brandId: string) => {
     try {
@@ -103,17 +103,20 @@ const BrandDropdown = () => {
   // Wait for brands to load
   if (!brands?.length) return null
 
+  // Find the current brand object
+  const selectedBrand = brands.find(b => b.id === currentBrand?.id)
+
   return (
     <Select
-      value={currentBrand?.id}
+      value={selectedBrand?.id}
       onValueChange={handleBrandChange}
     >
       <SelectTrigger 
         className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-white"
       >
-        <SelectValue>
-          {brands.find(b => b.id === currentBrand?.id)?.name}
-        </SelectValue>
+        <span className="text-sm font-medium">
+          {selectedBrand?.name || brands[0].name}
+        </span>
       </SelectTrigger>
       <SelectContent className="border-0 shadow-md">
         <div className="p-2 space-y-1">
