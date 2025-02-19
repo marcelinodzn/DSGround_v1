@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePlatformStore } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
+import { IconSelector } from "@/components/platform/icon-selector"
 
 export default function NewPlatformPage() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export default function NewPlatformPage() {
   const { addPlatform } = usePlatformStore()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [icon, setIcon] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,6 +27,7 @@ export default function NewPlatformPage() {
       const platform = await addPlatform(currentBrand.id, {
         name,
         description,
+        icon,
         units: {
           typography: 'rem',
           spacing: 'rem',
@@ -50,6 +53,19 @@ export default function NewPlatformPage() {
       <h1 className="text-[30px] font-bold mb-8">Create New Platform</h1>
       
       <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        <div className="space-y-2">
+          <label htmlFor="icon" className="text-sm font-medium">
+            Platform Icon
+          </label>
+          <IconSelector
+            value={icon}
+            onChange={setIcon}
+          />
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose an icon to represent your platform
+          </p>
+        </div>
+
         <div className="space-y-2">
           <label htmlFor="name" className="text-sm font-medium">
             Platform Name

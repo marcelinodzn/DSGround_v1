@@ -39,7 +39,7 @@ export default function PlatformDetailPage() {
   if (!platform) return null
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6">
       {/* Platform Header */}
       <div className="flex items-center gap-4 group">
         {isEditingName ? (
@@ -93,14 +93,14 @@ export default function PlatformDetailPage() {
         )}
       </div>
 
-      <Separator />
+      <Separator className="my-6" />
 
       {/* Platform Settings */}
       <div className="space-y-6 max-w-2xl">
         <div>
           <h2 className="text-lg font-semibold mb-4">Platform Icon</h2>
           <IconSelector
-            value={platform.icon || undefined}
+            value={platform.icon || ''}
             onChange={async (icon) => {
               try {
                 await updatePlatform(platform.id, { icon })
