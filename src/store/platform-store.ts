@@ -34,10 +34,10 @@ export interface Platform {
 
 interface PlatformStore {
   platforms: Platform[]
-  currentPlatform: string | null
+  currentPlatform: Platform | null
   isLoading: boolean
   error: string | null
-  fetchPlatforms: (brandId: string) => Promise<void>
+  fetchPlatformsByBrand: (brandId: string) => Promise<void>
   addPlatform: (brandId: string, platform: {
     name: string
     description?: string | null
@@ -46,7 +46,7 @@ interface PlatformStore {
   }) => Promise<void>
   updatePlatform: (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => Promise<void>
   deletePlatform: (id: string) => Promise<void>
-  setCurrentPlatform: (id: string | null) => void
+  setCurrentPlatform: (id: string | null) => Promise<void>
   resetPlatforms: () => void
 }
 
@@ -56,29 +56,36 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchPlatforms: async (brandId) => {
+  fetchPlatformsByBrand: async (brandId: string) => {
     set({ isLoading: true })
     try {
       const { data, error } = await supabase
         .from('platforms')
         .select('*')
         .eq('brand_id', brandId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
 
       if (error) throw error
-      set({ platforms: data, error: null })
-
-      // Always set a platform if available, regardless of current selection
-      if (data.length > 0) {
-        set({ currentPlatform: data[0].id })
-      } else {
-        set({ currentPlatform: null })
-      }
+      
+      // Ensure proper typing of the data
+      const typedData = (data || []) as Platform[]
+      
+      set({ 
+        platforms: typedData,
+        error: null,
+        // Reset current platform when brand changes
+        currentPlatform: null
+      })
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
       set({ isLoading: false })
     }
+  },
+
+  fetchPlatforms: async () => {
+    console.warn('Deprecated: Use fetchPlatformsByBrand instead')
+    set({ platforms: [], currentPlatform: null })
   },
 
   addPlatform: async (brandId, platform) => {
@@ -93,8 +100,8 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
       
       set(state => ({
-        platforms: [...state.platforms, data],
-        currentPlatform: data.id
+        platforms: [...state.platforms, data as Platform],
+        currentPlatform: data as Platform
       }))
     } catch (error) {
       set({ error: (error as Error).message })
@@ -117,7 +124,7 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       
       set(state => ({
         platforms: state.platforms.map(p => 
-          p.id === id ? { ...p, ...data } : p
+          p.id === id ? { ...p, ...data } as Platform : p
         )
       }))
     } catch (error) {
@@ -139,7 +146,7 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       
       set(state => ({
         platforms: state.platforms.filter(p => p.id !== id),
-        currentPlatform: state.currentPlatform === id ? null : state.currentPlatform
+        currentPlatform: state.currentPlatform?.id === id ? null : state.currentPlatform
       }))
     } catch (error) {
       set({ error: (error as Error).message })
@@ -148,8 +155,30 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
     }
   },
 
-  setCurrentPlatform: (id) => {
-    set({ currentPlatform: id })
+  setCurrentPlatform: async (id: string | null) => {
+    try {
+      if (!id) {
+        set({ currentPlatform: null })
+        return
+      }
+
+      const state = get()
+      const platform = state.platforms.find(p => p.id === id)
+      if (platform) {
+        set({ currentPlatform: platform })
+      } else {
+        const { data, error } = await supabase
+          .from('platforms')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (error) throw error
+        set({ currentPlatform: data as Platform })
+      }
+    } catch (error) {
+      set({ error: (error as Error).message })
+    }
   },
 
   resetPlatforms: () => {

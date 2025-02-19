@@ -14,44 +14,42 @@ import { TypographyProperties } from '@/modules/brand/typography-properties'
 export default function TypographyPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const currentBrand = useBrandStore((state) => state.currentBrand)
-  const { platforms, currentPlatform, setCurrentPlatform } = usePlatformStore()
+  const { 
+    platforms, 
+    currentPlatform, 
+    setCurrentPlatform, 
+    fetchPlatformsByBrand 
+  } = usePlatformStore()
   const { platforms: typographyPlatforms } = useTypographyStore()
-
-  // When the page loads, ensure a platform is selected
-  useEffect(() => {
-    if (!currentPlatform && platforms.length > 0) {
-      // Find the "Always active" platform or use the first one
-      const alwaysActivePlatform = platforms.find(p => p.name === "Always active")
-      const platformToSelect = alwaysActivePlatform || platforms[0]
-      setCurrentPlatform(platformToSelect.id)
-    }
-  }, [currentPlatform, platforms, setCurrentPlatform])
 
   // When brand changes, fetch platforms and select a platform
   useEffect(() => {
     const fetchAndSelectPlatform = async () => {
       if (!currentBrand) {
-        setCurrentPlatform(null);
-        return;
+        setCurrentPlatform(null)
+        return
       }
+      
       try {
-        // Clear any stale platform selection
-        setCurrentPlatform(null);
-        await usePlatformStore.getState().fetchPlatforms(currentBrand);
+        await fetchPlatformsByBrand(currentBrand.id)
+        
         // Get fresh platforms after fetch
-        const currentPlatforms = usePlatformStore.getState().platforms;
+        const currentPlatforms = usePlatformStore.getState().platforms
         if (currentPlatforms && currentPlatforms.length > 0) {
-          // Always select the first platform in the list
-          setCurrentPlatform(currentPlatforms[0].id);
+          // Select the first platform if none is selected
+          if (!currentPlatform) {
+            setCurrentPlatform(currentPlatforms[0].id)
+          }
         } else {
-          setCurrentPlatform(null);
+          setCurrentPlatform(null)
         }
       } catch (error) {
-        console.error('Error fetching platforms:', error);
+        console.error('Error fetching platforms:', error)
       }
-    };
-    fetchAndSelectPlatform();
-  }, [currentBrand])
+    }
+
+    fetchAndSelectPlatform()
+  }, [currentBrand, fetchPlatformsByBrand, setCurrentPlatform, currentPlatform])
 
   return (
     <div className={cn(

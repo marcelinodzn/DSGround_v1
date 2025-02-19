@@ -291,12 +291,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('brand_typography')
-        .select(`
-          *,
-          primary_font:primary_font_id(id, family, category, weight, style, format, is_variable),
-          secondary_font:secondary_font_id(id, family, category, weight, style, format, is_variable),
-          tertiary_font:tertiary_font_id(id, family, category, weight, style, format, is_variable)
-        `)
+        .select('*, primary_font:primary_font_id(*), secondary_font:secondary_font_id(*), tertiary_font:tertiary_font_id(*)')
         .eq('brand_id', brandId)
         .single()
 
@@ -304,22 +299,30 @@ export const useFontStore = create<FontState>((set, get) => ({
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // Initialize empty state if no record exists
+          // No record exists, create a new one
+          const { data: newData, error: insertError } = await supabase
+            .from('brand_typography')
+            .insert({
+              brand_id: brandId,
+              primary_font_id: null,
+              secondary_font_id: null,
+              tertiary_font_id: null,
+              primary_font_scale: null,
+              secondary_font_scale: null,
+              tertiary_font_scale: null,
+              primary_font_styles: null,
+              secondary_font_styles: null,
+              tertiary_font_styles: null
+            })
+            .select('*, primary_font:primary_font_id(*), secondary_font:secondary_font_id(*), tertiary_font:tertiary_font_id(*)')
+            .single()
+
+          if (insertError) throw insertError
+
           set(state => ({
             brandTypography: {
               ...state.brandTypography,
-              [brandId]: {
-                brand_id: brandId,
-                primary_font_id: null,
-                secondary_font_id: null,
-                tertiary_font_id: null,
-                primary_font_scale: null,
-                secondary_font_scale: null,
-                tertiary_font_scale: null,
-                primary_font_styles: null,
-                secondary_font_styles: null,
-                tertiary_font_styles: null
-              }
+              [brandId]: newData as BrandTypography
             }
           }))
           return
@@ -327,17 +330,31 @@ export const useFontStore = create<FontState>((set, get) => ({
         throw error
       }
 
-      if (data) {
-        set(state => ({
-          brandTypography: {
-            ...state.brandTypography,
-            [brandId]: data
-          }
-        }))
-      }
+      set(state => ({
+        brandTypography: {
+          ...state.brandTypography,
+          [brandId]: data as BrandTypography
+        }
+      }))
     } catch (error) {
       console.error('Error loading brand typography:', error)
-      throw error
+      set(state => ({
+        brandTypography: {
+          ...state.brandTypography,
+          [brandId]: {
+            brand_id: brandId,
+            primary_font_id: null,
+            secondary_font_id: null,
+            tertiary_font_id: null,
+            primary_font_scale: null,
+            secondary_font_scale: null,
+            tertiary_font_scale: null,
+            primary_font_styles: null,
+            secondary_font_styles: null,
+            tertiary_font_styles: null
+          }
+        }
+      }))
     }
-  }
+  },
 }))

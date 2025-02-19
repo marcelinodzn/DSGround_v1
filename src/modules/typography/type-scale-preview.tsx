@@ -27,6 +27,8 @@ interface ScaleViewProps {
   }>
   units?: Platform['units']
   baseSize: number
+  fontFamily?: string
+  typographyUnit: string
 }
 
 const defaultUnits = {
@@ -49,17 +51,14 @@ function convertToUnit(pixels: number, unit: string, baseSize: number = 16) {
 }
 
 // Create a dynamic version of ScaleView with SSR disabled
-const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize }: ScaleViewProps) => {
-  const { platforms, currentPlatform } = useTypographyStore()
-  const { platforms: platformSettings } = usePlatformStore()
-
+const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize, fontFamily, typographyUnit }: ScaleViewProps) => {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-[100px]">Label</TableHead>
           <TableHead>Preview</TableHead>
-          <TableHead className="w-[100px] text-right">Size (px)</TableHead>
+          <TableHead className="w-[100px] text-right">Size ({typographyUnit})</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -77,7 +76,8 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize }: Scal
                     whiteSpace: 'normal',
                     minHeight: `${Math.max(item.size * 1.2, 48)}px`,
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    fontFamily: fontFamily
                   }} 
                 >
                   The quick brown fox jumps over the lazy dog
@@ -85,7 +85,7 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize }: Scal
               </div>
             </TableCell>
             <TableCell className="py-6 text-right">
-              {item.size.toFixed(2)}px
+              {item.size.toFixed(2)}{typographyUnit}
             </TableCell>
           </TableRow>
         ))}
@@ -203,31 +203,61 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
 // Update the TypeScalePreview component to hide the property panel when no platform is selected
 export function TypeScalePreview() {
   const {
-    currentPlatform,
     platforms,
+    currentPlatform,
+    setCurrentPlatform,
     getScaleValues
   } = useTypographyStore()
   
-  const { platforms: platformSettings } = usePlatformStore()
+  const { platforms: platformSettings, fetchPlatformsByBrand } = usePlatformStore()
   const { currentBrand } = useBrandStore()
   const { brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
   const router = useRouter()
   const [view, setView] = useState<string>('scale')
-  
-  const currentTypography = currentBrand?.id ? brandTypography[currentBrand.id] : null
-  const platform = useTypographyStore((state) => 
-    state.platforms.find(p => p.id === currentPlatform)
-  )
 
-  // Load fonts and typography when component mounts
-  useEffect(() => {
-    loadFonts()
-    if (currentBrand?.id) {
-      loadBrandTypography(currentBrand.id)
+  // Always define these memoized values, even if they're null
+  const currentTypography = useMemo(() => 
+    currentBrand?.id ? brandTypography[currentBrand.id] : null
+  , [currentBrand?.id, brandTypography])
+
+  const platform = useMemo(() => 
+    platforms.find(p => p.id === currentPlatform)
+  , [platforms, currentPlatform])
+
+  const platformSetting = useMemo(() => 
+    platformSettings.find(p => p.id === currentPlatform)
+  , [platformSettings, currentPlatform])
+
+  // Compute active platform - always define this
+  const activePlatform = useMemo(() => {
+    if (currentPlatform && platformSettings.find(p => p.id === currentPlatform)) {
+      return currentPlatform
     }
-  }, [loadFonts, currentBrand?.id, loadBrandTypography])
+    return platformSettings.length > 0 ? platformSettings[0].id : ''
+  }, [currentPlatform, platformSettings])
 
-  // Apply the selected font to the preview with fallback
+  // Set initial platform if none selected
+  useEffect(() => {
+    if (!currentPlatform && platformSettings.length > 0) {
+      setCurrentPlatform(platformSettings[0].id)
+    }
+  }, [currentPlatform, platformSettings, setCurrentPlatform])
+
+  // Load data on mount and when brand changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (currentBrand?.id) {
+        await Promise.all([
+          loadFonts(),
+          loadBrandTypography(currentBrand.id),
+          fetchPlatformsByBrand(currentBrand.id)
+        ])
+      }
+    }
+    loadData()
+  }, [loadFonts, currentBrand?.id, loadBrandTypography, fetchPlatformsByBrand])
+
+  // Always compute font family and info, even if they're undefined
   const fontFamily = useMemo(() => {
     if (!currentTypography || !platform?.currentFontRole) return undefined
     const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
@@ -235,7 +265,6 @@ export function TypeScalePreview() {
     return font ? `"${font.family}", ${font.category}` : undefined
   }, [currentTypography, platform?.currentFontRole, fonts])
 
-  // Show current font information
   const currentFontInfo = useMemo(() => {
     if (!currentTypography || !platform?.currentFontRole) return null
     const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
@@ -247,34 +276,38 @@ export function TypeScalePreview() {
     } : null
   }, [currentTypography, platform?.currentFontRole, fonts])
 
-  // Compute active platform - either current platform or first available
-  const activePlatform = useMemo(() => {
-    if (currentPlatform) return currentPlatform;
-    return platformSettings.length > 0 ? platformSettings[0].id : '';
-  }, [currentPlatform, platformSettings]);
-
   const viewTabs = [
     { id: 'scale', label: 'Scale View' },
     { id: 'styles', label: 'Styles View' }
   ]
 
-  // Find current settings and handle the case where none are found
-  const currentSettings = platforms.find(p => p.id === activePlatform)
-  // Use currentBrand to find the platform settings
-  const currentPlatformSettings = platformSettings.find(p => p.brand_id === currentBrand && p.id === activePlatform)
-  
-  // If no settings found, show a message with action button
-  if (!currentSettings || !currentPlatformSettings || activePlatform === '') {
+  // Early return if conditions aren't met
+  if (!currentBrand) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
         <div className="text-center">
-          <h3 className="text-lg font-semibold mb-2">No Platform Selected</h3>
+          <h3 className="text-lg font-semibold mb-2">Please select a brand</h3>
+          <p className="text-muted-foreground mb-4">
+            Select a brand to view its typography settings
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!platformSetting || !platform || !activePlatform) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">
+            {platformSettings.length === 0 ? "No platforms available" : "No platform selected"}
+          </h3>
           <p className="text-muted-foreground mb-4">
             {platformSettings.length === 0 
-              ? "Please create a platform to get started with typography settings."
-              : "Please select a platform to view typography settings."}
+              ? "Create a platform to get started with typography settings"
+              : "Select a platform to view its typography settings"}
           </p>
-          {platformSettings.length === 0 && currentBrand && (
+          {platformSettings.length === 0 && (
             <Button 
               onClick={() => router.push('/platforms/new')}
               className="mt-2"
@@ -287,8 +320,9 @@ export function TypeScalePreview() {
     )
   }
 
-  const { scaleMethod, scale, distanceScale } = currentSettings
-  const typographyUnit = currentPlatformSettings.units.typography
+  // Now we can safely use these values
+  const { scaleMethod, scale, distanceScale } = platform
+  const typographyUnit = platformSetting.units.typography
   const scaleValues = getScaleValues(activePlatform)
 
   // Calculate the correct base size based on scale method
@@ -321,7 +355,6 @@ export function TypeScalePreview() {
       
       <div className="relative w-full" style={{ 
         fontFamily: fontFamily || 'inherit',
-        // Add fallback styles
         fontFallback: 'system-ui, -apple-system, sans-serif'
       }}>
         <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
@@ -348,12 +381,14 @@ export function TypeScalePreview() {
           <div className="min-w-0 overflow-x-auto">
             {view === 'scale' ? (
               <ScaleView 
-                scaleValues={scaleValues} 
-                baseSize={scale.baseSize}
+                scaleValues={scaleValues}
+                baseSize={displayBaseSize}
+                fontFamily={fontFamily}
+                typographyUnit={typographyUnit}
               />
             ) : (
               <StylesView 
-                typeStyles={currentSettings.typeStyles} 
+                typeStyles={platform.typeStyles} 
                 scaleValues={scaleValues}
                 baseSize={scale.baseSize}
               />

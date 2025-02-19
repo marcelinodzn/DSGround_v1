@@ -308,13 +308,23 @@ export function PropertiesPanel() {
     console.log('Fonts:', fonts)
   }, [currentBrand?.id, loadFonts, loadBrandTypography])
 
+  useEffect(() => {
+    if (activePlatform && !typographyPlatforms.find(p => p.id === activePlatform)) {
+      initializePlatform(activePlatform)
+    }
+  }, [activePlatform, typographyPlatforms, initializePlatform])
+
   // Find current settings
   const currentSettings = typographyPlatforms.find(p => p.id === activePlatform)
   const currentPlatformSettings = platformSettings.find(p => p.id === activePlatform)
   
   if (!currentSettings) {
-    return null
+    return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
   }
+
+  // Ensure typeStyles exists
+  const typeStyles = currentSettings.typeStyles || []
+  const typographyUnit = currentSettings.units?.typography || 'px'
 
   // Constants
   const viewTabs = [
@@ -1519,11 +1529,11 @@ ${recommendation}`
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={currentSettings.typeStyles.map(style => style.id)}
+                items={typeStyles.map(style => style.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  {currentSettings.typeStyles?.map((style) => (
+                  {typeStyles.map((style) => (
                     <SortableTypeStyle 
                       key={style.id} 
                       style={style} 
@@ -1531,7 +1541,7 @@ ${recommendation}`
                       handleDeleteTypeStyle={handleDeleteTypeStyle} 
                       handleDuplicateStyle={handleDuplicateStyle} 
                       getScaleValues={getScaleValues}
-                      typographyUnit={currentSettings.units.typography}
+                      typographyUnit={typographyUnit}
                     />
                   ))}
                 </div>

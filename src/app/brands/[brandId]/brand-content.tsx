@@ -1,11 +1,14 @@
 'use client'
 
 import { useBrandStore } from "@/store/brand-store"
+import { Brand } from "@/store/brand-store"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { useLayout } from "@/store/layout-store"
 import { useTypographyStore } from "@/store/typography-store"
+import { Platform } from "@/store/typography"
+import { usePlatformStore } from "@/store/platform-store"
 import { supabase } from "@/lib/supabase"
 
 interface BrandContentProps {
@@ -18,11 +21,10 @@ interface BrandContentProps {
 export function BrandContent({ params, searchParams }: BrandContentProps) {
   const { brandId } = params
   const { isFullscreen, setIsFullscreen } = useLayout()
-  const [brand, setBrand] = useState<any>(null)
+  const [brand, setBrand] = useState<Brand | null>(null)
   const [isEditingName, setIsEditingName] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
-  const [currentPlatform, setCurrentPlatform] = useState<string>('')
-  const [platforms, setPlatforms] = useState<any[]>([])
+  const { platforms, currentPlatform, fetchPlatformsByBrand, setCurrentPlatform } = usePlatformStore()
 
   useEffect(() => {
     const fetchBrand = async () => {
@@ -34,7 +36,7 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
           .single()
 
         if (error) throw error
-        setBrand(data)
+        setBrand(data as Brand)
       } catch (error) {
         console.error('Error fetching brand:', error)
       }
@@ -43,9 +45,44 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
     fetchBrand()
   }, [brandId])
 
+  useEffect(() => {
+    if (brand?.id) {
+      fetchPlatformsByBrand(brand.id)
+    }
+  }, [brand?.id, fetchPlatformsByBrand])
+
+  useEffect(() => {
+    if (platforms.length > 0 && !currentPlatform) {
+      setCurrentPlatform(platforms[0].id)
+    }
+  }, [platforms, currentPlatform, setCurrentPlatform])
+
   if (!brand) {
     return <div>Loading...</div>
   }
+
+  const tabs = [
+    {
+      id: 'typography',
+      label: 'Typography',
+      content: 'Typography'
+    },
+    {
+      id: 'colors',
+      label: 'Colors',
+      content: 'Colors'
+    },
+    {
+      id: 'components',
+      label: 'Components',
+      content: 'Components'
+    },
+    {
+      id: 'tokens',
+      label: 'Tokens',
+      content: 'Tokens'
+    }
+  ]
 
   return (
     <div className="container py-10">

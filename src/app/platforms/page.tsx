@@ -44,37 +44,61 @@ export default function PlatformsPage() {
     platforms, 
     isLoading,
     error,
-    fetchPlatforms,
+    fetchPlatformsByBrand,
     deletePlatform, 
     addPlatform 
   } = usePlatformStore()
 
   useEffect(() => {
-    if (currentBrand) {
-      fetchPlatforms(currentBrand)
+    const loadPlatforms = async () => {
+      if (currentBrand) {
+        await fetchPlatformsByBrand(currentBrand.id)
+      }
     }
-  }, [currentBrand, fetchPlatforms])
+    
+    loadPlatforms()
+  }, [currentBrand, fetchPlatformsByBrand])
 
-  const handleAddPlatform = () => {
+  const handleCreatePlatform = async (e: any) => {
+    e.preventDefault()
     if (!currentBrand) {
       toast.error('Please select a brand first')
       return
     }
-    router.push('/platforms/new')
-  }
 
-  const handleViewPlatform = (platformId: string) => {
-    router.push(`/platforms/${platformId}`)
-  }
-
-  const handleDeletePlatform = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
     try {
-      await deletePlatform(id)
+      await addPlatform(currentBrand.id, {
+        name: 'New Platform',
+        description: 'Platform description',
+        units: {
+          typography: 'rem',
+          spacing: 'rem',
+          dimensions: 'px'
+        },
+        layout: {
+          baseSize: 16,
+          gridColumns: 12,
+          gridGutter: 16,
+          containerPadding: 16
+        }
+      })
+      toast.success('Platform created successfully')
+    } catch (error) {
+      toast.error('Failed to create platform')
+    }
+  }
+
+  const handleDeletePlatform = async (platformId: string) => {
+    try {
+      await deletePlatform(platformId)
       toast.success('Platform deleted successfully')
     } catch (error) {
       toast.error('Failed to delete platform')
     }
+  }
+
+  const handleViewPlatform = (platformId: string) => {
+    router.push(`/platforms/${platformId}`)
   }
 
   if (!currentBrand) {
@@ -127,7 +151,7 @@ export default function PlatformsPage() {
             <Button 
               variant="outline" 
               className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent"
-              onClick={handleAddPlatform}
+              onClick={handleCreatePlatform}
             >
               <h3 className="font-semibold">Add New Platform</h3>
             </Button>
@@ -146,7 +170,7 @@ export default function PlatformsPage() {
                   </p>
                 </Button>
                 <CardMenu
-                  onDelete={(e) => handleDeletePlatform(platform.id, e)}
+                  onDelete={(e) => handleDeletePlatform(platform.id)}
                 />
               </div>
             ))}

@@ -238,46 +238,55 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   platforms: [],
   isLoading: false,
   error: null,
-  
-  setCurrentPlatform: (platformId) => {
-    const state = get()
-    // Initialize platform if it doesn't exist
-    if (!state.platforms.find(p => p.id === platformId)) {
-      get().initializePlatform(platformId)
-    }
+
+  setCurrentPlatform: (platformId: string) => {
     set({ currentPlatform: platformId })
+    // Fetch typography settings if they don't exist
+    const state = get()
+    if (platformId && !state.platforms.find(p => p.id === platformId)) {
+      get().fetchTypographySettings(platformId)
+    }
   },
 
-  // Add this new function to initialize typography settings for a platform
-  initializePlatform: (platformId) => {
+  initializePlatform: async (platformId: string) => {
     const platformStore = usePlatformStore.getState()
     const platformData = platformStore.platforms.find(p => p.id === platformId)
     
-    if (!platformData) return
+    if (!platformData) {
+      console.error('Platform not found:', platformId)
+      return
+    }
 
-    set((state) => ({
-      platforms: [...state.platforms, {
-        id: platformId,
-        name: platformData.name,
-        scaleMethod: 'modular',
-        scale: { ...defaultScale },
-        units: {
-          typography: platformData.units.typography,
-          spacing: platformData.units.spacing,
-          dimensions: platformData.units.dimensions
-        },
-        distanceScale: {
-          viewingDistance: 50,
-          visualAcuity: 1,
-          meanLengthRatio: 1,
-          textType: 'continuous',
-          lighting: 'good',
-          ppi: 96
-        },
-        accessibility: { ...defaultAccessibility },
-        typeStyles: [...defaultTypeStyles]
-      }]
+    const defaultSettings = {
+      id: platformId,
+      scaleMethod: 'modular' as ScaleMethod,
+      scale: {
+        baseSize: 16,
+        ratio: 1.2,
+        stepsUp: 3,
+        stepsDown: 2
+      },
+      distanceScale: {
+        viewingDistance: 400,
+        visualAcuity: 1,
+        meanLengthRatio: 5,
+        textType: 'continuous' as TextType,
+        lighting: 'good' as LightingCondition,
+        ppi: 96
+      },
+      accessibility: {
+        minContrastBody: 4.5,
+        minContrastLarge: 3
+      },
+      typeStyles: []
+    }
+
+    set(state => ({
+      platforms: [...state.platforms, { ...defaultSettings }]
     }))
+
+    // Save the default settings to the database
+    await get().saveTypographySettings(platformId, defaultSettings)
   },
 
   updatePlatform: (platformId: string, updates: Partial<Platform>) => {
@@ -346,7 +355,6 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     return scaleValues;
   },
 
-  // Modify the copyTypeStylesToAllPlatforms function
   copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => {
     set((state) => ({
       platforms: state.platforms.map(platform => {
@@ -374,7 +382,6 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     }))
   },
 
-  // Save type styles to Supabase
   saveTypeStyles: async (platformId: string, styles: TypeStyle[]) => {
     set({ isLoading: true, error: null })
     try {
@@ -399,7 +406,6 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     }
   },
 
-  // Save typography settings to Supabase
   saveTypographySettings: async (platformId: string, settings: Partial<Platform>) => {
     set({ isLoading: true, error: null })
     try {
@@ -420,74 +426,71 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     }
   },
 
-  // Fetch type styles from Supabase
   fetchTypeStyles: async (platformId: string) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true })
     try {
       const { data, error } = await supabase
         .from('type_styles')
         .select('*')
         .eq('platform_id', platformId)
-      
+
       if (error) throw error
-      
-      if (data) {
-        const styles = data.map(style => ({
-          id: style.id,
-          name: style.name,
-          scaleStep: style.scale_step,
-          fontWeight: style.font_weight,
-          lineHeight: style.line_height,
-          letterSpacing: style.letter_spacing,
-          opticalSize: style.optical_size
-        }))
-        
-        set(state => ({
-          platforms: state.platforms.map(p => 
-            p.id === platformId 
-              ? { ...p, typeStyles: styles }
-              : p
-          )
-        }))
-      }
+
+      const styles = data.map(style => ({
+        id: style.id,
+        name: style.name,
+        scaleStep: style.scale_step,
+        fontWeight: style.font_weight,
+        lineHeight: style.line_height,
+        letterSpacing: style.letter_spacing,
+        opticalSize: style.optical_size
+      }))
+
+      set(state => ({
+        platforms: state.platforms.map(p => 
+          p.id === platformId ? { ...p, typeStyles: styles } : p
+        ),
+        isLoading: false,
+        error: null
+      }))
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ 
+        isLoading: false,
+        error: (error as Error).message 
+      })
     }
   },
 
-  // Fetch typography settings from Supabase
   fetchTypographySettings: async (platformId: string) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true })
     try {
       const { data, error } = await supabase
         .from('typography_settings')
         .select('*')
         .eq('platform_id', platformId)
         .single()
-      
-      if (error) throw error
-      
-      if (data) {
-        set(state => ({
-          platforms: state.platforms.map(p => 
-            p.id === platformId 
-              ? {
-                  ...p,
-                  scaleMethod: data.scale_method,
-                  scale: data.scale_config,
-                  distanceScale: data.distance_scale,
-                  aiSettings: data.ai_settings
-                }
-              : p
-          )
-        }))
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Initialize with default settings if none exist
+          await get().initializePlatform(platformId)
+          return
+        }
+        throw error
       }
+
+      set(state => ({
+        platforms: state.platforms.map(p => 
+          p.id === platformId ? { ...p, ...data } : p
+        ),
+        isLoading: false,
+        error: null
+      }))
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ 
+        isLoading: false,
+        error: (error as Error).message 
+      })
     }
   }
 }),

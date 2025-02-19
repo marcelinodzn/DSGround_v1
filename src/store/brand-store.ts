@@ -45,7 +45,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      set({ brands: data, error: null })
+      set({ brands: data as Brand[], error: null })
 
       const state = get()
       if (!state.currentBrand && data.length > 0) {
@@ -70,7 +70,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       if (error) throw error
       
       set(state => ({
-        brands: [...state.brands, data],
+        brands: [...state.brands, data as Brand],
         currentBrand: data.id
       }))
     } catch (error) {
@@ -94,7 +94,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       
       set(state => ({
         brands: state.brands.map(b => 
-          b.id === id ? { ...b, ...data } : b
+          b.id === id ? { ...b, ...data } as Brand : b
         )
       }))
     } catch (error) {
@@ -125,42 +125,29 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
     }
   },
 
-  setCurrentBrand: async (id) => {
-    console.log("setCurrentBrand called with id:", id)
-    set({ currentBrand: id })
-    
-    if (id) {
-      const platformStore = usePlatformStore.getState()
-      
-      // Reset platform store
-      platformStore.resetPlatforms()
-      
-      // Fetch platforms for the new brand
-      console.log("Fetching platforms for brand id:", id)
-      await platformStore.fetchPlatforms(id)
-      
-      // Get all platforms for this brand
-      const { platforms } = platformStore
-      console.log("Platforms fetched:", platforms)
-      if (platforms.length > 0) {
-        // Try to find "Always active" platform first
-        const alwaysActivePlatform = platforms.find(p => p.name === "Always active")
-        const platformToSelect = alwaysActivePlatform || platforms[0]
-        console.log("Platform to select:", platformToSelect)
-        
-        // Set the current platform
-        platformStore.setCurrentPlatform(platformToSelect.id)
-        
-        // Fetch typography data for the selected platform
-        const typographyStore = useTypographyStore.getState()
-        await Promise.all([
-          typographyStore.fetchTypographySettings(platformToSelect.id),
-          typographyStore.fetchTypeStyles(platformToSelect.id)
-        ])
-      } else {
-        console.log("No platforms found for brand id:", id)
-        platformStore.setCurrentPlatform('') // Clear the current platform
+  setCurrentBrand: async (id: string | null) => {
+    try {
+      if (!id) {
+        set({ currentBrand: null })
+        return
       }
+
+      const state = get()
+      const brand = state.brands.find(b => b.id === id)
+      if (brand) {
+        set({ currentBrand: brand })
+      } else {
+        const { data, error } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (error) throw error
+        set({ currentBrand: data as Brand })
+      }
+    } catch (error) {
+      set({ error: (error as Error).message })
     }
   },
 
@@ -176,7 +163,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       if (error) throw error
       
       set({ 
-        currentBrand: data,
+        currentBrand: data as Brand,
         error: null 
       })
     } catch (error) {
