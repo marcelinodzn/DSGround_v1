@@ -16,19 +16,12 @@ export interface Platform {
     spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
     dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
   }
-  typography: 'rem' | 'em' | 'ch' | 'ex' | 'vw' | 'vh' | '%' | 'px' | 'pt' | 'pc'
-  spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
-  dimensions: '%' | 'vw' | 'vh' | 'px' | 'cm' | 'mm' | 'in' | 'm'
   layout: {
     baseSize: number
     gridColumns: number
     gridGutter: number
     containerPadding: number
   }
-  baseSize: number
-  gridColumns: number
-  gridGutter: number
-  containerPadding: number
   created_at: string
   updated_at: string
 }
@@ -79,11 +72,6 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
     }
   },
 
-  fetchPlatforms: async () => {
-    console.warn('Deprecated: Use fetchPlatformsByBrand instead')
-    set({ platforms: [], currentPlatform: null })
-  },
-
   addPlatform: async (brandId: string, platform: Partial<Platform>) => {
     try {
       const { data, error } = await supabase
@@ -95,13 +83,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
           units: {
             typography: 'rem',
             spacing: 'rem',
-            borderWidth: 'px',
-            borderRadius: 'px'
+            dimensions: 'px'
           },
           layout: {
+            baseSize: 16,
             gridColumns: 12,
-            gridGutter: 16,
-            containerPadding: 16
+            gridGutter: 24,
+            containerPadding: 24
           }
         })
         .select()
@@ -109,56 +97,45 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       if (error) throw error
 
-      set((state) => ({
-        platforms: [...state.platforms, data]
+      const newPlatform = data as Platform
+      
+      set(state => ({
+        platforms: [...state.platforms, newPlatform]
       }))
 
-      return data
+      return newPlatform
     } catch (error) {
-      console.error('Error adding platform:', error)
       throw error
     }
   },
 
-  updatePlatform: async (id, updates) => {
-    set({ isLoading: true, error: null })
+  updatePlatform: async (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('platforms')
         .update(updates)
         .eq('id', id)
-
-      if (error) throw error
-      
-      // Fetch the updated platform to ensure we have the latest data
-      const { data: updatedPlatform, error: fetchError } = await supabase
-        .from('platforms')
-        .select('*')
-        .eq('id', id)
+        .select()
         .single()
 
-      if (fetchError) throw fetchError
+      if (error) throw error
 
+      const updatedPlatform = data as Platform
+      
       set(state => ({
         platforms: state.platforms.map(p => 
-          p.id === id ? { ...p, ...updatedPlatform } : p
+          p.id === id ? updatedPlatform : p
         ),
-        currentPlatform: state.currentPlatform?.id === id ? 
-          { ...state.currentPlatform, ...updatedPlatform } : 
-          state.currentPlatform
+        currentPlatform: state.currentPlatform?.id === id ? updatedPlatform : state.currentPlatform
       }))
 
       return updatedPlatform
     } catch (error) {
-      set({ error: (error as Error).message })
       throw error
-    } finally {
-      set({ isLoading: false })
     }
   },
 
-  deletePlatform: async (id) => {
-    set({ isLoading: true, error: null })
+  deletePlatform: async (id: string) => {
     try {
       const { error } = await supabase
         .from('platforms')
@@ -174,34 +151,26 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       return true
     } catch (error) {
-      set({ error: (error as Error).message })
       throw error
-    } finally {
-      set({ isLoading: false })
     }
   },
 
   setCurrentPlatform: async (id: string | null) => {
+    if (!id) {
+      set({ currentPlatform: null })
+      return
+    }
+
     try {
-      if (!id) {
-        set({ currentPlatform: null })
-        return
-      }
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-      const state = get()
-      const platform = state.platforms.find(p => p.id === id)
-      if (platform) {
-        set({ currentPlatform: platform })
-      } else {
-        const { data, error } = await supabase
-          .from('platforms')
-          .select('*')
-          .eq('id', id)
-          .single()
-
-        if (error) throw error
-        set({ currentPlatform: data as Platform })
-      }
+      if (error) throw error
+      
+      set({ currentPlatform: data as Platform })
     } catch (error) {
       set({ error: (error as Error).message })
     }

@@ -4,10 +4,10 @@ import { useBrandStore } from "@/store/brand-store"
 import { Brand } from "@/store/brand-store"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { AnimatedTabs } from "@/components/ui/animated-tabs"
-import { useLayout } from "@/store/layout-store"
-import { useTypographyStore } from "@/store/typography-store"
-import { Platform } from "@/store/typography"
+import { AnimatedTabs, Tab } from "@/components/ui/animated-tabs"
+import { useLayout } from "@/contexts/layout-context"
+import { useTypographyStore } from "@/store/typography"
+import { Platform } from "@/store/platform-store"
 import { usePlatformStore } from "@/store/platform-store"
 import { supabase } from "@/lib/supabase"
 
@@ -61,25 +61,25 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
     return <div>Loading...</div>
   }
 
-  const tabs = [
+  const tabs: Tab[] = [
     {
       id: 'typography',
-      label: 'Typography',
+      title: 'Typography',
       content: 'Typography'
     },
     {
       id: 'colors',
-      label: 'Colors',
+      title: 'Colors',
       content: 'Colors'
     },
     {
       id: 'components',
-      label: 'Components',
+      title: 'Components',
       content: 'Components'
     },
     {
       id: 'tokens',
-      label: 'Tokens',
+      title: 'Tokens',
       content: 'Tokens'
     }
   ]
@@ -98,14 +98,8 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
 
       <div className="mt-6">
         <AnimatedTabs
-          value="overview"
-          onValueChange={() => {}}
-          tabs={[
-            { value: 'overview', label: 'Overview' },
-            { value: 'tokens', label: 'Design Tokens' },
-            { value: 'components', label: 'Components' },
-            { value: 'settings', label: 'Settings' },
-          ]}
+          defaultValue="typography"
+          tabs={tabs}
         />
       </div>
     </div>
