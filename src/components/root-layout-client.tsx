@@ -65,20 +65,11 @@ const BrandDropdown = () => {
   useEffect(() => {
     const initializeBrands = async () => {
       try {
-        const brands = await fetchBrands()
-        if (!brands?.length) return
+        const fetchedBrands = await fetchBrands()
+        if (!fetchedBrands?.length) return
         
-        // Try to get brand from URL first
-        const brandIdFromUrl = pathname.match(/\/brands\/([^\/]+)/)?.[1]
-        const brandFromUrl = brands.find(b => b.id === brandIdFromUrl)
-        
-        // Only set initial brand if we don't have one
-        if (!currentBrand) {
-          if (brandFromUrl) {
-            await setCurrentBrand(brandFromUrl.id)
-          } else {
-            await setCurrentBrand(brands[0].id)
-          }
+        if (!currentBrand?.id && fetchedBrands[0]) {
+          await setCurrentBrand(fetchedBrands[0].id)
         }
       } catch (error) {
         console.error('Error initializing brands:', error)
@@ -86,7 +77,7 @@ const BrandDropdown = () => {
     }
 
     initializeBrands()
-  }, [pathname, currentBrand, setCurrentBrand, fetchBrands])
+  }, [fetchBrands, setCurrentBrand])
 
   const handleBrandChange = async (brandId: string) => {
     try {
@@ -100,44 +91,29 @@ const BrandDropdown = () => {
     }
   }
 
-  // Wait for brands to load
   if (!brands?.length) return null
-
-  // Find the current brand object
-  const selectedBrand = brands.find(b => b.id === currentBrand?.id)
 
   return (
     <Select
-      value={selectedBrand?.id}
+      value={currentBrand?.id}
       onValueChange={handleBrandChange}
     >
-      <SelectTrigger 
-        className="w-auto min-w-[160px] border-0 shadow-none focus:ring-0 hover:bg-accent transition-colors rounded-md px-4 py-2 focus:outline-none bg-background"
-      >
-        <span className="text-sm font-medium">
-          {selectedBrand?.name || brands[0].name}
-        </span>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Select brand" />
       </SelectTrigger>
-      <SelectContent className="border-0 shadow-md bg-background">
-        <div className="p-2 space-y-1">
-          {brands.map((brand) => (
-            <SelectItem 
-              key={brand.id} 
-              value={brand.id}
-              className="rounded-md cursor-pointer hover:bg-accent focus:bg-accent focus:text-accent-foreground"
-            >
-              {brand.name}
-            </SelectItem>
-          ))}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full justify-start text-left mt-2"
-            onClick={() => router.push('/brands/new')}
-          >
-            + Add new brand
-          </Button>
-        </div>
+      <SelectContent>
+        {brands.map((brand) => (
+          <SelectItem key={brand.id} value={brand.id}>
+            {brand.name}
+          </SelectItem>
+        ))}
+        <SelectItem 
+          value="new" 
+          className="border-t" 
+          onClick={() => router.push('/brands/new')}
+        >
+          <span className="text-sm py-2">Add brand</span>
+        </SelectItem>
       </SelectContent>
     </Select>
   )
