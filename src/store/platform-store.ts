@@ -10,6 +10,7 @@ export interface Platform {
   brand_id: string
   name: string
   description: string | null
+  icon: string | null
   units: {
     typography: 'rem' | 'em' | 'ch' | 'ex' | 'vw' | 'vh' | '%' | 'px' | 'pt' | 'pc'
     spacing: 'rem' | 'em' | 'vw' | 'vh' | '%' | 'px'
@@ -38,14 +39,9 @@ interface PlatformStore {
   isLoading: boolean
   error: string | null
   fetchPlatformsByBrand: (brandId: string) => Promise<void>
-  addPlatform: (brandId: string, platform: {
-    name: string
-    description?: string | null
-    units: Platform['units']
-    layout: Platform['layout']
-  }) => Promise<void>
-  updatePlatform: (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => Promise<void>
-  deletePlatform: (id: string) => Promise<void>
+  addPlatform: (brandId: string, platform: Partial<Platform>) => Promise<Platform>
+  updatePlatform: (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => Promise<Platform>
+  deletePlatform: (id: string) => Promise<boolean>
   setCurrentPlatform: (id: string | null) => Promise<void>
   resetPlatforms: () => void
 }
@@ -88,54 +84,81 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
     set({ platforms: [], currentPlatform: null })
   },
 
-  addPlatform: async (brandId, platform) => {
-    set({ isLoading: true })
+  addPlatform: async (brandId: string, platform: Partial<Platform>) => {
     try {
       const { data, error } = await supabase
         .from('platforms')
-        .insert([{ ...platform, brand_id: brandId }])
+        .insert({
+          brand_id: brandId,
+          name: platform.name || 'New Platform',
+          description: platform.description || '',
+          units: {
+            typography: 'rem',
+            spacing: 'rem',
+            borderWidth: 'px',
+            borderRadius: 'px'
+          },
+          layout: {
+            gridColumns: 12,
+            gridGutter: 16,
+            containerPadding: 16
+          }
+        })
         .select()
         .single()
 
       if (error) throw error
-      
-      set(state => ({
-        platforms: [...state.platforms, data as Platform],
-        currentPlatform: data as Platform
+
+      set((state) => ({
+        platforms: [...state.platforms, data]
       }))
+
+      return data
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      console.error('Error adding platform:', error)
+      throw error
     }
   },
 
   updatePlatform: async (id, updates) => {
-    set({ isLoading: true })
+    set({ isLoading: true, error: null })
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('platforms')
         .update(updates)
         .eq('id', id)
-        .select()
-        .single()
 
       if (error) throw error
       
+      // Fetch the updated platform to ensure we have the latest data
+      const { data: updatedPlatform, error: fetchError } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (fetchError) throw fetchError
+
       set(state => ({
         platforms: state.platforms.map(p => 
-          p.id === id ? { ...p, ...data } as Platform : p
-        )
+          p.id === id ? { ...p, ...updatedPlatform } : p
+        ),
+        currentPlatform: state.currentPlatform?.id === id ? 
+          { ...state.currentPlatform, ...updatedPlatform } : 
+          state.currentPlatform
       }))
+
+      return updatedPlatform
     } catch (error) {
       set({ error: (error as Error).message })
+      throw error
     } finally {
       set({ isLoading: false })
     }
   },
 
   deletePlatform: async (id) => {
-    set({ isLoading: true })
+    set({ isLoading: true, error: null })
     try {
       const { error } = await supabase
         .from('platforms')
@@ -148,8 +171,11 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         platforms: state.platforms.filter(p => p.id !== id),
         currentPlatform: state.currentPlatform?.id === id ? null : state.currentPlatform
       }))
+
+      return true
     } catch (error) {
       set({ error: (error as Error).message })
+      throw error
     } finally {
       set({ isLoading: false })
     }

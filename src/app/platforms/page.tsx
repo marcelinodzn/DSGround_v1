@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLayout } from "@/contexts/layout-context"
 import { Button } from "@/components/ui/button"
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2, Plus } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { CardMenu } from "@/components/ui/card-menu"
@@ -26,6 +26,7 @@ interface Platform {
     gridGutter: number
     containerPadding: number
   }
+  icon?: string
 }
 
 // Add slugify function
@@ -49,6 +50,7 @@ export default function PlatformsPage() {
     addPlatform,
     updatePlatform 
   } = usePlatformStore()
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
     const loadPlatforms = async () => {
@@ -60,32 +62,30 @@ export default function PlatformsPage() {
     loadPlatforms()
   }, [currentBrand, fetchPlatformsByBrand])
 
-  const handleCreatePlatform = async (e: any) => {
-    e.preventDefault()
-    if (!currentBrand) {
-      toast.error('Please select a brand first')
-      return
-    }
-
+  const handleCreatePlatform = async (name: string, description: string = '') => {
+    if (!currentBrand) return
+    
     try {
-      await addPlatform(currentBrand.id, {
-        name: 'New Platform',
-        description: 'Platform description',
+      const platform = await addPlatform(currentBrand.id, {
+        name,
+        description,
         units: {
           typography: 'rem',
           spacing: 'rem',
-          dimensions: 'px'
+          borderWidth: 'px',
+          borderRadius: 'px'
         },
         layout: {
-          baseSize: 16,
           gridColumns: 12,
           gridGutter: 16,
           containerPadding: 16
         }
       })
-      toast.success('Platform created successfully')
+      
+      // Navigate to the new platform
+      router.push(`/platforms/${platform.id}`)
     } catch (error) {
-      toast.error('Failed to create platform')
+      console.error('Create platform error:', error)
     }
   }
 
@@ -93,7 +93,12 @@ export default function PlatformsPage() {
     try {
       await deletePlatform(platformId)
       toast.success('Platform deleted successfully')
+      // Refresh platforms list
+      if (currentBrand) {
+        await fetchPlatformsByBrand(currentBrand.id)
+      }
     } catch (error) {
+      console.error('Delete error:', error)
       toast.error('Failed to delete platform')
     }
   }
@@ -109,7 +114,10 @@ export default function PlatformsPage() {
         layout: platform.layout
       })
       toast.success('Platform duplicated successfully')
+      // Refresh platforms list
+      await fetchPlatformsByBrand(currentBrand.id)
     } catch (error) {
+      console.error('Duplicate error:', error)
       toast.error('Failed to duplicate platform')
     }
   }
@@ -118,7 +126,12 @@ export default function PlatformsPage() {
     try {
       await updatePlatform(id, updates)
       toast.success('Platform updated successfully')
+      // Refresh platforms list
+      if (currentBrand) {
+        await fetchPlatformsByBrand(currentBrand.id)
+      }
     } catch (error) {
+      console.error('Edit error:', error)
       toast.error('Failed to update platform')
     }
   }
@@ -157,64 +170,139 @@ export default function PlatformsPage() {
           <div>
             <h1 className="text-[30px] font-bold">Platforms</h1>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="ml-2"
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="bg-muted rounded-full p-1 flex items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 p-0 rounded-full",
+                  viewMode === 'grid' && "bg-background shadow-sm"
+                )}
+                onClick={() => setViewMode('grid')}
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 2H6.5V6.5H2V2ZM8.5 2H13V6.5H8.5V2ZM2 8.5H6.5V13H2V8.5ZM8.5 8.5H13V13H8.5V8.5Z" stroke="currentColor"/>
+                </svg>
+                <span className="sr-only">Grid view</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 p-0 rounded-full",
+                  viewMode === 'list' && "bg-background shadow-sm"
+                )}
+                onClick={() => setViewMode('list')}
+              >
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 4H13M2 7.5H13M2 11H13" stroke="currentColor"/>
+                </svg>
+                <span className="sr-only">List view</span>
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="py-8 px-6 max-w-full overflow-x-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className={cn(
+            viewMode === 'grid' 
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+              : "flex flex-col gap-4"
+          )}>
             {/* Add Platform card */}
             <Button 
               variant="outline" 
-              className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent"
-              onClick={handleCreatePlatform}
+              className={cn(
+                "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
+                viewMode === 'grid'
+                  ? "h-[116px]"
+                  : "h-14"
+              )}
+              onClick={() => router.push('/platforms/new')}
             >
-              <h3 className="font-semibold">Add New Platform</h3>
+              {viewMode === 'grid' ? (
+                <div className="h-full w-full flex flex-col justify-between p-6">
+                  <div className="text-left">
+                    <h3 className="font-semibold">Add New Platform</h3>
+                  </div>
+                  <div className="flex items-center">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full w-full flex items-center gap-2 px-4">
+                  <Plus className="h-4 w-4" />
+                  <span className="font-semibold">Add New Platform</span>
+                </div>
+              )}
             </Button>
-            
+
             {/* Platform cards */}
             {platforms.map((platform) => (
               <div key={platform.id} className="relative group">
                 <Button
                   variant="outline"
-                  className="h-[116px] p-6 flex flex-col items-start justify-between border rounded-lg hover:bg-accent w-full"
+                  className={cn(
+                    "relative w-full border rounded-lg hover:bg-accent",
+                    viewMode === 'grid'
+                      ? "h-[116px] p-6"
+                      : "h-14 p-4"
+                  )}
                   onClick={() => handleViewPlatform(platform.id)}
                 >
-                  <h3 className="font-semibold">{platform.name}</h3>
-                  <p className="text-sm text-muted-foreground text-left line-clamp-2">
-                    {platform.description}
-                  </p>
+                  {viewMode === 'grid' ? (
+                    <div className="h-full w-full flex flex-col justify-between">
+                      <h3 className="font-semibold text-left">{platform.name}</h3>
+                      <div className="flex items-center gap-2">
+                        {platform.icon && (
+                          <img 
+                            src={platform.icon} 
+                            alt=""
+                            className="w-5 h-5 object-contain"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {platform.icon && (
+                          <img 
+                            src={platform.icon} 
+                            alt=""
+                            className="w-5 h-5 object-contain"
+                          />
+                        )}
+                        <h3 className="font-semibold">{platform.name}</h3>
+                      </div>
+                    </div>
+                  )}
                 </Button>
                 <CardMenu
-                  items={[
-                    {
-                      label: 'Edit Name',
-                      onClick: () => {
-                        const newName = window.prompt('Enter new name:', platform.name)
-                        if (newName && newName !== platform.name) {
-                          handleEditPlatform(platform.id, { name: newName })
-                        }
-                      }
-                    },
-                    {
-                      label: 'Duplicate',
-                      onClick: () => handleDuplicatePlatform(platform)
-                    },
-                    {
-                      label: 'Delete',
-                      onClick: () => handleDeletePlatform(platform.id)
+                  onEdit={() => {
+                    const newName = window.prompt('Enter new name:', platform.name)
+                    if (newName && newName !== platform.name) {
+                      handleEditPlatform(platform.id, { name: newName })
                     }
-                  ]}
+                  }}
+                  onDelete={() => {
+                    if (window.confirm('Are you sure you want to delete this platform? This action cannot be undone.')) {
+                      handleDeletePlatform(platform.id)
+                    }
+                  }}
+                  onDuplicate={() => handleDuplicatePlatform(platform)}
                 />
               </div>
             ))}
