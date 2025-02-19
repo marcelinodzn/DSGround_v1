@@ -46,7 +46,8 @@ export default function PlatformsPage() {
     error,
     fetchPlatformsByBrand,
     deletePlatform, 
-    addPlatform 
+    addPlatform,
+    updatePlatform 
   } = usePlatformStore()
 
   useEffect(() => {
@@ -94,6 +95,31 @@ export default function PlatformsPage() {
       toast.success('Platform deleted successfully')
     } catch (error) {
       toast.error('Failed to delete platform')
+    }
+  }
+
+  const handleDuplicatePlatform = async (platform: Platform) => {
+    if (!currentBrand) return
+
+    try {
+      await addPlatform(currentBrand.id, {
+        name: `${platform.name} (Copy)`,
+        description: platform.description,
+        units: platform.units,
+        layout: platform.layout
+      })
+      toast.success('Platform duplicated successfully')
+    } catch (error) {
+      toast.error('Failed to duplicate platform')
+    }
+  }
+
+  const handleEditPlatform = async (id: string, updates: { name: string }) => {
+    try {
+      await updatePlatform(id, updates)
+      toast.success('Platform updated successfully')
+    } catch (error) {
+      toast.error('Failed to update platform')
     }
   }
 
@@ -170,7 +196,25 @@ export default function PlatformsPage() {
                   </p>
                 </Button>
                 <CardMenu
-                  onDelete={(e) => handleDeletePlatform(platform.id)}
+                  items={[
+                    {
+                      label: 'Edit Name',
+                      onClick: () => {
+                        const newName = window.prompt('Enter new name:', platform.name)
+                        if (newName && newName !== platform.name) {
+                          handleEditPlatform(platform.id, { name: newName })
+                        }
+                      }
+                    },
+                    {
+                      label: 'Duplicate',
+                      onClick: () => handleDuplicatePlatform(platform)
+                    },
+                    {
+                      label: 'Delete',
+                      onClick: () => handleDeletePlatform(platform.id)
+                    }
+                  ]}
                 />
               </div>
             ))}

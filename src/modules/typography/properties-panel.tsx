@@ -343,14 +343,36 @@ export function PropertiesPanel() {
   }
 
   const handleScaleChange = (ratio: number, baseSize: number) => {
+    const updatedScale = {
+      ...currentSettings.scale,
+      ratio,
+      baseSize
+    }
+    
+    // Update the scale
     updatePlatform(activePlatform, {
-      scale: { 
-        ...currentSettings.scale,
-        ratio,
-        baseSize
-      }
+      scale: updatedScale
     })
-  }
+
+    // Update all type styles to reflect new scale values
+    if (currentSettings.typeStyles) {
+      const updatedTypeStyles = currentSettings.typeStyles.map(style => {
+        const scaleValues = getScaleValues(activePlatform)
+        const matchingScale = scaleValues.find(s => s.label === style.scaleStep)
+        if (matchingScale) {
+          return {
+            ...style,
+            fontSize: matchingScale.size
+          }
+        }
+        return style
+      })
+
+      updatePlatform(activePlatform, {
+        typeStyles: updatedTypeStyles
+      })
+    }
+  };
 
   const handleDistanceScaleChange = (updates: Partial<Platform['distanceScale']>) => {
     // Calculate the base size using the distance formula
