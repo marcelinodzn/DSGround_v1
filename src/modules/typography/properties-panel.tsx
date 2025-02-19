@@ -1599,7 +1599,15 @@ function TypeScaleTab({ platform }: { platform: Platform }) {
   )
 }
 
-function ModularScaleTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+function ModularScaleTab({
+  platform,
+  currentSettings,
+  updatePlatform,
+}: {
+  platform: Platform;
+  currentSettings: any;
+  updatePlatform: (id: string, updates: Partial<Platform>) => void;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -1608,8 +1616,11 @@ function ModularScaleTab({ platform, currentSettings }: { platform: Platform; cu
           type="number"
           value={platform.scale.baseSize}
           onChange={(e) => {
-            handleScaleChange({
-              baseSize: Number(e.target.value)
+            updatePlatform(platform.id, {
+              scale: {
+                ...platform.scale,
+                baseSize: Number(e.target.value)
+              }
             })
           }}
           className="text-xs h-8"
@@ -1620,11 +1631,17 @@ function ModularScaleTab({ platform, currentSettings }: { platform: Platform; cu
   )
 }
 
-function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
-  // Calculate the base size using the distance formula
+function DistanceBasedTab({
+  platform,
+  currentSettings,
+  updatePlatform,
+}: {
+  platform: Platform;
+  currentSettings: any;
+  updatePlatform: (id: string, updates: Partial<Platform>) => void;
+}) {
   const calculatedBaseSize = useMemo(() => {
     if (!platform.distanceScale) return 0;
-    
     return calculateDistanceBasedSize(
       platform.distanceScale.viewingDistance,
       platform.distanceScale.visualAcuity,
@@ -1658,8 +1675,11 @@ function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; c
           step="1"
           value={platform.distanceScale?.viewingDistance || 0}
           onChange={(e) => {
-            handleDistanceScaleChange({
-              viewingDistance: Number(e.target.value)
+            updatePlatform(platform.id, {
+              distanceScale: {
+                ...platform.distanceScale,
+                viewingDistance: Number(e.target.value)
+              }
             })
           }}
           className="text-xs h-8"
@@ -1670,7 +1690,15 @@ function DistanceBasedTab({ platform, currentSettings }: { platform: Platform; c
   )
 }
 
-function AIDistanceTab({ platform, currentSettings }: { platform: Platform; currentSettings: any }) {
+function AIDistanceTab({
+  platform,
+  currentSettings,
+  updatePlatform,
+}: {
+  platform: Platform;
+  currentSettings: any;
+  updatePlatform: (id: string, updates: Partial<Platform>) => void;
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -1682,7 +1710,7 @@ function AIDistanceTab({ platform, currentSettings }: { platform: Platform; curr
           className="text-xs h-8"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Recommended base size in {currentPlatformSettings?.units.typography || 'px'} based on AI analysis
+          Recommended base size in {platform.units.typography || 'px'} based on AI analysis
         </p>
       </div>
       {/* ... rest of the component */}
