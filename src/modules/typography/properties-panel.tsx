@@ -22,6 +22,8 @@ import { usePlatformStore } from "@/store/platform-store"
 import { convertUnits, formatWithUnit } from "@/lib/utils"
 import { useRouter } from 'next/navigation';
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
+import { useFontStore } from "@/store/font-store"
+import { useBrandStore } from "@/store/brand-store"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -214,6 +216,8 @@ export function PropertiesPanel() {
     initializePlatform
   } = useTypographyStore()
   const { platforms: platformSettings } = usePlatformStore()
+  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
+  const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
 
   // Compute active platform - either current platform or first available
   const activePlatform = useMemo(() => {
@@ -246,6 +250,13 @@ export function PropertiesPanel() {
   const [showPlatformActions, setShowPlatformActions] = useState(false);
   const router = useRouter();
 
+  // Add state for font role
+  const currentTypography = useMemo(() => {
+    if (!currentBrand?.id) return null
+    return brandTypography[currentBrand.id]
+  }, [currentBrand?.id, brandTypography])
+  const [currentFontRole, setCurrentFontRole] = useState<'primary' | 'secondary' | 'tertiary'>('primary')
+
   const formatText = (text: string) => {
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   };
@@ -276,6 +287,26 @@ export function PropertiesPanel() {
       }
     }
   }, [platforms, typographyPlatforms, activePlatform, initializePlatform, setCurrentPlatform])
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        await loadFonts()
+        if (currentBrand?.id) {
+          await loadBrandTypography(currentBrand.id)
+        }
+      } catch (error) {
+        console.error('Error loading fonts and typography:', error)
+      }
+    }
+
+    initializeData()
+    
+    // Debug logs
+    console.log('Current Brand:', currentBrand)
+    console.log('Brand Typography:', brandTypography)
+    console.log('Fonts:', fonts)
+  }, [currentBrand?.id, loadFonts, loadBrandTypography])
 
   // Find current settings
   const currentSettings = typographyPlatforms.find(p => p.id === activePlatform)
@@ -571,6 +602,45 @@ ${recommendation}`
     }
   }
 
+  const handleFontRoleChange = async (role: 'primary' | 'secondary' | 'tertiary') => {
+    console.log('Changing font role to:', role)
+    console.log('Current typography:', currentTypography)
+    console.log('Available fonts:', fonts)
+    
+    if (!currentBrand?.id || !currentTypography) return
+    
+    try {
+      const fontId = currentTypography[`${role}_font_id`]
+      console.log('Selected font ID:', fontId)
+      
+      if (fontId) {
+        updatePlatform(activePlatform, {
+          currentFontRole: role,
+          fontId: fontId
+        })
+      }
+    } catch (error) {
+      console.error('Error updating font role:', error)
+    }
+  }
+
+  const getFontInfo = (role: 'primary' | 'secondary' | 'tertiary') => {
+    const fontId = currentTypography?.[`${role}_font_id`]
+    const font = fonts.find(f => f.id === fontId)
+    return font
+  }
+
+  const getRoleDescription = (role: 'primary' | 'secondary' | 'tertiary') => {
+    switch (role) {
+      case 'primary':
+        return 'Used for headlines and important text'
+      case 'secondary':
+        return 'Used for body text and supporting content'
+      case 'tertiary':
+        return 'Used sparingly for special purposes'
+    }
+  }
+
   return (
     <div className="h-full">
       <div className="px-4 py-4">
@@ -627,6 +697,88 @@ ${recommendation}`
 
       <div className="mt-[11.9px]">
         <Separator className="mb-4" />
+      </div>
+
+      <div className="px-4 py-4">
+        <Label className="text-xs mb-2 block">Font Role</Label>
+        <Select 
+          value={currentSettings.currentFontRole || ''}
+          onValueChange={(value) => handleFontRoleChange(value as 'primary' | 'secondary' | 'tertiary')}
+        >
+          <SelectTrigger className="text-xs h-8">
+            <SelectValue>
+              {currentSettings.currentFontRole ? 
+                `${currentSettings.currentFontRole.charAt(0).toUpperCase() + 
+                  currentSettings.currentFontRole.slice(1)} Font` : 
+                "Select font role"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(['primary', 'secondary', 'tertiary'] as const).map((role) => {
+              const fontId = currentTypography?.[`${role}_font_id`]
+              const font = fonts.find(f => f.id === fontId)
+              
+              return (
+                <SelectItem key={role} value={role}>
+                  <div className="flex flex-col">
+                    <span>{role.charAt(0).toUpperCase() + role.slice(1)} Font</span>
+                    {font ? (
+                      <span className="text-xs text-muted-foreground">
+                        {font.family}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No font selected
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select>
+
+        {/* Show current font info */}
+        {currentSettings.currentFontRole && currentTypography && (
+          <div className="mt-4">
+            <div className="rounded-md border p-3 bg-muted/5">
+              {(() => {
+                const fontId = currentTypography[`${currentSettings.currentFontRole}_font_id`]
+                const font = fonts.find(f => f.id === fontId)
+                
+                if (!font) {
+                  return (
+                    <div className="text-sm text-muted-foreground">
+                      No font selected for {currentSettings.currentFontRole} role
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      {getRoleDescription(currentSettings.currentFontRole)}
+                    </div>
+                    <div className="font-preview" style={{
+                      fontFamily: `"${font.family}", ${font.category}`,
+                      fontSize: '16px',
+                      fontWeight: font.is_variable ? undefined : font.weight,
+                      fontVariationSettings: font.is_variable ? `'wght' ${font.weight}` : undefined,
+                    }}>
+                      The quick brown fox jumps over the lazy dog
+                    </div>
+                    <div className="text-xs space-y-1 text-muted-foreground">
+                      <div>Font: {font.family}</div>
+                      <div>Weight: {font.is_variable ? 'Variable (1-1000)' : font.weight}</div>
+                      <div>Style: {font.style || 'Normal'}</div>
+                      <div>Format: {font.format.toUpperCase()}</div>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
       </div>
 
       <Collapsible defaultOpen>
@@ -1126,7 +1278,7 @@ ${recommendation}`
                                           ...currentSettings.scale,
                                           stepsDown: parseInt(e.target.value)
                                         }
-                                      });
+                                      })
                                     }}
                                     className="text-xs h-8"
                                   />

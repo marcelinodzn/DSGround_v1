@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { useBrandStore } from "@/store/brand-store"
 import { usePlatformStore } from "@/store/platform-store"
 import { useTypographyStore } from "@/store/typography"
+import { TypographyProperties } from '@/modules/brand/typography-properties'
 
 export default function TypographyPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()

@@ -80,6 +80,11 @@ const BrandDropdown = () => {
   }, [fetchBrands, setCurrentBrand])
 
   const handleBrandChange = async (brandId: string) => {
+    if (brandId === 'new') {
+      router.push('/brands/new')
+      return
+    }
+
     try {
       await setCurrentBrand(brandId)
       if (pathname.includes('/brands/')) {
@@ -107,12 +112,8 @@ const BrandDropdown = () => {
             {brand.name}
           </SelectItem>
         ))}
-        <SelectItem 
-          value="new" 
-          className="border-t" 
-          onClick={() => router.push('/brands/new')}
-        >
-          <span className="text-sm py-2">Add brand</span>
+        <SelectItem value="new" className="border-t text-muted-foreground">
+          + Add brand
         </SelectItem>
       </SelectContent>
     </Select>

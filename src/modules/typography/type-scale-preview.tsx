@@ -210,8 +210,42 @@ export function TypeScalePreview() {
   
   const { platforms: platformSettings } = usePlatformStore()
   const { currentBrand } = useBrandStore()
+  const { brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
   const router = useRouter()
   const [view, setView] = useState<string>('scale')
+  
+  const currentTypography = currentBrand?.id ? brandTypography[currentBrand.id] : null
+  const platform = useTypographyStore((state) => 
+    state.platforms.find(p => p.id === currentPlatform)
+  )
+
+  // Load fonts and typography when component mounts
+  useEffect(() => {
+    loadFonts()
+    if (currentBrand?.id) {
+      loadBrandTypography(currentBrand.id)
+    }
+  }, [loadFonts, currentBrand?.id, loadBrandTypography])
+
+  // Apply the selected font to the preview with fallback
+  const fontFamily = useMemo(() => {
+    if (!currentTypography || !platform?.currentFontRole) return undefined
+    const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
+    const font = fonts.find(f => f.id === fontId)
+    return font ? `"${font.family}", ${font.category}` : undefined
+  }, [currentTypography, platform?.currentFontRole, fonts])
+
+  // Show current font information
+  const currentFontInfo = useMemo(() => {
+    if (!currentTypography || !platform?.currentFontRole) return null
+    const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
+    const font = fonts.find(f => f.id === fontId)
+    return font ? {
+      name: font.family,
+      role: platform.currentFontRole,
+      category: font.category
+    } : null
+  }, [currentTypography, platform?.currentFontRole, fonts])
 
   // Compute active platform - either current platform or first available
   const activePlatform = useMemo(() => {
@@ -275,40 +309,56 @@ export function TypeScalePreview() {
 
   return (
     <div className="relative w-full">
-      <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
-        <Separator className="w-screen" />
-      </div>
-      
-      <div className="flex justify-between items-center pt-6">
-        <div className="py-4 text-sm text-muted-foreground">
-          Base Size: {displayBaseSize}{typographyUnit}
-          {scaleMethod === 'distance' && ' (distance-based)'} • 
-          Scale Ratio: {scale.ratio} • 
-          Steps Up: {scale.stepsUp} • 
-          Steps Down: {scale.stepsDown}
+      {currentFontInfo && (
+        <div className="mb-4 text-sm">
+          <span className="font-medium">Current Font: </span>
+          <span>{currentFontInfo.name}</span>
+          <span className="text-muted-foreground ml-2">
+            ({currentFontInfo.role} font - {currentFontInfo.category})
+          </span>
         </div>
-        <AnimatedTabs
-          tabs={viewTabs}
-          defaultTab="scale"
-          onChange={(value) => setView(value)}
-          layoutId="preview-view-tabs"
-        />
-      </div>
+      )}
+      
+      <div className="relative w-full" style={{ 
+        fontFamily: fontFamily || 'inherit',
+        // Add fallback styles
+        fontFallback: 'system-ui, -apple-system, sans-serif'
+      }}>
+        <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
+          <Separator className="w-screen" />
+        </div>
+        
+        <div className="flex justify-between items-center pt-6">
+          <div className="py-4 text-sm text-muted-foreground">
+            Base Size: {displayBaseSize}{typographyUnit}
+            {scaleMethod === 'distance' && ' (distance-based)'} • 
+            Scale Ratio: {scale.ratio} • 
+            Steps Up: {scale.stepsUp} • 
+            Steps Down: {scale.stepsDown}
+          </div>
+          <AnimatedTabs
+            tabs={viewTabs}
+            defaultTab="scale"
+            onChange={(value) => setView(value)}
+            layoutId="preview-view-tabs"
+          />
+        </div>
 
-      <div className="py-4">
-        <div className="min-w-0 overflow-x-auto">
-          {view === 'scale' ? (
-            <ScaleView 
-              scaleValues={scaleValues} 
-              baseSize={scale.baseSize}
-            />
-          ) : (
-            <StylesView 
-              typeStyles={currentSettings.typeStyles} 
-              scaleValues={scaleValues}
-              baseSize={scale.baseSize}
-            />
-          )}
+        <div className="py-4">
+          <div className="min-w-0 overflow-x-auto">
+            {view === 'scale' ? (
+              <ScaleView 
+                scaleValues={scaleValues} 
+                baseSize={scale.baseSize}
+              />
+            ) : (
+              <StylesView 
+                typeStyles={currentSettings.typeStyles} 
+                scaleValues={scaleValues}
+                baseSize={scale.baseSize}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

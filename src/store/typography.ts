@@ -56,6 +56,8 @@ export interface Platform {
   }
   typeStyles: TypeStyle[]
   aiScale?: AIScale
+  currentFontRole?: 'primary' | 'secondary' | 'tertiary'
+  fontId?: string
 }
 
 interface TypographyState {
@@ -278,34 +280,14 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
     }))
   },
 
-  updatePlatform: (platformId, updates) => {
-    const session = supabase.auth.getSession()
-    
-    if (!session) {
-      // Instead of redirecting, we'll update the local state
-      set((state) => ({
-        platforms: state.platforms.map((platform) =>
-          platform.id === platformId
-            ? { ...platform, ...updates }
-            : platform
-        ),
-      }))
-      return
-    }
-
-    // If authenticated, proceed with the update
-    set((state) => ({
-      platforms: state.platforms.map((platform) =>
-        platform.id === platformId
+  updatePlatform: (platformId: string, updates: Partial<Platform>) => {
+    set(state => ({
+      platforms: state.platforms.map(platform => 
+        platform.id === platformId 
           ? { ...platform, ...updates }
           : platform
-      ),
+      )
     }))
-
-    // Save to Supabase if authenticated
-    if (session) {
-      get().saveTypographySettings(platformId, updates)
-    }
   },
 
   getScaleValues: (platformId) => {
