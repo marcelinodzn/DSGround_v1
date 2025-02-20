@@ -57,12 +57,15 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       if (error) throw error
       
+      if (!data) throw new Error('Platform not found')
+
+      const platform = data as Platform
       set({ 
-        currentPlatform: data as Platform,
+        currentPlatform: platform,
         error: null
       })
     } catch (error) {
-      set({ error: (error as Error).message })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     } finally {
       set({ isLoading: false })
     }
@@ -75,21 +78,15 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         .from('platforms')
         .select('*')
         .eq('brand_id', brandId)
-        .order('created_at', { ascending: false })
 
       if (error) throw error
-      
-      // Ensure proper typing of the data
-      const typedData = (data || []) as Platform[]
-      
-      set({ 
-        platforms: typedData,
-        error: null,
-        // Reset current platform when brand changes
-        currentPlatform: null
-      })
+
+      if (!data) throw new Error('No platforms found')
+
+      const platforms = data as Platform[]
+      set({ platforms, error: null })
     } catch (error) {
-      set({ error: (error as Error).message })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     } finally {
       set({ isLoading: false })
     }
@@ -104,73 +101,71 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('platforms')
-        .insert({
-          brand_id: brandId,
-          name: platform.name || 'New Platform',
-          description: platform.description || '',
-          units: platform.units || {
-            typography: 'rem',
-            spacing: 'rem',
-            borderWidth: 'px',
-            borderRadius: 'px'
-          },
-          layout: {
-            ...(platform.layout || {
+        .insert([
+          {
+            brand_id: brandId,
+            name: platform.name,
+            description: platform.description,
+            units: platform.units || {
+              typography: 'px',
+              spacing: 'px',
+              borderWidth: 'px',
+              borderRadius: 'px'
+            },
+            layout: platform.layout || {
               gridColumns: 12,
               gridGutter: 16,
               containerPadding: 16
-            }),
-            icon: platform.layout?.icon
+            }
           }
-        })
+        ])
         .select()
         .single()
 
       if (error) throw error
+      
+      if (!data) throw new Error('Failed to create platform')
 
+      const newPlatform = data as Platform
       set((state) => ({
-        platforms: [...state.platforms, data]
+        platforms: [...state.platforms, newPlatform]
       }))
 
-      return data
+      return newPlatform
     } catch (error) {
       console.error('Error adding platform:', error)
       throw error
     }
   },
 
-  updatePlatform: async (id, updates) => {
-    set({ isLoading: true, error: null })
+  updatePlatform: async (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => {
     try {
-      const layoutUpdates = updates.layout ? {
-        ...updates.layout,
-        icon: updates.layout.icon
-      } : undefined
-
       const { data, error } = await supabase
         .from('platforms')
-        .update({
-          ...updates,
-          layout: layoutUpdates,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
 
+      if (!data) throw new Error('Platform not found')
+
+      const updatedPlatform = data as Platform
       set((state) => ({
-        platforms: state.platforms.map(p => p.id === id ? { ...p, ...updates } : p),
-        currentPlatform: state.currentPlatform?.id === id ? { ...state.currentPlatform, ...updates } : state.currentPlatform,
-        isLoading: false
+        platforms: state.platforms.map((p) =>
+          p.id === id ? updatedPlatform : p
+        ),
+        currentPlatform: state.currentPlatform?.id === id ? updatedPlatform : state.currentPlatform
       }))
 
-      return data
+      return updatedPlatform
     } catch (error) {
-      console.error('Error updating platform:', error)
-      set({ isLoading: false, error: error.message })
-      throw error
+      if (error instanceof Error) {
+        console.error('Error updating platform:', error.message)
+        throw error
+      }
+      throw new Error('An error occurred while updating the platform')
     }
   },
 
@@ -205,22 +200,20 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         return
       }
 
-      const state = get()
-      const platform = state.platforms.find(p => p.id === id)
-      if (platform) {
-        set({ currentPlatform: platform })
-      } else {
-        const { data, error } = await supabase
-          .from('platforms')
-          .select('*')
-          .eq('id', id)
-          .single()
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-        if (error) throw error
-        set({ currentPlatform: data as Platform })
-      }
+      if (error) throw error
+
+      if (!data) throw new Error('Platform not found')
+
+      const platform = data as Platform
+      set({ currentPlatform: platform })
     } catch (error) {
-      set({ error: (error as Error).message })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
   },
 
