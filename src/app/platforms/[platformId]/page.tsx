@@ -31,34 +31,34 @@ import {
 
 const UNIT_OPTIONS = {
   typography: [
-    { value: 'rem', label: 'rem - Root EM' },
-    { value: 'em', label: 'em - EM' },
-    { value: 'ch', label: 'ch - Character Width' },
-    { value: 'ex', label: 'ex - x-Height' },
-    { value: 'vw', label: 'vw - Viewport Width' },
-    { value: 'vh', label: 'vh - Viewport Height' },
-    { value: '%', label: '% - Percentage' },
-    { value: 'px', label: 'px - Pixels' },
-    { value: 'pt', label: 'pt - Points (Print)' },
-    { value: 'pc', label: 'pc - Picas (Print)' }
+    { value: 'rem', label: 'rem · Root EM' },
+    { value: 'em', label: 'em · EM' },
+    { value: 'ch', label: 'ch · Character Width' },
+    { value: 'ex', label: 'ex · x-Height' },
+    { value: 'vw', label: 'vw · Viewport Width' },
+    { value: 'vh', label: 'vh · Viewport Height' },
+    { value: '%', label: '% · Percentage' },
+    { value: 'px', label: 'px · Pixels' },
+    { value: 'pt', label: 'pt · Points (Print)' },
+    { value: 'pc', label: 'pc · Picas (Print)' }
   ] as const,
   spacing: [
-    { value: 'rem', label: 'rem - Root EM' },
-    { value: 'em', label: 'em - EM' },
-    { value: 'vw', label: 'vw - Viewport Width' },
-    { value: 'vh', label: 'vh - Viewport Height' },
-    { value: '%', label: '% - Percentage' },
-    { value: 'px', label: 'px - Pixels' }
+    { value: 'rem', label: 'rem · Root EM' },
+    { value: 'em', label: 'em · EM' },
+    { value: 'vw', label: 'vw · Viewport Width' },
+    { value: 'vh', label: 'vh · Viewport Height' },
+    { value: '%', label: '% · Percentage' },
+    { value: 'px', label: 'px · Pixels' }
   ] as const,
   dimensions: [
-    { value: 'px', label: 'px - Pixels' },
-    { value: '%', label: '% - Percentage' },
-    { value: 'vw', label: 'vw - Viewport Width' },
-    { value: 'vh', label: 'vh - Viewport Height' },
-    { value: 'cm', label: 'cm - Centimeters' },
-    { value: 'mm', label: 'mm - Millimeters' },
-    { value: 'in', label: 'in - Inches' },
-    { value: 'm', label: 'm - Meters' }
+    { value: 'px', label: 'px · Pixels' },
+    { value: '%', label: '% · Percentage' },
+    { value: 'vw', label: 'vw · Viewport Width' },
+    { value: 'vh', label: 'vh · Viewport Height' },
+    { value: 'cm', label: 'cm · Centimeters' },
+    { value: 'mm', label: 'mm · Millimeters' },
+    { value: 'in', label: 'in · Inches' },
+    { value: 'm', label: 'm · Meters' }
   ] as const
 }
 
