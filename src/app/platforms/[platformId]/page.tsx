@@ -173,7 +173,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
           <div className="space-y-6">
             {/* Icon Selection */}
             <div>
-              <Label>Platform Icon</Label>
+              <Label className="font-bold mb-1.5 block">Platform Icon</Label>
               <IconSelector
                 value={platform.layout?.icon}
                 onChange={async (icon) => {
@@ -195,18 +195,18 @@ export default function PlatformPage({ params }: { params: { platformId: string 
 
             {/* Units */}
             <div>
-              <Label>Units</Label>
+              <Label className="font-bold mb-1.5 block">Units</Label>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
+                    <TableHead className="pl-0">Type</TableHead>
                     <TableHead>Unit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow>
-                    <TableCell>Typography</TableCell>
-                    <TableCell>
+                    <TableCell className="pl-0">Typography</TableCell>
+                    <TableCell className="w-full">
                       <Select
                         value={platform.units.typography}
                         onValueChange={(value) => {
@@ -215,7 +215,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                           })
                         }}
                       >
-                        <SelectTrigger className="w-[120px]">
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -229,8 +229,8 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Spacing</TableCell>
-                    <TableCell>
+                    <TableCell className="pl-0">Spacing</TableCell>
+                    <TableCell className="w-full">
                       <Select
                         value={platform.units.spacing}
                         onValueChange={(value) => {
@@ -239,7 +239,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                           })
                         }}
                       >
-                        <SelectTrigger className="w-[120px]">
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -258,7 +258,7 @@ export default function PlatformPage({ params }: { params: { platformId: string 
 
             {/* Layout Settings */}
             <div>
-              <Label>Layout</Label>
+              <Label className="font-bold mb-1.5 block">Layout</Label>
               <div className="space-y-4 mt-2">
                 <div>
                   <Label>Grid Columns</Label>
