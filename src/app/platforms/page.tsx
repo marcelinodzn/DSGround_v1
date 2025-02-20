@@ -10,6 +10,7 @@ import { CardMenu } from "@/components/ui/card-menu"
 import { usePlatformStore } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
 import { toast } from 'sonner'
+import { Icon } from '@iconify/react'
 
 interface Platform {
   id: string
@@ -25,8 +26,8 @@ interface Platform {
     gridColumns: number
     gridGutter: number
     containerPadding: number
+    icon?: string
   }
-  icon?: string
 }
 
 // Add slugify function
@@ -264,29 +265,35 @@ export default function PlatformsPage() {
                 >
                   {viewMode === 'grid' ? (
                     <div className="h-full w-full flex flex-col justify-between">
-                      <h3 className="font-semibold text-left">{platform.name}</h3>
-                      <div className="flex items-center gap-2">
-                        {platform.icon && (
-                          <img 
-                            src={platform.icon} 
-                            alt=""
-                            className="w-5 h-5 object-contain"
+                      <div className="text-left">
+                        <h3 className="font-semibold">{platform.name}</h3>
+                      </div>
+                      <div className="flex items-center">
+                        {platform.layout?.icon ? (
+                          <Icon 
+                            icon={platform.layout.icon}
+                            width={16}
+                            height={16}
+                            className="text-foreground"
                           />
+                        ) : (
+                          <div className="w-4 h-4 rounded border" />
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {platform.icon && (
-                          <img 
-                            src={platform.icon} 
-                            alt=""
-                            className="w-5 h-5 object-contain"
-                          />
-                        )}
-                        <h3 className="font-semibold">{platform.name}</h3>
-                      </div>
+                    <div className="w-full flex items-center gap-3">
+                      {platform.layout?.icon ? (
+                        <Icon 
+                          icon={platform.layout.icon}
+                          width={16}
+                          height={16}
+                          className="text-foreground"
+                        />
+                      ) : (
+                        <div className="w-4 h-4 rounded border" />
+                      )}
+                      <h3 className="font-semibold">{platform.name}</h3>
                     </div>
                   )}
                 </Button>

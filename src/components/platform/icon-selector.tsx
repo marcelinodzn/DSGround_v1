@@ -13,20 +13,63 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { Icon } from '@iconify/react'
 
 // Icon sets with their icons
 const ICON_SETS = {
   "Material": [
-    "home", "settings", "person", "search", "notifications", "mail", "calendar",
-    "bookmark", "favorite", "shopping_cart", "dashboard", "analytics", "build",
-    "code", "cloud", "security", "phone", "message", "menu", "close", "add",
-    "remove", "edit", "delete", "share", "download", "upload", "refresh"
+    // Platforms & Devices
+    "mdi:devices", "mdi:laptop", "mdi:desktop-windows", "mdi:monitor",
+    "mdi:cellphone-android", "mdi:cellphone-iphone", "mdi:cellphone",
+    "mdi:tablet-android", "mdi:tablet", "mdi:tablet-ipad",
+    "mdi:television", "mdi:cast", "mdi:cast-connected",
+    "mdi:virtual-reality", "mdi:rotate-3d", "mdi:augmented-reality",
+    "mdi:watch", "mdi:watch-variant", "mdi:devices",
+    "mdi:phone-settings", "mdi:phone-sync", "mdi:tablet-dashboard",
+    // Print & Media
+    "mdi:book", "mdi:book-open", "mdi:book-multiple",
+    "mdi:newspaper", "mdi:newspaper-variant", "mdi:file-document",
+    "mdi:printer", "mdi:printer-outline", "mdi:printer-pos",
+    "mdi:image", "mdi:image-multiple", "mdi:folder-image",
+    "mdi:video", "mdi:movie", "mdi:movie-open",
+    // Store & Commerce
+    "mdi:store", "mdi:storefront", "mdi:cart",
+    "mdi:cash-register", "mdi:receipt", "mdi:credit-card",
+    "mdi:qrcode", "mdi:barcode", "mdi:barcode-scan",
+    // UI & Navigation
+    "mdi:view-dashboard", "mdi:view-grid", "mdi:view-dashboard-variant",
+    "mdi:view-grid-plus", "mdi:view-compact", "mdi:view-sidebar",
+    "mdi:menu", "mdi:apps", "mdi:widgets", "mdi:puzzle",
+    // Content & Tools
+    "mdi:palette", "mdi:brush", "mdi:pencil",
+    "mdi:pencil-ruler", "mdi:ruler-square", "mdi:tools",
+    "mdi:format-paint", "mdi:palette-swatch", "mdi:brush-variant"
   ],
   "Lucide": [
-    "home", "settings", "user", "search", "bell", "mail", "calendar",
-    "bookmark", "heart", "shopping-cart", "layout", "bar-chart", "tool",
-    "code", "cloud", "shield", "phone", "message-circle", "menu", "x", "plus",
-    "minus", "edit", "trash", "share", "download", "upload", "refresh-cw"
+    // Platforms & Devices
+    "computer", "laptop", "monitor",
+    "smartphone", "tablet", "phone",
+    "tv", "tv-2", "cast",
+    "glasses", "gamepad", "gamepad-2",
+    "watch", "devices", "device-mobile",
+    // Print & Media
+    "book", "book-open", "book-copy",
+    "newspaper", "scroll-text", "file-text",
+    "printer", "print", "scanner",
+    "image", "images", "gallery",
+    "video", "film", "clapperboard",
+    // Store & Commerce
+    "store", "shopping-bag", "shopping-cart",
+    "qr-code", "barcode", "scan-line",
+    "credit-card", "wallet", "receipt",
+    // UI & Navigation
+    "layout-dashboard", "layout-grid",
+    "layout-list", "layout-template", "layers",
+    "grid", "table", "kanban", "sidebar",
+    // Content & Tools
+    "palette", "paintbrush", "paintbrush-2",
+    "pen-tool", "pencil", "brush",
+    "wand-2", "settings", "wrench"
   ]
 }
 
@@ -47,9 +90,18 @@ export function IconSelector({ value, onChange }: IconSelectorProps) {
     )
   }, [selectedSet, search])
 
-  const getIconUrl = (icon: string) => {
-    const prefix = selectedSet === "Material" ? "material-symbols" : "lucide"
-    return `https://api.iconify.design/${prefix}/${icon}.svg`
+  const getIconSet = (icon: string) => {
+    // For Material icons, they already include the mdi: prefix
+    if (selectedSet === "Material") {
+      return icon
+    }
+    // For Lucide icons, add the lucide: prefix
+    return `lucide:${icon}`
+  }
+
+  // Function to display the icon name without the prefix
+  const getDisplayName = (icon: string) => {
+    return icon.split(':').pop() || icon
   }
 
   return (
@@ -57,21 +109,26 @@ export function IconSelector({ value, onChange }: IconSelectorProps) {
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          className="w-[240px] justify-start text-left font-normal"
+          className="w-full justify-start text-left font-normal"
         >
           <div className="flex items-center gap-2">
             {value ? (
-              <img src={value} alt="" className="w-4 h-4" />
+              <Icon 
+                icon={value} 
+                width={16}
+                height={16}
+                className="text-foreground"
+              />
             ) : (
               <div className="w-4 h-4 rounded border" />
             )}
             <span>
-              {value ? value.split('/').pop()?.replace('.svg', '') : 'Select icon'}
+              {value ? getDisplayName(value) : 'Select icon'}
             </span>
           </div>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[600px]">
+      <DialogContent className="max-w-[600px] p-6">
         <DialogHeader>
           <DialogTitle>Select Icon</DialogTitle>
         </DialogHeader>
@@ -92,58 +149,60 @@ export function IconSelector({ value, onChange }: IconSelectorProps) {
             <TabsContent value="Material" className="mt-0">
               <ScrollArea className="h-[400px] rounded-md border p-4">
                 <div className="grid grid-cols-8 gap-2">
-                  {filteredIcons.map((icon) => {
-                    const iconUrl = getIconUrl(icon)
+                  {filteredIcons.map((icon, index) => {
+                    const iconKey = getIconSet(icon)
                     return (
                       <Button
-                        key={icon}
+                        key={`${selectedSet}-${icon}-${index}`}
                         variant="outline"
                         className={cn(
                           "h-10 w-10 p-0",
-                          value === iconUrl && "border-primary"
+                          value === iconKey && "border-primary"
                         )}
                         onClick={() => {
-                          onChange?.(iconUrl)
+                          onChange?.(iconKey)
                           setOpen(false)
                         }}
                       >
-                        <img 
-                          src={iconUrl}
-                          alt={icon}
-                          className="w-5 h-5"
+                        <Icon 
+                          icon={iconKey}
+                          width={20}
+                          height={20}
+                          className="text-foreground"
                         />
                       </Button>
-                    )}
-                  )}
+                    )
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>
             <TabsContent value="Lucide" className="mt-0">
               <ScrollArea className="h-[400px] rounded-md border p-4">
                 <div className="grid grid-cols-8 gap-2">
-                  {filteredIcons.map((icon) => {
-                    const iconUrl = getIconUrl(icon)
+                  {filteredIcons.map((icon, index) => {
+                    const iconKey = getIconSet(icon)
                     return (
                       <Button
-                        key={icon}
+                        key={`${selectedSet}-${icon}-${index}`}
                         variant="outline"
                         className={cn(
                           "h-10 w-10 p-0",
-                          value === iconUrl && "border-primary"
+                          value === iconKey && "border-primary"
                         )}
                         onClick={() => {
-                          onChange?.(iconUrl)
+                          onChange?.(iconKey)
                           setOpen(false)
                         }}
                       >
-                        <img 
-                          src={iconUrl}
-                          alt={icon}
-                          className="w-5 h-5"
+                        <Icon 
+                          icon={iconKey}
+                          width={20}
+                          height={20}
+                          className="text-foreground"
                         />
                       </Button>
-                    )}
-                  )}
+                    )
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>

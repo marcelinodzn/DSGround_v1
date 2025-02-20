@@ -27,17 +27,17 @@ export default function NewPlatformPage() {
       const platform = await addPlatform(currentBrand.id, {
         name,
         description,
-        icon,
+        layout: {
+          gridColumns: 12,
+          gridGutter: 16,
+          containerPadding: 16,
+          icon: icon // Store icon in layout
+        },
         units: {
           typography: 'rem',
           spacing: 'rem',
           borderWidth: 'px',
           borderRadius: 'px'
-        },
-        layout: {
-          gridColumns: 12,
-          gridGutter: 16,
-          containerPadding: 16
         }
       })
       router.push(`/platforms/${platform.id}`)
@@ -53,19 +53,6 @@ export default function NewPlatformPage() {
       <h1 className="text-[30px] font-bold mb-8">Create New Platform</h1>
       
       <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
-        <div className="space-y-2">
-          <label htmlFor="icon" className="text-sm font-medium">
-            Platform Icon
-          </label>
-          <IconSelector
-            value={icon}
-            onChange={setIcon}
-          />
-          <p className="text-sm text-muted-foreground mt-1">
-            Choose an icon to represent your platform
-          </p>
-        </div>
-
         <div className="space-y-2">
           <label htmlFor="name" className="text-sm font-medium">
             Platform Name
@@ -90,6 +77,16 @@ export default function NewPlatformPage() {
             placeholder="Enter platform description"
             rows={4}
           />
+        </div>
+
+        <div className="space-y-2">
+          <IconSelector
+            value={icon}
+            onChange={setIcon}
+          />
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose an icon to represent your platform
+          </p>
         </div>
 
         <div className="flex items-center gap-4">

@@ -23,9 +23,6 @@ export interface TypeStyle {
   lineHeight: number
   letterSpacing: number
   opticalSize: number
-  fontFamily?: string
-  fontCategory?: string
-  isVariable?: boolean
 }
 
 export interface AIScale {
@@ -35,7 +32,7 @@ export interface AIScale {
   summaryTable?: string
 }
 
-export interface TypographyPlatform {
+export interface Platform {
   id: string
   name: string
   scaleMethod: ScaleMethod
@@ -64,17 +61,17 @@ export interface TypographyPlatform {
 }
 
 interface TypographyState {
-  currentPlatform: string | null
-  platforms: TypographyPlatform[]
+  currentPlatform: string
+  platforms: Platform[]
   isLoading: boolean
   error: string | null
-  setCurrentPlatform: (platformId: string | null) => void
-  updatePlatform: (platformId: string, updates: Partial<TypographyPlatform>) => void
+  setCurrentPlatform: (platformId: string) => void
+  updatePlatform: (platformId: string, updates: Partial<Platform>) => void
   getScaleValues: (platformId: string) => { size: number; ratio: number; label: string }[]
   copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => void
   initializePlatform: (platformId: string) => void
   saveTypeStyles: (platformId: string, styles: TypeStyle[]) => Promise<void>
-  saveTypographySettings: (platformId: string, settings: Partial<TypographyPlatform>) => Promise<void>
+  saveTypographySettings: (platformId: string, settings: Partial<Platform>) => Promise<void>
   fetchTypeStyles: (platformId: string) => Promise<void>
   fetchTypographySettings: (platformId: string) => Promise<void>
 }
@@ -102,80 +99,26 @@ const defaultTypeStyles: TypeStyle[] = [
     letterSpacing: -0.02
   },
   {
-    id: 'h1',
+    id: 'heading1',
     name: 'Heading 1',
     scaleStep: 'f5',
     fontWeight: 700,
     lineHeight: 1.2,
-    opticalSize: 40,
-    letterSpacing: -0.015
-  },
-  {
-    id: 'h2',
-    name: 'Heading 2',
-    scaleStep: 'f4',
-    fontWeight: 700,
-    lineHeight: 1.3,
     opticalSize: 32,
     letterSpacing: -0.01
-  },
-  {
-    id: 'h3',
-    name: 'Heading 3',
-    scaleStep: 'f3',
-    fontWeight: 600,
-    lineHeight: 1.4,
-    opticalSize: 24,
-    letterSpacing: -0.005
-  },
-  {
-    id: 'h4',
-    name: 'Heading 4',
-    scaleStep: 'f2',
-    fontWeight: 600,
-    lineHeight: 1.4,
-    opticalSize: 20,
-    letterSpacing: 0
-  },
-  {
-    id: 'h5',
-    name: 'Heading 5',
-    scaleStep: 'f1',
-    fontWeight: 600,
-    lineHeight: 1.5,
-    opticalSize: 16,
-    letterSpacing: 0
   },
   {
     id: 'body',
     name: 'Body',
     scaleStep: 'f0',
     fontWeight: 400,
-    lineHeight: 1.6,
+    lineHeight: 1.5,
     opticalSize: 16,
     letterSpacing: 0
-  },
-  {
-    id: 'small',
-    name: 'Small',
-    scaleStep: 'f-1',
-    fontWeight: 400,
-    lineHeight: 1.6,
-    opticalSize: 14,
-    letterSpacing: 0.01
-  },
-  {
-    id: 'tiny',
-    name: 'Tiny',
-    scaleStep: 'f-2',
-    fontWeight: 400,
-    lineHeight: 1.6,
-    opticalSize: 12,
-    letterSpacing: 0.02
   }
 ]
 
-const initialPlatforms: TypographyPlatform[] = [
+const initialPlatforms: Platform[] = [
   {
     id: 'web',
     name: 'Web',
@@ -290,224 +233,268 @@ const initialPlatforms: TypographyPlatform[] = [
   },
 ]
 
-export const useTypographyStore = create<TypographyState>()(
-  persist(
-    (set, get) => ({
-      currentPlatform: null,
-      platforms: initialPlatforms,
-      isLoading: false,
-      error: null,
+export const useTypographyStore = create<TypographyState>((set, get) => ({
+  currentPlatform: '',
+  platforms: [],
+  isLoading: false,
+  error: null,
 
-      setCurrentPlatform: (platformId) => {
-        set({ currentPlatform: platformId })
-      },
-
-      initializePlatform: (platformId) => {
-        const { platforms } = get()
-        const existingPlatform = platforms.find(p => p.id === platformId)
-
-        if (!existingPlatform) {
-          const newPlatform: TypographyPlatform = {
-            id: platformId,
-            name: 'New Platform',
-            scaleMethod: 'modular',
-            scale: { ...defaultScale },
-            units: {
-              typography: 'rem',
-              spacing: 'rem',
-              dimensions: 'px'
-            },
-            distanceScale: {
-              viewingDistance: 500,
-              visualAcuity: 1,
-              meanLengthRatio: 0.7,
-              textType: 'continuous',
-              lighting: 'good',
-              ppi: 96
-            },
-            accessibility: { ...defaultAccessibility },
-            typeStyles: [...defaultTypeStyles]
-          }
-
-          set(state => ({
-            platforms: [...state.platforms, newPlatform]
-          }))
-        }
-      },
-
-      updatePlatform: (platformId, updates) => {
-        set(state => ({
-          platforms: state.platforms.map(p => 
-            p.id === platformId ? { ...p, ...updates } : p
-          )
-        }))
-      },
-
-      getScaleValues: (platformId) => {
-        const { platforms } = get()
-        const platform = platforms.find(p => p.id === platformId)
-        if (!platform) return []
-
-        const { scale, scaleMethod, distanceScale } = platform
-        const { baseSize, ratio, stepsUp, stepsDown } = scale
-        const steps = []
-
-        let calculatedBaseSize = baseSize
-
-        if (scaleMethod === 'distance') {
-          calculatedBaseSize = calculateDistanceBasedSize(
-            distanceScale.viewingDistance,
-            distanceScale.visualAcuity,
-            distanceScale.meanLengthRatio,
-            distanceScale.textType,
-            distanceScale.lighting,
-            distanceScale.ppi
-          )
-        }
-
-        // Generate scale using the calculated base size
-        for (let i = -stepsDown; i <= stepsUp; i++) {
-          const size = calculatedBaseSize * Math.pow(ratio, i)
-          steps.push({
-            size: Math.round(size * 100) / 100,
-            ratio: i === 0 ? 1 : Math.round(Math.pow(ratio, i) * 1000) / 1000,
-            label: `f${i}`
-          })
-        }
-
-        return steps
-      },
-
-      copyTypeStylesToAllPlatforms: (sourceTypeStyles) => {
-        set(state => ({
-          platforms: state.platforms.map(platform => ({
-            ...platform,
-            typeStyles: [...sourceTypeStyles]
-          }))
-        }))
-      },
-
-      saveTypeStyles: async (platformId, styles) => {
-        try {
-          const { data, error } = await supabase
-            .from('type_styles')
-            .upsert(
-              styles.map(style => ({
-                platform_id: platformId,
-                name: style.name,
-                scale_step: style.scaleStep,
-                font_weight: style.fontWeight,
-                line_height: style.lineHeight,
-                letter_spacing: style.letterSpacing,
-                optical_size: style.opticalSize
-              }))
-            )
-
-          if (error) throw error
-
-          set(state => ({
-            platforms: state.platforms.map(p => 
-              p.id === platformId ? { ...p, typeStyles: styles } : p
-            )
-          }))
-        } catch (error) {
-          console.error('Error saving type styles:', error)
-          throw error
-        }
-      },
-
-      saveTypographySettings: async (platformId, settings) => {
-        try {
-          const { data, error } = await supabase
-            .from('typography_settings')
-            .upsert({
-              platform_id: platformId,
-              scale_method: settings.scaleMethod,
-              scale_config: settings.scale,
-              distance_scale: settings.distanceScale,
-              ai_settings: settings.aiSettings
-            })
-
-          if (error) throw error
-
-          set(state => ({
-            platforms: state.platforms.map(p => 
-              p.id === platformId ? { ...p, ...settings } : p
-            )
-          }))
-        } catch (error) {
-          console.error('Error saving typography settings:', error)
-          throw error
-        }
-      },
-
-      fetchTypeStyles: async (platformId) => {
-        try {
-          const { data, error } = await supabase
-            .from('type_styles')
-            .select('*')
-            .eq('platform_id', platformId)
-
-          if (error) throw error
-
-          const styles = data.map(style => ({
-            id: style.id,
-            name: style.name,
-            scaleStep: style.scale_step,
-            fontWeight: style.font_weight,
-            lineHeight: style.line_height,
-            letterSpacing: style.letter_spacing,
-            opticalSize: style.optical_size
-          }))
-
-          set(state => ({
-            platforms: state.platforms.map(p => 
-              p.id === platformId ? { ...p, typeStyles: styles } : p
-            ),
-            isLoading: false,
-            error: null
-          }))
-        } catch (error) {
-          console.error('Error fetching type styles:', error)
-          throw error
-        }
-      },
-
-      fetchTypographySettings: async (platformId) => {
-        try {
-          const { data, error } = await supabase
-            .from('typography_settings')
-            .select('*')
-            .eq('platform_id', platformId)
-            .single()
-
-          if (error) {
-            if (error.code === 'PGRST116') {
-              // Initialize with default settings if none exist
-              await get().initializePlatform(platformId)
-              return
-            }
-            throw error
-          }
-
-          set(state => ({
-            platforms: state.platforms.map(p => 
-              p.id === platformId ? { ...p, ...data } : p
-            ),
-            isLoading: false,
-            error: null
-          }))
-        } catch (error) {
-          console.error('Error fetching typography settings:', error)
-          set({ 
-            isLoading: false,
-            error: (error as Error).message 
-          })
-        }
-      }
-    }),
-    {
-      name: 'typography-store'
+  setCurrentPlatform: (platformId: string) => {
+    set({ currentPlatform: platformId })
+    // Fetch typography settings if they don't exist
+    const state = get()
+    if (platformId && !state.platforms.find(p => p.id === platformId)) {
+      get().fetchTypographySettings(platformId)
     }
-  )
+  },
+
+  initializePlatform: async (platformId: string) => {
+    const platformStore = usePlatformStore.getState()
+    const platformData = platformStore.platforms.find(p => p.id === platformId)
+    
+    if (!platformData) {
+      console.error('Platform not found:', platformId)
+      return
+    }
+
+    const defaultSettings = {
+      id: platformId,
+      scaleMethod: 'modular' as ScaleMethod,
+      scale: {
+        baseSize: 16,
+        ratio: 1.2,
+        stepsUp: 3,
+        stepsDown: 2
+      },
+      distanceScale: {
+        viewingDistance: 400,
+        visualAcuity: 1,
+        meanLengthRatio: 5,
+        textType: 'continuous' as TextType,
+        lighting: 'good' as LightingCondition,
+        ppi: 96
+      },
+      accessibility: {
+        minContrastBody: 4.5,
+        minContrastLarge: 3
+      },
+      typeStyles: []
+    }
+
+    set(state => ({
+      platforms: [...state.platforms, { ...defaultSettings }]
+    }))
+
+    // Save the default settings to the database
+    await get().saveTypographySettings(platformId, defaultSettings)
+  },
+
+  updatePlatform: (platformId: string, updates: Partial<Platform>) => {
+    set(state => ({
+      platforms: state.platforms.map(platform => 
+        platform.id === platformId 
+          ? { ...platform, ...updates }
+          : platform
+      )
+    }))
+  },
+
+  getScaleValues: (platformId) => {
+    const platform = get().platforms.find(p => p.id === platformId);
+    if (!platform) return [];
+
+    let effectiveBaseSize = platform.scale.baseSize;
+    
+    // Calculate base size for distance method
+    if (platform.scaleMethod === 'distance' && platform.distanceScale) {
+      effectiveBaseSize = calculateDistanceBasedSize(
+        platform.distanceScale.viewingDistance,
+        platform.distanceScale.visualAcuity,
+        platform.distanceScale.meanLengthRatio,
+        platform.distanceScale.textType,
+        platform.distanceScale.lighting,
+        platform.distanceScale.ppi
+      );
+    }
+
+    // Round the base size consistently
+    effectiveBaseSize = Math.round(effectiveBaseSize * 100) / 100;
+
+    // Generate scale values using the effective base size
+    const scaleValues = [];
+
+    const { baseSize, ratio, stepsUp, stepsDown } = platform.scale;
+
+    // Generate decreasing values (f-n to f-1)
+    for (let i = stepsDown; i > 0; i--) {
+      const size = effectiveBaseSize / Math.pow(ratio, i);
+      scaleValues.push({
+        label: `f-${i}`,
+        size: Math.round(size),
+        ratio: Math.round((1 / Math.pow(ratio, i)) * 1000) / 1000
+      });
+    }
+
+    // Add base size (f0)
+    scaleValues.push({
+      label: 'f0',
+      size: effectiveBaseSize,
+      ratio: 1
+    });
+
+    // Generate increasing values (f1 to fn)
+    for (let i = 1; i <= stepsUp; i++) {
+      const size = effectiveBaseSize * Math.pow(ratio, i);
+      scaleValues.push({
+        label: `f${i}`,
+        size: Math.round(size),
+        ratio: Math.round(Math.pow(ratio, i) * 1000) / 1000
+      });
+    }
+
+    return scaleValues;
+  },
+
+  copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => {
+    set((state) => ({
+      platforms: state.platforms.map(platform => {
+        // Get existing type styles for this platform to preserve scale steps
+        const existingTypeStyles = platform.typeStyles || [];
+        
+        // Create new type styles while preserving existing scale steps
+        const newTypeStyles = sourceTypeStyles.map(style => {
+          // Try to find matching style by name in existing platform styles
+          const existingStyle = existingTypeStyles.find(ts => ts.name === style.name);
+          
+          return {
+            ...style,
+            id: crypto.randomUUID(),
+            // Keep existing scale step if style exists, otherwise use the source scale step
+            scaleStep: existingStyle?.scaleStep || style.scaleStep
+          };
+        });
+
+        return {
+          ...platform,
+          typeStyles: newTypeStyles
+        };
+      }),
+    }))
+  },
+
+  saveTypeStyles: async (platformId: string, styles: TypeStyle[]) => {
+    set({ isLoading: true, error: null })
+    try {
+      const { error } = await supabase
+        .from('type_styles')
+        .upsert(
+          styles.map(style => ({
+            platform_id: platformId,
+            name: style.name,
+            scale_step: style.scaleStep,
+            font_weight: style.fontWeight,
+            line_height: style.lineHeight,
+            letter_spacing: style.letterSpacing,
+            optical_size: style.opticalSize
+          }))
+        )
+      if (error) throw error
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  saveTypographySettings: async (platformId: string, settings: Partial<Platform>) => {
+    set({ isLoading: true, error: null })
+    try {
+      const { error } = await supabase
+        .from('typography_settings')
+        .upsert({
+          platform_id: platformId,
+          scale_method: settings.scaleMethod,
+          scale_config: settings.scale,
+          distance_scale: settings.distanceScale,
+          ai_settings: settings.aiSettings
+        })
+      if (error) throw error
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  fetchTypeStyles: async (platformId: string) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('type_styles')
+        .select('*')
+        .eq('platform_id', platformId)
+
+      if (error) throw error
+
+      const styles = data.map(style => ({
+        id: style.id,
+        name: style.name,
+        scaleStep: style.scale_step,
+        fontWeight: style.font_weight,
+        lineHeight: style.line_height,
+        letterSpacing: style.letter_spacing,
+        opticalSize: style.optical_size
+      }))
+
+      set(state => ({
+        platforms: state.platforms.map(p => 
+          p.id === platformId ? { ...p, typeStyles: styles } : p
+        ),
+        isLoading: false,
+        error: null
+      }))
+    } catch (error) {
+      set({ 
+        isLoading: false,
+        error: (error as Error).message 
+      })
+    }
+  },
+
+  fetchTypographySettings: async (platformId: string) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('typography_settings')
+        .select('*')
+        .eq('platform_id', platformId)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Initialize with default settings if none exist
+          await get().initializePlatform(platformId)
+          return
+        }
+        throw error
+      }
+
+      set(state => ({
+        platforms: state.platforms.map(p => 
+          p.id === platformId ? { ...p, ...data } : p
+        ),
+        isLoading: false,
+        error: null
+      }))
+    } catch (error) {
+      set({ 
+        isLoading: false,
+        error: (error as Error).message 
+      })
+    }
+  }
+}),
+{
+  name: 'typography-store',
+}
 )
