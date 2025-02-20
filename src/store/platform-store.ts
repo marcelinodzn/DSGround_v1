@@ -32,6 +32,7 @@ interface PlatformStore {
   isLoading: boolean
   error: string | null
   fetchPlatformsByBrand: (brandId: string) => Promise<void>
+  getPlatform: (id: string) => Promise<void>
   addPlatform: (brandId: string, platform: Partial<Platform>) => Promise<Platform>
   updatePlatform: (id: string, updates: Partial<Omit<Platform, 'id' | 'brand_id' | 'created_at'>>) => Promise<Platform>
   deletePlatform: (id: string) => Promise<boolean>
@@ -44,6 +45,28 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
   currentPlatform: null,
   isLoading: false,
   error: null,
+
+  getPlatform: async (id: string) => {
+    set({ isLoading: true })
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      
+      set({ 
+        currentPlatform: data as Platform,
+        error: null
+      })
+    } catch (error) {
+      set({ error: (error as Error).message })
+    } finally {
+      set({ isLoading: false })
+    }
+  },
 
   fetchPlatformsByBrand: async (brandId: string) => {
     set({ isLoading: true })

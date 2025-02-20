@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useLayout } from "@/contexts/layout-context"
 import { Button } from "@/components/ui/button"
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2, Pencil } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { usePlatformStore, Platform } from "@/store/platform-store"
@@ -11,6 +11,8 @@ import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { toast } from 'sonner'
+import { Icon } from '@iconify/react'
+import { IconSelector } from "@/components/platform/icon-selector"
 import {
   Table,
   TableBody,
@@ -61,291 +63,258 @@ const UNIT_OPTIONS = {
 }
 
 export default function PlatformPage({ params }: { params: { platformId: string } }) {
-  const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const { platforms, updatePlatform } = usePlatformStore()
-  const [platform, setPlatform] = useState<Platform | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    name: '',
-    description: '',
-    units: {
-      typography: 'rem' as const,
-      spacing: 'px' as const,
-      dimensions: 'px' as const
-    },
-    layout: {
-      baseSize: 16,
-      gridColumns: 12,
-      gridGutter: 24,
-      containerPadding: 16
-    }
-  })
+  const { currentPlatform: platform, getPlatform, updatePlatform } = usePlatformStore()
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [newName, setNewName] = useState("")
+  const { toggleMaximized, isMaximized } = useLayout()
 
   useEffect(() => {
-    const currentPlatform = platforms.find(p => p.id === params.platformId)
-    if (currentPlatform) {
-      setPlatform(currentPlatform)
-      setEditForm({
-        name: currentPlatform.name,
-        description: currentPlatform.description || '',
-        units: currentPlatform.units,
-        layout: currentPlatform.layout
-      })
+    if (params.platformId) {
+      getPlatform(params.platformId)
     }
-  }, [params.platformId, platforms])
+  }, [params.platformId, getPlatform])
 
-  const handleSave = async () => {
-    if (!platform) return
+  useEffect(() => {
+    if (platform) {
+      setNewName(platform.name)
+    }
+  }, [platform])
 
+  const handleNameUpdate = async () => {
+    if (!platform || newName === platform.name) return
     try {
-      await updatePlatform(platform.id, {
-        name: editForm.name.trim(),
-        description: editForm.description.trim() || null,
-        units: editForm.units,
-        layout: editForm.layout
-      })
-      setIsEditing(false)
-      toast.success('Platform updated successfully')
+      await updatePlatform(platform.id, { name: newName })
+      setIsEditingName(false)
+      toast.success('Platform name updated')
     } catch (error) {
-      console.error('Update platform error:', error)
-      toast.error('Failed to update platform')
+      console.error('Failed to update platform name:', error)
+      toast.error('Failed to update platform name')
     }
   }
 
-  if (!platform) {
-    return <div>Loading...</div>
-  }
+  if (!platform) return null
 
   return (
-    <div className={cn(
-      "h-full flex transition-all duration-300 ease-in-out",
-      isFullscreen && "fixed inset-0 bg-background z-50 overflow-y-auto p-6 max-w-[100vw]"
-    )}>
-      <div className="flex-1 min-w-0 max-w-full">
-        <div className={cn(
-          "flex items-center justify-between mb-6",
-          isFullscreen ? "" : "pt-6 px-6"
-        )}>
-          <div>
-            <div className="flex flex-col gap-2">
-              <h1 className="text-[30px] font-bold">
-                {platform.name}
-              </h1>
-              {isEditing ? (
-                <Input
-                  value={editForm.description}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Add description"
-                  className="max-w-md"
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground max-w-md">
-                  {platform.description || 'No description'}
-                </p>
-              )}
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 group">
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleNameUpdate()
+                  if (e.key === 'Escape') setIsEditingName(false)
+                }}
+                className="text-2xl font-semibold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded px-2"
+                autoFocus
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditingName(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleNameUpdate}
+              >
+                Save
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                {platform.layout?.icon ? (
+                  <Icon 
+                    icon={platform.layout.icon}
+                    width={24}
+                    height={24}
+                    className="text-foreground"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded border" />
+                )}
+                <h1 className="text-2xl font-semibold">{platform.name}</h1>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => setIsEditingName(true)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleMaximized}
+        >
+          {isMaximized ? (
+            <Minimize2 className="h-4 w-4" />
+          ) : (
+            <Maximize2 className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
+      {/* Content */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left Column - Platform Settings */}
+        <Card className="col-span-4 p-6">
+          <div className="space-y-6">
+            {/* Icon Selection */}
+            <div>
+              <Label>Platform Icon</Label>
+              <IconSelector
+                value={platform.layout?.icon}
+                onChange={async (icon) => {
+                  try {
+                    await updatePlatform(platform.id, {
+                      layout: {
+                        ...platform.layout,
+                        icon
+                      }
+                    })
+                    toast.success('Platform icon updated')
+                  } catch (error) {
+                    console.error('Failed to update platform icon:', error)
+                    toast.error('Failed to update platform icon')
+                  }
+                }}
+              />
+            </div>
+
+            {/* Units */}
+            <div>
+              <Label>Units</Label>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Unit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>Typography</TableCell>
+                    <TableCell>
+                      <Select
+                        value={platform.units.typography}
+                        onValueChange={(value) => {
+                          updatePlatform(platform.id, {
+                            units: { ...platform.units, typography: value }
+                          })
+                        }}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.typography.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Spacing</TableCell>
+                    <TableCell>
+                      <Select
+                        value={platform.units.spacing}
+                        onValueChange={(value) => {
+                          updatePlatform(platform.id, {
+                            units: { ...platform.units, spacing: value }
+                          })
+                        }}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.spacing.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Layout Settings */}
+            <div>
+              <Label>Layout</Label>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label>Grid Columns</Label>
+                  <Input
+                    type="number"
+                    value={platform.layout.gridColumns}
+                    onChange={(e) => {
+                      updatePlatform(platform.id, {
+                        layout: {
+                          ...platform.layout,
+                          gridColumns: parseInt(e.target.value)
+                        }
+                      })
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label>Grid Gutter (px)</Label>
+                  <Input
+                    type="number"
+                    value={platform.layout.gridGutter}
+                    onChange={(e) => {
+                      updatePlatform(platform.id, {
+                        layout: {
+                          ...platform.layout,
+                          gridGutter: parseInt(e.target.value)
+                        }
+                      })
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label>Container Padding (px)</Label>
+                  <Input
+                    type="number"
+                    value={platform.layout.containerPadding}
+                    onChange={(e) => {
+                      updatePlatform(platform.id, {
+                        layout: {
+                          ...platform.layout,
+                          containerPadding: parseInt(e.target.value)
+                        }
+                      })
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave}>
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => setIsEditing(true)}>
-                Edit Platform
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
+        </Card>
 
-        <div className="py-8 px-6">
-          <Card className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">Setting</TableHead>
-                  <TableHead>Value</TableHead>
-                  {isEditing && <TableHead>Edit</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Units Section */}
-                <TableRow>
-                  <TableCell className="font-medium">Typography Units</TableCell>
-                  <TableCell>{platform.units.typography}</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Select
-                        value={editForm.units.typography}
-                        onValueChange={(value: Platform['units']['typography']) => 
-                          setEditForm(prev => ({
-                            ...prev,
-                            units: { ...prev.units, typography: value }
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNIT_OPTIONS.typography.map(({ value, label }) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Spacing Units</TableCell>
-                  <TableCell>{platform.units.spacing}</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Select
-                        value={editForm.units.spacing}
-                        onValueChange={(value: Platform['units']['spacing']) => 
-                          setEditForm(prev => ({
-                            ...prev,
-                            units: { ...prev.units, spacing: value }
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNIT_OPTIONS.spacing.map(({ value, label }) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Dimension Units</TableCell>
-                  <TableCell>{platform.units.dimensions}</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Select
-                        value={editForm.units.dimensions}
-                        onValueChange={(value: Platform['units']['dimensions']) => 
-                          setEditForm(prev => ({
-                            ...prev,
-                            units: { ...prev.units, dimensions: value }
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNIT_OPTIONS.dimensions.map(({ value, label }) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
-                </TableRow>
-
-                {/* Layout Section */}
-                <TableRow>
-                  <TableCell className="font-medium">Base Size</TableCell>
-                  <TableCell>{platform.layout.baseSize}px</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={editForm.layout.baseSize}
-                        onChange={(e) => setEditForm(prev => ({
-                          ...prev,
-                          layout: { ...prev.layout, baseSize: parseInt(e.target.value) }
-                        }))}
-                        className="w-[180px]"
-                      />
-                    </TableCell>
-                  )}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Grid Columns</TableCell>
-                  <TableCell>{platform.layout.gridColumns}</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={editForm.layout.gridColumns}
-                        onChange={(e) => setEditForm(prev => ({
-                          ...prev,
-                          layout: { ...prev.layout, gridColumns: parseInt(e.target.value) }
-                        }))}
-                        className="w-[180px]"
-                      />
-                    </TableCell>
-                  )}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Grid Gutter</TableCell>
-                  <TableCell>{platform.layout.gridGutter}px</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={editForm.layout.gridGutter}
-                        onChange={(e) => setEditForm(prev => ({
-                          ...prev,
-                          layout: { ...prev.layout, gridGutter: parseInt(e.target.value) }
-                        }))}
-                        className="w-[180px]"
-                      />
-                    </TableCell>
-                  )}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Container Padding</TableCell>
-                  <TableCell>{platform.layout.containerPadding}px</TableCell>
-                  {isEditing && (
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={editForm.layout.containerPadding}
-                        onChange={(e) => setEditForm(prev => ({
-                          ...prev,
-                          layout: { ...prev.layout, containerPadding: parseInt(e.target.value) }
-                        }))}
-                        className="w-[180px]"
-                      />
-                    </TableCell>
-                  )}
-                </TableRow>
-              </TableBody>
-            </Table>
-          </Card>
+        {/* Right Column - Platform Content */}
+        <div className="col-span-8">
+          {/* Add your platform content here */}
         </div>
       </div>
     </div>
   )
-} 
+}
