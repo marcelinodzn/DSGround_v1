@@ -14,20 +14,23 @@ import { Icon } from '@iconify/react'
 
 interface Platform {
   id: string
+  brand_id: string
   name: string
-  description: string
-  createdAt: string
+  description: string | null
   units: {
-    distance: 'px' | 'rem' | 'pt'
-    typography: 'px' | 'rem' | 'pt'
+    typography: string
+    spacing: string
+    borderWidth: string
+    borderRadius: string
   }
   layout: {
-    baseSize: number
     gridColumns: number
     gridGutter: number
     containerPadding: number
     icon?: string
   }
+  created_at: string
+  updated_at: string
 }
 
 // Add slugify function
@@ -111,7 +114,12 @@ export default function PlatformsPage() {
       await addPlatform(currentBrand.id, {
         name: `${platform.name} (Copy)`,
         description: platform.description,
-        units: platform.units,
+        units: {
+          typography: platform.units.typography,
+          spacing: platform.units.spacing,
+          borderWidth: platform.units.borderWidth,
+          borderRadius: platform.units.borderRadius
+        },
         layout: platform.layout
       })
       toast.success('Platform duplicated successfully')
