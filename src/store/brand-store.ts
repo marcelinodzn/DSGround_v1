@@ -30,6 +30,16 @@ interface BrandStore {
   fetchBrand: (brandId: string) => Promise<void>
 }
 
+// Type for raw brand data from Supabase
+type RawBrandResponse = {
+  id: string;
+  name: string;
+  description: string | null;
+  type: 'master' | 'sub';
+  created_at: string;
+  updated_at: string;
+}
+
 // Type guard for raw brand data
 function isBrand(obj: unknown): obj is Brand {
   if (!obj || typeof obj !== 'object') return false;
@@ -56,6 +66,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       const { data: rawData, error } = await supabase
         .from('brands')
         .select('*')
+        .returns<RawBrandResponse[]>()
 
       if (error) throw error
       if (!rawData) throw new Error('No brands found')
@@ -80,6 +91,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .from('brands')
         .insert([brand])
         .select()
+        .returns<RawBrandResponse>()
         .single()
 
       if (error) throw error
@@ -103,6 +115,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .update(updates)
         .eq('id', id)
         .select()
+        .returns<RawBrandResponse>()
         .single()
 
       if (error) throw error
@@ -149,6 +162,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .from('brands')
         .select('*')
         .eq('id', id)
+        .returns<RawBrandResponse>()
         .single()
 
       if (error) throw error
@@ -167,6 +181,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .from('brands')
         .select('*')
         .eq('id', brandId)
+        .returns<RawBrandResponse>()
         .single()
 
       if (error) throw error
