@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react"
 import { useTypographyStore, TypeStyle } from "@/store/typography"
-import { usePlatformStore } from "@/store/platform-store"
+import { usePlatformStore, Platform } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -135,14 +135,14 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   useEffect(() => {
     typeStyles.forEach(async (style) => {
       const font = fonts.find(f => f.family === style.fontFamily)
-      if (!font?.fileUrl) return
+      if (!font?.file_url) return
 
       try {
         const fontFace = new FontFace(
           style.fontFamily,
-          `url(${font.fileUrl})`,
+          `url(${font.file_url})`,
           {
-            weight: font.isVariable ? '1 1000' : font.weight.toString(),
+            weight: font.is_variable ? '1 1000' : font.weight.toString(),
             style: font.style || 'normal',
           }
         )
@@ -178,13 +178,13 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              {style.fontSize}px
+              {style.scaleStep}px
             </div>
           </div>
           <div 
             style={{ 
               fontFamily: `"${style.fontFamily}", ${getFontCategoryFallback(style.fontCategory || 'sans-serif')}`,
-              fontSize: `${style.fontSize}px`,
+              fontSize: `${style.scaleStep}px`,
               fontWeight: style.fontWeight,
               lineHeight: style.lineHeight,
               letterSpacing: style.letterSpacing,
@@ -355,7 +355,6 @@ export function TypeScalePreview() {
       
       <div className="relative w-full" style={{ 
         fontFamily: fontFamily || 'inherit',
-        fontFallback: 'system-ui, -apple-system, sans-serif'
       }}>
         <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
           <Separator className="w-screen" />
