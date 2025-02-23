@@ -156,46 +156,50 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   
   return (
     <div className="space-y-8">
-      {typeStyles.map((style, index) => (
-        <div key={index} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">
-                {style.name}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-xs text-muted-foreground">
-                  {style.fontFamily}
+      {typeStyles.map((style, index) => {
+        const font = fonts.find(f => f.family === style.fontFamily)
+
+        return (
+          <div key={index} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-muted-foreground">
+                  {style.name}
                 </div>
-                {style.isVariable && (
-                  <Badge variant="secondary" className="text-[10px] h-4">
-                    Variable
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {font?.family}
+                  </div>
+                  {font?.is_variable && (
+                    <Badge variant="secondary" className="text-[10px] h-4">
+                      Variable
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="text-[10px] h-4">
+                    {style.fontWeight}
                   </Badge>
-                )}
-                <Badge variant="outline" className="text-[10px] h-4">
-                  {style.fontWeight}
-                </Badge>
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {style.scaleStep}px
               </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {style.scaleStep}px
+            <div 
+              style={{ 
+                fontFamily: `"${font?.family}", ${getFontCategoryFallback(font?.category || 'sans-serif')}`,
+                fontSize: `${style.scaleStep}px`,
+                fontWeight: style.fontWeight,
+                lineHeight: style.lineHeight,
+                letterSpacing: style.letterSpacing,
+                fontVariationSettings: font?.is_variable ? `'wght' ${style.fontWeight}` : undefined,
+              }}
+              className="break-words"
+            >
+              The quick brown fox jumps over the lazy dog
             </div>
           </div>
-          <div 
-            style={{ 
-              fontFamily: `"${style.fontFamily}", ${getFontCategoryFallback(style.fontCategory || 'sans-serif')}`,
-              fontSize: `${style.scaleStep}px`,
-              fontWeight: style.fontWeight,
-              lineHeight: style.lineHeight,
-              letterSpacing: style.letterSpacing,
-              fontVariationSettings: style.isVariable ? `'wght' ${style.fontWeight}` : undefined,
-            }}
-            className="break-words"
-          >
-            The quick brown fox jumps over the lazy dog
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

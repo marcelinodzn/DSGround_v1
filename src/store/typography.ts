@@ -19,6 +19,7 @@ export interface TypeStyle {
   id: string
   name: string
   scaleStep: string
+  fontFamily: string
   fontWeight: number
   lineHeight: number
   letterSpacing: number
@@ -93,6 +94,7 @@ const defaultTypeStyles: TypeStyle[] = [
     id: 'display',
     name: 'Display',
     scaleStep: 'f6',
+    fontFamily: 'Arial',
     fontWeight: 700,
     lineHeight: 1.1,
     opticalSize: 48,
@@ -102,6 +104,7 @@ const defaultTypeStyles: TypeStyle[] = [
     id: 'heading1',
     name: 'Heading 1',
     scaleStep: 'f5',
+    fontFamily: 'Arial',
     fontWeight: 700,
     lineHeight: 1.2,
     opticalSize: 32,
@@ -111,6 +114,7 @@ const defaultTypeStyles: TypeStyle[] = [
     id: 'body',
     name: 'Body',
     scaleStep: 'f0',
+    fontFamily: 'Arial',
     fontWeight: 400,
     lineHeight: 1.5,
     opticalSize: 16,
@@ -392,6 +396,7 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
             platform_id: platformId,
             name: style.name,
             scale_step: style.scaleStep,
+            font_family: style.fontFamily,
             font_weight: style.fontWeight,
             line_height: style.lineHeight,
             letter_spacing: style.letterSpacing,
@@ -440,6 +445,7 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         id: style.id,
         name: style.name,
         scaleStep: style.scale_step,
+        fontFamily: style.font_family,
         fontWeight: style.font_weight,
         lineHeight: style.line_height,
         letterSpacing: style.letter_spacing,
