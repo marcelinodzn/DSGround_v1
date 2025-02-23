@@ -40,11 +40,33 @@ interface PlatformStore {
   resetPlatforms: () => void
 }
 
-// Add type guard for Platform
-function isPlatform(obj: unknown): obj is Platform {
-  if (!obj || typeof obj !== 'object') return false
+// Type for raw platform data from Supabase
+type RawPlatform = {
+  id: string;
+  brand_id: string;
+  name: string;
+  description: string | null;
+  units: {
+    typography: string;
+    spacing: string;
+    borderWidth: string;
+    borderRadius: string;
+  };
+  layout: {
+    gridColumns: number;
+    gridGutter: number;
+    containerPadding: number;
+    icon?: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// Type guard for raw platform data
+function isRawPlatform(obj: unknown): obj is RawPlatform {
+  if (!obj || typeof obj !== 'object') return false;
   
-  const p = obj as any
+  const p = obj as any;
   return (
     typeof p.id === 'string' &&
     typeof p.brand_id === 'string' &&
@@ -62,7 +84,15 @@ function isPlatform(obj: unknown): obj is Platform {
     (p.layout.icon === undefined || typeof p.layout.icon === 'string') &&
     typeof p.created_at === 'string' &&
     typeof p.updated_at === 'string'
-  )
+  );
+}
+
+// Convert raw platform to Platform type
+function convertToPlatform(raw: RawPlatform): Platform {
+  return {
+    ...raw,
+    // Add any necessary transformations here
+  };
 }
 
 export const usePlatformStore = create<PlatformStore>((set, get) => ({
@@ -74,7 +104,7 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
   getPlatform: async (id: string) => {
     set({ isLoading: true })
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('platforms')
         .select('*')
         .eq('id', id)
@@ -82,14 +112,14 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       if (error) throw error
       
-      if (!data) throw new Error('Platform not found')
+      if (!rawData) throw new Error('Platform not found')
       
-      if (!isPlatform(data)) {
+      if (!isRawPlatform(rawData)) {
         throw new Error('Invalid platform data received from server')
       }
 
       set({ 
-        currentPlatform: data,
+        currentPlatform: convertToPlatform(rawData),
         error: null
       })
     } catch (error) {
@@ -100,27 +130,29 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
   },
 
   fetchPlatformsByBrand: async (brandId: string) => {
-    set({ isLoading: true })
+    set({ isLoading: true });
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('platforms')
         .select('*')
-        .eq('brand_id', brandId)
+        .eq('brand_id', brandId);
 
-      if (error) throw error
-
-      if (!data) throw new Error('No platforms found')
+      if (error) throw error;
+      if (!rawData) throw new Error('No platforms found');
       
-      const platforms = data.filter(isPlatform)
-      if (platforms.length !== data.length) {
-        console.warn('Some platform data was invalid and filtered out')
+      const validPlatforms = rawData
+        .filter(isRawPlatform)
+        .map(convertToPlatform);
+
+      if (validPlatforms.length !== rawData.length) {
+        console.warn('Some platform data was invalid and filtered out');
       }
 
-      set({ platforms, error: null })
+      set({ platforms: validPlatforms, error: null });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'An error occurred' })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' });
     } finally {
-      set({ isLoading: false })
+      set({ isLoading: false });
     }
   },
 
@@ -131,26 +163,26 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
   addPlatform: async (brandId: string, platform: Partial<Platform>) => {
     try {
+      const newPlatform = {
+        brand_id: brandId,
+        name: platform.name || 'New Platform',
+        description: platform.description || null,
+        units: platform.units || {
+          typography: 'px',
+          spacing: 'px',
+          borderWidth: 'px',
+          borderRadius: 'px'
+        },
+        layout: platform.layout || {
+          gridColumns: 12,
+          gridGutter: 16,
+          containerPadding: 16
+        }
+      }
+
       const { data, error } = await supabase
         .from('platforms')
-        .insert([
-          {
-            brand_id: brandId,
-            name: platform.name,
-            description: platform.description,
-            units: platform.units || {
-              typography: 'px',
-              spacing: 'px',
-              borderWidth: 'px',
-              borderRadius: 'px'
-            },
-            layout: platform.layout || {
-              gridColumns: 12,
-              gridGutter: 16,
-              containerPadding: 16
-            }
-          }
-        ])
+        .insert([newPlatform])
         .select()
         .single()
 
@@ -158,15 +190,15 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       
       if (!data) throw new Error('Failed to create platform')
       
-      if (!isPlatform(data)) {
+      if (!isRawPlatform(data)) {
         throw new Error('Invalid platform data received from server')
       }
 
       set((state) => ({
-        platforms: [...state.platforms, data]
+        platforms: [...state.platforms, convertToPlatform(data)]
       }))
 
-      return data
+      return convertToPlatform(data)
     } catch (error) {
       console.error('Error adding platform:', error)
       throw error
@@ -186,18 +218,18 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       if (!data) throw new Error('Platform not found')
       
-      if (!isPlatform(data)) {
+      if (!isRawPlatform(data)) {
         throw new Error('Invalid platform data received from server')
       }
 
       set((state) => ({
         platforms: state.platforms.map((p) =>
-          p.id === id ? data : p
+          p.id === id ? convertToPlatform(data) : p
         ),
-        currentPlatform: state.currentPlatform?.id === id ? data : state.currentPlatform
+        currentPlatform: state.currentPlatform?.id === id ? convertToPlatform(data) : state.currentPlatform
       }))
 
-      return data
+      return convertToPlatform(data)
     } catch (error) {
       if (error instanceof Error) {
         console.error('Error updating platform:', error.message)
@@ -238,7 +270,7 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
         return
       }
 
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('platforms')
         .select('*')
         .eq('id', id)
@@ -246,13 +278,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
       if (error) throw error
 
-      if (!data) throw new Error('Platform not found')
+      if (!rawData) throw new Error('Platform not found')
       
-      if (!isPlatform(data)) {
+      if (!isRawPlatform(rawData)) {
         throw new Error('Invalid platform data received from server')
       }
 
-      set({ currentPlatform: data })
+      set({ currentPlatform: convertToPlatform(rawData) })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
