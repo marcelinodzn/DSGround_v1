@@ -30,6 +30,21 @@ interface BrandStore {
   fetchBrand: (brandId: string) => Promise<void>
 }
 
+// Type guard for raw brand data
+function isBrand(obj: unknown): obj is Brand {
+  if (!obj || typeof obj !== 'object') return false;
+  
+  const b = obj as any;
+  return (
+    typeof b.id === 'string' &&
+    typeof b.name === 'string' &&
+    (b.description === null || typeof b.description === 'string') &&
+    (b.type === 'master' || b.type === 'sub') &&
+    typeof b.created_at === 'string' &&
+    typeof b.updated_at === 'string'
+  );
+}
+
 export const useBrandStore = create<BrandStore>((set, get) => ({
   brands: [],
   currentBrand: null,
@@ -37,53 +52,53 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
   error: null,
 
   fetchBrands: async () => {
-    set({ isLoading: true })
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('brands')
         .select('*')
-        .order('created_at', { ascending: false })
 
       if (error) throw error
-      set({ brands: data as Brand[], error: null })
+      if (!rawData) throw new Error('No brands found')
 
-      const state = get()
-      if (!state.currentBrand && data.length > 0) {
-        await get().setCurrentBrand(data[0].id)
+      const validBrands = rawData.filter(isBrand)
+      if (validBrands.length !== rawData.length) {
+        console.warn('Some brand data was invalid and filtered out')
       }
+
+      set({ 
+        brands: validBrands,
+        error: null 
+      })
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
   },
 
   createBrand: async (brand) => {
-    set({ isLoading: true })
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('brands')
         .insert([brand])
         .select()
         .single()
 
       if (error) throw error
-      
-      set(state => ({
-        brands: [...state.brands, data as Brand],
-        currentBrand: data.id
+      if (!rawData) throw new Error('Failed to create brand')
+      if (!isBrand(rawData)) throw new Error('Invalid brand data received from server')
+
+      set((state) => ({
+        brands: [...state.brands, rawData],
+        currentBrand: rawData
       }))
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
+      throw error
     }
   },
 
   updateBrand: async (id, updates) => {
-    set({ isLoading: true })
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('brands')
         .update(updates)
         .eq('id', id)
@@ -91,21 +106,20 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .single()
 
       if (error) throw error
-      
-      set(state => ({
-        brands: state.brands.map(b => 
-          b.id === id ? { ...b, ...data } as Brand : b
-        )
+      if (!rawData) throw new Error('Brand not found')
+      if (!isBrand(rawData)) throw new Error('Invalid brand data received from server')
+
+      set((state) => ({
+        brands: state.brands.map((b) => (b.id === id ? rawData : b)),
+        currentBrand: state.currentBrand?.id === id ? rawData : state.currentBrand
       }))
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
+      throw error
     }
   },
 
   deleteBrand: async (id) => {
-    set({ isLoading: true })
     try {
       const { error } = await supabase
         .from('brands')
@@ -113,63 +127,55 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .eq('id', id)
 
       if (error) throw error
-      
-      set(state => ({
-        brands: state.brands.filter(b => b.id !== id),
-        currentBrand: state.currentBrand === id ? null : state.currentBrand
+
+      set((state) => ({
+        brands: state.brands.filter((b) => b.id !== id),
+        currentBrand: state.currentBrand?.id === id ? null : state.currentBrand
       }))
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
+      throw error
     }
   },
 
-  setCurrentBrand: async (id: string | null) => {
+  setCurrentBrand: async (id) => {
     try {
       if (!id) {
         set({ currentBrand: null })
         return
       }
 
-      const state = get()
-      const brand = state.brands.find(b => b.id === id)
-      if (brand) {
-        set({ currentBrand: brand })
-      } else {
-        const { data, error } = await supabase
-          .from('brands')
-          .select('*')
-          .eq('id', id)
-          .single()
+      const { data: rawData, error } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-        if (error) throw error
-        set({ currentBrand: data as Brand })
-      }
+      if (error) throw error
+      if (!rawData) throw new Error('Brand not found')
+      if (!isBrand(rawData)) throw new Error('Invalid brand data received from server')
+
+      set({ currentBrand: rawData })
     } catch (error) {
-      set({ error: (error as Error).message })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
   },
 
   fetchBrand: async (brandId) => {
-    set({ isLoading: true })
     try {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('brands')
         .select('*')
         .eq('id', brandId)
         .single()
 
       if (error) throw error
-      
-      set({ 
-        currentBrand: data as Brand,
-        error: null 
-      })
+      if (!rawData) throw new Error('Brand not found')
+      if (!isBrand(rawData)) throw new Error('Invalid brand data received from server')
+
+      set({ currentBrand: rawData })
     } catch (error) {
-      set({ error: (error as Error).message })
-    } finally {
-      set({ isLoading: false })
+      set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
   }
 }))
