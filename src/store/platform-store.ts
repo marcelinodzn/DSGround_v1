@@ -40,6 +40,31 @@ interface PlatformStore {
   resetPlatforms: () => void
 }
 
+// Add type guard for Platform
+function isPlatform(obj: unknown): obj is Platform {
+  if (!obj || typeof obj !== 'object') return false
+  
+  const p = obj as any
+  return (
+    typeof p.id === 'string' &&
+    typeof p.brand_id === 'string' &&
+    typeof p.name === 'string' &&
+    (p.description === null || typeof p.description === 'string') &&
+    typeof p.units === 'object' &&
+    typeof p.units.typography === 'string' &&
+    typeof p.units.spacing === 'string' &&
+    typeof p.units.borderWidth === 'string' &&
+    typeof p.units.borderRadius === 'string' &&
+    typeof p.layout === 'object' &&
+    typeof p.layout.gridColumns === 'number' &&
+    typeof p.layout.gridGutter === 'number' &&
+    typeof p.layout.containerPadding === 'number' &&
+    (p.layout.icon === undefined || typeof p.layout.icon === 'string') &&
+    typeof p.created_at === 'string' &&
+    typeof p.updated_at === 'string'
+  )
+}
+
 export const usePlatformStore = create<PlatformStore>((set, get) => ({
   platforms: [],
   currentPlatform: null,
@@ -58,10 +83,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
       
       if (!data) throw new Error('Platform not found')
+      
+      if (!isPlatform(data)) {
+        throw new Error('Invalid platform data received from server')
+      }
 
-      const platform = data as Platform
       set({ 
-        currentPlatform: platform,
+        currentPlatform: data,
         error: null
       })
     } catch (error) {
@@ -82,8 +110,12 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
 
       if (!data) throw new Error('No platforms found')
+      
+      const platforms = data.filter(isPlatform)
+      if (platforms.length !== data.length) {
+        console.warn('Some platform data was invalid and filtered out')
+      }
 
-      const platforms = data as Platform[]
       set({ platforms, error: null })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'An error occurred' })
@@ -125,13 +157,16 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
       
       if (!data) throw new Error('Failed to create platform')
+      
+      if (!isPlatform(data)) {
+        throw new Error('Invalid platform data received from server')
+      }
 
-      const newPlatform = data as Platform
       set((state) => ({
-        platforms: [...state.platforms, newPlatform]
+        platforms: [...state.platforms, data]
       }))
 
-      return newPlatform
+      return data
     } catch (error) {
       console.error('Error adding platform:', error)
       throw error
@@ -150,16 +185,19 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
 
       if (!data) throw new Error('Platform not found')
+      
+      if (!isPlatform(data)) {
+        throw new Error('Invalid platform data received from server')
+      }
 
-      const updatedPlatform = data as Platform
       set((state) => ({
         platforms: state.platforms.map((p) =>
-          p.id === id ? updatedPlatform : p
+          p.id === id ? data : p
         ),
-        currentPlatform: state.currentPlatform?.id === id ? updatedPlatform : state.currentPlatform
+        currentPlatform: state.currentPlatform?.id === id ? data : state.currentPlatform
       }))
 
-      return updatedPlatform
+      return data
     } catch (error) {
       if (error instanceof Error) {
         console.error('Error updating platform:', error.message)
@@ -209,9 +247,12 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (error) throw error
 
       if (!data) throw new Error('Platform not found')
+      
+      if (!isPlatform(data)) {
+        throw new Error('Invalid platform data received from server')
+      }
 
-      const platform = data as Platform
-      set({ currentPlatform: platform })
+      set({ currentPlatform: data })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'An error occurred' })
     }
