@@ -59,6 +59,7 @@ export interface Platform {
   aiScale?: AIScale
   currentFontRole?: 'primary' | 'secondary' | 'tertiary'
   fontId?: string
+  aiSettings?: any
 }
 
 export interface DatabaseTypeStyle {
