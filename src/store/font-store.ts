@@ -69,6 +69,7 @@ type RawFontFamily = {
   name: string;
   category: string;
   tags: string[];
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -83,8 +84,11 @@ type RawFont = {
   format: string;
   is_variable: boolean;
   variable_mode?: 'variable' | 'fixed';
-  category: FontCategory;
+  category: string;
   tags: string[];
+  file_url: string;
+  file_key: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -114,7 +118,9 @@ function isFont(obj: unknown): obj is Font {
     typeof f.weight === 'number' &&
     typeof f.style === 'string' &&
     typeof f.format === 'string' &&
-    typeof f.is_variable === 'boolean'
+    typeof f.file_url === 'string' &&
+    typeof f.file_key === 'string' &&
+    typeof f.user_id === 'string'
   );
 }
 
@@ -228,13 +234,30 @@ export const useFontStore = create<FontState>((set, get) => ({
       const { data: rawData, error } = await supabase
         .from('fonts')
         .select('*')
-        .eq('family', familyName)
-        .returns<RawFont[]>();
+        .eq('family', familyName);
 
       if (error) throw error;
       if (!rawData) throw new Error('No fonts found');
 
-      const validFonts = rawData.filter(isFont);
+      // Convert raw data to Font type
+      const validFonts = rawData
+        .filter((f): f is RawFont => (
+          typeof f.id === 'string' &&
+          typeof f.name === 'string' &&
+          typeof f.family === 'string' &&
+          typeof f.family_id === 'string' &&
+          typeof f.weight === 'number' &&
+          typeof f.style === 'string' &&
+          typeof f.format === 'string' &&
+          typeof f.file_url === 'string' &&
+          typeof f.file_key === 'string' &&
+          typeof f.user_id === 'string'
+        ))
+        .map(f => ({
+          ...f,
+          is_variable: f.is_variable || false,
+        })) as Font[];
+
       set({ fonts: validFonts });
     } catch (error) {
       console.error('Error fetching fonts:', error);
@@ -246,13 +269,30 @@ export const useFontStore = create<FontState>((set, get) => ({
     try {
       const { data: rawData, error } = await supabase
         .from('fonts')
-        .select('*')
-        .returns<RawFont[]>();
+        .select('*');
 
       if (error) throw error;
       if (!rawData) throw new Error('No fonts found');
 
-      const validFonts = rawData.filter(isFont);
+      // Convert raw data to Font type
+      const validFonts = rawData
+        .filter((f): f is RawFont => (
+          typeof f.id === 'string' &&
+          typeof f.name === 'string' &&
+          typeof f.family === 'string' &&
+          typeof f.family_id === 'string' &&
+          typeof f.weight === 'number' &&
+          typeof f.style === 'string' &&
+          typeof f.format === 'string' &&
+          typeof f.file_url === 'string' &&
+          typeof f.file_key === 'string' &&
+          typeof f.user_id === 'string'
+        ))
+        .map(f => ({
+          ...f,
+          is_variable: f.is_variable || false,
+        })) as Font[];
+
       set({ fonts: validFonts });
     } catch (error) {
       console.error('Error loading fonts:', error);
