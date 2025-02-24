@@ -12,7 +12,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { generateTypeScale, parseAIRecommendation } from "@/lib/gemini"
+import { generateTypeScale } from "@/lib/gemini"
 import { convertToBase64 } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
@@ -604,15 +604,21 @@ export function PropertiesPanel() {
     }, 100);
 
     try {
-      const { recommendation } = await analyzeImage(base64Image);
+      const result = await generateTypeScale({
+        device: platforms.find(p => p.id === activePlatform)?.name,
+        context: selectedContext,
+        location: selectedLocation,
+        image: base64Image
+      });
+
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (!recommendation) {
+      if (!result) {
         throw new Error('No recommendation received from AI');
       }
 
-      const params = parseAIRecommendation(recommendation);
+      const params = parseAIRecommendation(result);
 
       // Format the analysis text
       const analysisText = `Scale Parameters:
@@ -621,7 +627,7 @@ Ratio: ${params.ratio}
 Steps up: ${params.stepsUp}
 Steps down: ${params.stepsDown}
 
-${recommendation}`;
+${result}`;
 
       setImageAnalysis(analysisText);
       setPlatformReasoning(analysisText);
