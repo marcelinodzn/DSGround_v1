@@ -63,8 +63,17 @@ interface FontState {
   loadBrandTypography: (brandId: string) => Promise<void>
 }
 
-// Type for raw responses from Supabase
-type RawFontResponse = {
+// Type for raw Supabase responses
+type RawFontFamily = {
+  id: string;
+  name: string;
+  category: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+type RawFont = {
   id: string;
   name: string;
   family: string;
@@ -74,18 +83,6 @@ type RawFontResponse = {
   format: string;
   is_variable: boolean;
   variable_mode?: 'variable' | 'fixed';
-  category: string;
-  tags: string[];
-  file_url: string;
-  file_key: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-type RawFontFamilyResponse = {
-  id: string;
-  name: string;
   category: FontCategory;
   tags: string[];
   created_at: string;
@@ -133,28 +130,6 @@ function isBrandTypography(obj: unknown): obj is BrandTypography {
     (t.secondary_font_scale === null || typeof t.secondary_font_scale === 'string') &&
     (t.tertiary_font_scale === null || typeof t.tertiary_font_scale === 'string')
   );
-}
-
-// Convert RawFontResponse to Font
-function convertToFont(raw: RawFontResponse): Font {
-  return {
-    id: raw.id,
-    name: raw.name,
-    family: raw.family,
-    family_id: raw.family_id,
-    weight: raw.weight,
-    style: raw.style,
-    format: raw.format,
-    category: raw.category,
-    tags: raw.tags,
-    file_url: raw.file_url,
-    file_key: raw.file_key,
-    user_id: raw.user_id,
-    created_at: raw.created_at,
-    updated_at: raw.updated_at,
-    is_variable: raw.is_variable,
-    variable_mode: raw.variable_mode
-  };
 }
 
 export const useFontStore = create<FontState>((set, get) => ({
@@ -235,16 +210,16 @@ export const useFontStore = create<FontState>((set, get) => ({
       const { data: rawData, error } = await supabase
         .from('font_families')
         .select('*')
-        .returns<RawFontFamilyResponse[]>()
+        .returns<RawFontFamily[]>();
 
-      if (error) throw error
-      if (!rawData) throw new Error('No font families found')
+      if (error) throw error;
+      if (!rawData) throw new Error('No font families found');
 
-      const validFamilies = rawData.filter(isFontFamily)
-      set({ families: validFamilies })
+      const validFamilies = rawData.filter(isFontFamily);
+      set({ families: validFamilies });
     } catch (error) {
-      console.error('Error fetching families:', error)
-      throw error
+      console.error('Error fetching families:', error);
+      throw error;
     }
   },
 
@@ -254,16 +229,16 @@ export const useFontStore = create<FontState>((set, get) => ({
         .from('fonts')
         .select('*')
         .eq('family', familyName)
-        .returns<RawFontResponse[]>()
+        .returns<RawFont[]>();
 
-      if (error) throw error
-      if (!rawData) throw new Error('No fonts found')
+      if (error) throw error;
+      if (!rawData) throw new Error('No fonts found');
 
-      const fonts = rawData.map(convertToFont)
-      set({ fonts })
+      const validFonts = rawData.filter(isFont);
+      set({ fonts: validFonts });
     } catch (error) {
-      console.error('Error fetching fonts:', error)
-      throw error
+      console.error('Error fetching fonts:', error);
+      throw error;
     }
   },
 
@@ -272,16 +247,16 @@ export const useFontStore = create<FontState>((set, get) => ({
       const { data: rawData, error } = await supabase
         .from('fonts')
         .select('*')
-        .returns<RawFontResponse[]>()
+        .returns<RawFont[]>();
 
-      if (error) throw error
-      if (!rawData) throw new Error('No fonts found')
+      if (error) throw error;
+      if (!rawData) throw new Error('No fonts found');
 
-      const fonts = rawData.map(convertToFont)
-      set({ fonts })
+      const validFonts = rawData.filter(isFont);
+      set({ fonts: validFonts });
     } catch (error) {
-      console.error('Error loading fonts:', error)
-      throw error
+      console.error('Error loading fonts:', error);
+      throw error;
     }
   },
 
