@@ -29,39 +29,14 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
   useEffect(() => {
     const fetchBrand = async () => {
       try {
-        const { data: rawData, error } = await supabase
+        const { data, error } = await supabase
           .from('brands')
           .select('*')
           .eq('id', brandId)
           .single()
 
         if (error) throw error
-        
-        if (!rawData) throw new Error('Brand not found')
-
-        // Type guard for raw brand data
-        if (
-          typeof rawData.id !== 'string' ||
-          typeof rawData.name !== 'string' ||
-          (rawData.description !== null && typeof rawData.description !== 'string') ||
-          (rawData.type !== 'master' && rawData.type !== 'sub') ||
-          typeof rawData.created_at !== 'string' ||
-          typeof rawData.updated_at !== 'string'
-        ) {
-          throw new Error('Invalid brand data received from server')
-        }
-
-        // Now TypeScript knows the types are correct
-        const brandData: Brand = {
-          id: rawData.id,
-          name: rawData.name,
-          description: rawData.description,
-          type: rawData.type,
-          created_at: rawData.created_at,
-          updated_at: rawData.updated_at,
-        }
-        
-        setBrand(brandData)
+        setBrand(data as Brand)
       } catch (error) {
         console.error('Error fetching brand:', error)
       }
@@ -123,14 +98,13 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
 
       <div className="mt-6">
         <AnimatedTabs
-          layoutId="brand-tabs"
-          defaultTab="overview"
-          onChange={() => {}}
+          value="overview"
+          onValueChange={() => {}}
           tabs={[
-            { id: 'overview', label: 'Overview' },
-            { id: 'tokens', label: 'Design Tokens' },
-            { id: 'components', label: 'Components' },
-            { id: 'settings', label: 'Settings' },
+            { value: 'overview', label: 'Overview' },
+            { value: 'tokens', label: 'Design Tokens' },
+            { value: 'components', label: 'Components' },
+            { value: 'settings', label: 'Settings' },
           ]}
         />
       </div>

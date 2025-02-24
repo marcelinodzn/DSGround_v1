@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTypographyStore, ScaleMethod, Platform, TypeStyle, ScaleConfig } from "@/store/typography"
+import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/typography"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -12,7 +12,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { generateTypeScale } from "@/lib/gemini"
+import { generateTypeScale, parseAIRecommendation } from "@/lib/gemini"
 import { convertToBase64 } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
@@ -24,21 +24,14 @@ import { useRouter } from 'next/navigation';
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { useFontStore } from "@/store/font-store"
 import { useBrandStore } from "@/store/brand-store"
-import { DragEndEvent } from '@dnd-kit/core';
-import { UniqueIdentifier } from '@dnd-kit/core';
 
-interface TypeScale {
-  baseSize: number;
-  ratio: number;
-  stepsUp: number;
-  stepsDown: number;
-}
-
-interface AIResponse {
-  recommendation: string;
-  reasoning: string;
-  rawResponse: string;
-}
+const typographyScales = [
+  { name: "Major Second", ratio: 1.125 },
+  { name: "Major Third", ratio: 1.25 },
+  { name: "Perfect Fourth", ratio: 1.333 },
+  { name: "Perfect Fifth", ratio: 1.5 },
+  { name: "Golden Ratio", ratio: 1.618 },
+]
 
 interface DistanceScale {
   viewingDistance: number
@@ -47,13 +40,6 @@ interface DistanceScale {
   textType: 'continuous' | 'isolated'
   lighting: 'good' | 'moderate' | 'poor'
   ppi: number
-}
-
-interface ScaleParams {
-  baseSize: number;
-  ratio: number;
-  stepsUp: number;
-  stepsDown: number;
 }
 
 interface SortableTypeStyleProps {
@@ -230,8 +216,8 @@ export function PropertiesPanel() {
     initializePlatform
   } = useTypographyStore()
   const { platforms: platformSettings } = usePlatformStore()
-  const { currentBrand } = useBrandStore();
-  const { saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
+  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
+  const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
 
   // Compute active platform - either current platform or first available
   const activePlatform = useMemo(() => {
@@ -357,11 +343,10 @@ export function PropertiesPanel() {
   }
 
   const handleScaleChange = (ratio: number, baseSize: number) => {
-    const updatedScale: TypeScale = {
-      baseSize,
+    const updatedScale = {
+      ...currentSettings.scale,
       ratio,
-      stepsUp: currentSettings.scale.stepsUp,
-      stepsDown: currentSettings.scale.stepsDown
+      baseSize
     }
     
     // Update the scale
@@ -412,10 +397,8 @@ export function PropertiesPanel() {
     updatePlatform(activePlatform, {
       distanceScale: updatedDistanceScale,
       scale: {
-        baseSize: roundedBaseSize,
-        ratio: currentSettings.scale.ratio,
-        stepsUp: currentSettings.scale.stepsUp,
-        stepsDown: currentSettings.scale.stepsDown
+        ...currentSettings.scale,
+        baseSize: roundedBaseSize // Update the main scale base size
       }
     });
   };
@@ -429,7 +412,7 @@ export function PropertiesPanel() {
   const handleTypeStyleChange = (id: string, updates: Partial<TypeStyle>) => {
     if (!activePlatform || !currentSettings) return;
 
-    // Create a new array of type styles with the updated style
+    // Create a new array of type styles
     const updatedTypeStyles = currentSettings.typeStyles.map(style => {
       if (style.id === id) {
         // If we're updating the scale step
@@ -440,8 +423,8 @@ export function PropertiesPanel() {
           if (scaleValue) {
             return {
               ...style,
-              ...updates,
-              scaleStep: updates.scaleStep || style.scaleStep // Ensure scaleStep is never undefined
+              scaleStep: updates.scaleStep,
+              fontSize: scaleValue.size
             };
           }
         }
@@ -461,8 +444,8 @@ export function PropertiesPanel() {
     });
   };
 
-  const getScaleValues = (platformId?: string) => {
-    return useTypographyStore.getState().getScaleValues(platformId || activePlatform);
+  const getScaleValues = () => {
+    return useTypographyStore.getState().getScaleValues(activePlatform)
   }
 
   const handleAddTypeStyle = () => {
@@ -470,7 +453,6 @@ export function PropertiesPanel() {
       id: crypto.randomUUID(),
       name: 'New Style',
       scaleStep: 'f0',
-      fontFamily: currentSettings.typeStyles?.[0]?.fontFamily || 'System UI',
       fontWeight: 400,
       lineHeight: 1.5,
       opticalSize: 16,
@@ -500,10 +482,13 @@ export function PropertiesPanel() {
     })
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+  const handleDragEnd = (event: {
+    active: { id: string };
+    over: { id: string } | null;
+  }) => {
+    if (!event.over) return;
     
-    if (!over) return;
+    const { active, over } = event;
     
     if (active.id !== over.id) {
       const oldIndex = currentSettings.typeStyles.findIndex(style => style.id === active.id);
@@ -527,7 +512,7 @@ export function PropertiesPanel() {
   };
 
   const handleGenerateScale = async () => {
-    if (isGenerating) return;
+    if (isGenerating) return; // Prevent multiple clicks
     
     setIsGenerating(true);
     setAiError(null);
@@ -542,28 +527,32 @@ export function PropertiesPanel() {
         customRequirements
       });
 
-      const params = parseAIRecommendation(response);
+      const recommendedSizeInPx = parseAIRecommendation(response.recommendation);
+      const convertedSize = convertUnits(
+        recommendedSizeInPx,
+        'px',
+        currentPlatformSettings?.units.typography || 'px',
+        currentSettings.scale.baseSize
+      );
 
       // Update both aiScale and scale settings
-      const scale: ScaleConfig = {
-        baseSize: params.baseSize,
-        ratio: params.ratio,
-        stepsUp: params.stepsUp,
-        stepsDown: params.stepsDown
-      };
-
       updatePlatform(activePlatform, {
         aiScale: {
-          recommendedBaseSize: params.baseSize,
-          originalSizeInPx: params.baseSize,
+          recommendedBaseSize: convertedSize,
+          originalSizeInPx: recommendedSizeInPx,
           recommendations: response.recommendation
         },
-        scale
+        scale: {
+          ...currentSettings.scale,
+          baseSize: convertedSize
+        }
       });
 
       setPlatformReasoning(response.reasoning);
+      setProgress(100);
     } catch (error) {
-      setAiError(error instanceof Error ? error.message : 'An error occurred');
+      console.error('AI Scale generation error:', error);
+      setAiError(error instanceof Error ? error.message : 'Failed to generate scale');
     } finally {
       setIsGenerating(false);
     }
@@ -592,33 +581,32 @@ export function PropertiesPanel() {
   }
 
   const handleGenerateFromImage = async (base64Image: string) => {
-    if (isAnalyzing) return;
-    
-    setIsAnalyzing(true);
-    setAiError(null);
-    setImageAnalysis(null);
-    setProgress(0);
-
-    const progressInterval = setInterval(() => {
-      setProgress(prev => Math.min(prev + 1, 95));
-    }, 100);
-
     try {
-      const result = await generateTypeScale({
-        device: platforms.find(p => p.id === activePlatform)?.name,
+      setAiError(null)
+      setIsAnalyzing(true)
+      setProgress(0)
+      setPlatformReasoning(null)
+      
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 10, 90))
+      }, 500)
+
+      // Call Gemini directly
+      const recommendation = await generateTypeScale({
+        deviceType: platforms.find(p => p.id === activePlatform)?.name,
         context: selectedContext,
         location: selectedLocation,
         image: base64Image
-      });
+      })
 
-      clearInterval(progressInterval);
-      setProgress(100);
+      clearInterval(progressInterval)
+      setProgress(100)
 
-      if (!result) {
-        throw new Error('No recommendation received from AI');
+      if (!recommendation) {
+        throw new Error('No recommendation received from AI')
       }
 
-      const params = parseAIRecommendation(result);
+      const params = parseAIRecommendation(recommendation)
 
       // Format the analysis text
       const analysisText = `Scale Parameters:
@@ -627,22 +615,24 @@ Ratio: ${params.ratio}
 Steps up: ${params.stepsUp}
 Steps down: ${params.stepsDown}
 
-${result}`;
+${recommendation}`
 
-      setImageAnalysis(analysisText);
-      setPlatformReasoning(analysisText);
+      setImageAnalysis(analysisText)
+      setPlatformReasoning(analysisText)
 
       updatePlatform(activePlatform, {
-        scale: params
-      });
+        scale: {
+          ...params
+        }
+      })
     } catch (error) {
-      console.error('Error in handleGenerateFromImage:', error);
-      setAiError(error instanceof Error ? error.message : 'Failed to analyze image');
+      console.error('Error in handleGenerateFromImage:', error)
+      setAiError(error instanceof Error ? error.message : 'Failed to analyze image')
     } finally {
-      setIsAnalyzing(false);
-      setTimeout(() => setProgress(0), 500);
+      setIsAnalyzing(false)
+      setTimeout(() => setProgress(0), 500)
     }
-  };
+  }
 
   const handleFontRoleChange = async (role: 'primary' | 'secondary' | 'tertiary') => {
     console.log('Changing font role to:', role)
@@ -682,25 +672,6 @@ ${result}`;
         return 'Used sparingly for special purposes'
     }
   }
-
-  const parseAIRecommendation = (response: AIResponse | string): ScaleParams => {
-    // If response is a string, it's the raw recommendation
-    const recommendationText = typeof response === 'string' ? response : response.recommendation;
-    
-    // Extract parameters using regex or string parsing
-    // This is a simplified example - adjust based on actual AI response format
-    const baseSize = parseFloat(recommendationText.match(/base size:\s*(\d+\.?\d*)/i)?.[1] || '16');
-    const ratio = parseFloat(recommendationText.match(/ratio:\s*(\d+\.?\d*)/i)?.[1] || '1.2');
-    const stepsUp = parseInt(recommendationText.match(/steps up:\s*(\d+)/i)?.[1] || '3');
-    const stepsDown = parseInt(recommendationText.match(/steps down:\s*(\d+)/i)?.[1] || '2');
-    
-    return {
-      baseSize,
-      ratio,
-      stepsUp,
-      stepsDown
-    };
-  };
 
   return (
     <div className="h-full">
