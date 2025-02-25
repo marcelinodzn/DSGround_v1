@@ -4,6 +4,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase'
+import { useTypographyStore } from '@/store/typography-store'
 
 export interface Platform {
   id: string
@@ -38,6 +39,12 @@ interface PlatformStore {
   deletePlatform: (id: string) => Promise<boolean>
   setCurrentPlatform: (id: string | null) => Promise<void>
   resetPlatforms: () => void
+  createPlatform: (platformData: {
+    name: string;
+    description?: string;
+    type: string;
+    brandId: string;
+  }) => Promise<void>
 }
 
 // Type for raw platform data from Supabase
@@ -324,5 +331,46 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
   resetPlatforms: () => {
     set({ platforms: [], currentPlatform: null })
+  },
+
+  createPlatform: async (platformData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert({
+          name: platformData.name,
+          description: platformData.description || '',
+          type: platformData.type,
+          brand_id: platformData.brandId
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Add the new platform to the state
+      set(state => ({
+        platforms: [...state.platforms, {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          type: data.type,
+          brandId: data.brand_id
+        }],
+        isLoading: false
+      }));
+      
+      // Initialize typography settings for this platform
+      const { initializePlatform } = useTypographyStore.getState();
+      await initializePlatform(data.id);
+      
+    } catch (error) {
+      set({ 
+        isLoading: false,
+        error: (error as Error).message 
+      });
+      throw error;
+    }
   }
 }))

@@ -11,6 +11,9 @@ import { usePlatformStore } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
 import { toast } from 'sonner'
 import { Icon } from '@iconify/react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { PlusCircle } from "lucide-react"
 
 interface Platform {
   id: string
@@ -44,27 +47,34 @@ const slugify = (text: string) => {
 export default function PlatformsPage() {
   const { isFullscreen, setIsFullscreen } = useLayout()
   const router = useRouter()
-  const { currentBrand } = useBrandStore()
-  const { 
-    platforms, 
-    isLoading,
-    error,
-    fetchPlatformsByBrand,
-    deletePlatform, 
-    addPlatform,
-    updatePlatform 
-  } = usePlatformStore()
+  const { currentBrand, brands, fetchBrands, setCurrentBrand } = useBrandStore()
+  const { platforms, isLoading: storeIsLoading, error, fetchPlatformsByBrand, deletePlatform, addPlatform, updatePlatform } = usePlatformStore()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const loadPlatforms = async () => {
-      if (currentBrand) {
+    const loadData = async () => {
+      setIsLoading(true)
+      await fetchBrands()
+      
+      // If there's a current brand, fetch its platforms
+      if (currentBrand?.id) {
         await fetchPlatformsByBrand(currentBrand.id)
       }
+      
+      setIsLoading(false)
     }
     
-    loadPlatforms()
-  }, [currentBrand, fetchPlatformsByBrand])
+    loadData()
+  }, [fetchBrands, currentBrand, fetchPlatformsByBrand])
+
+  const handleBrandChange = async (brandId: string) => {
+    const brand = brands.find(b => b.id === brandId)
+    if (brand) {
+      setCurrentBrand(brand)
+      await fetchPlatformsByBrand(brandId)
+    }
+  }
 
   const handleCreatePlatform = async (name: string, description: string = '') => {
     if (!currentBrand) return
@@ -149,17 +159,53 @@ export default function PlatformsPage() {
     router.push(`/platforms/${platformId}`)
   }
 
-  if (!currentBrand) {
+  if (isLoading || storeIsLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)]">
-        <h2 className="text-2xl font-bold mb-4">No Brand Selected</h2>
-        <p className="text-muted-foreground">Please select a brand to view platforms</p>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p>Loading...</p>
       </div>
     )
   }
 
-  if (isLoading) {
-    return <div>Loading...</div>
+  if (!currentBrand) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold mb-2">Please select a brand</h3>
+              <p className="text-muted-foreground mb-4">
+                Select a brand to view its platforms
+              </p>
+              
+              {brands.length > 0 ? (
+                <div className="w-64 mx-auto">
+                  <Select onValueChange={handleBrandChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brands.map(brand => (
+                        <SelectItem key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div>
+                  <p className="mb-4">No brands found. Create a brand first.</p>
+                  <Button onClick={() => router.push('/brands/new')}>
+                    Create Brand
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (error) {

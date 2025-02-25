@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown, GripVertical, Trash2, Copy, Upload, X, Codesandbox, ScanEye, LineChart, MoreHorizontal } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -483,6 +483,7 @@ export function PropertiesPanel() {
       id: crypto.randomUUID(),
       name: 'New Style',
       scaleStep: 'f0',
+      fontFamily: 'Arial',
       fontWeight: 400,
       lineHeight: 1.5,
       opticalSize: 16,
@@ -512,10 +513,7 @@ export function PropertiesPanel() {
     })
   }
 
-  const handleDragEnd = (event: {
-    active: { id: string };
-    over: { id: string } | null;
-  }) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     if (!event.over) return;
     
     const { active, over } = event;
@@ -636,16 +634,16 @@ export function PropertiesPanel() {
         throw new Error('No recommendation received from AI')
       }
 
-      const params = parseAIRecommendation(recommendation)
+      const params = parseAIRecommendation(recommendation.recommendation)
 
       // Format the analysis text
       const analysisText = `Scale Parameters:
-Base size: ${params.baseSize}px
-Ratio: ${params.ratio}
-Steps up: ${params.stepsUp}
-Steps down: ${params.stepsDown}
+Base size: ${params.baseSize || 0}px
+Ratio: ${params.ratio || 0}
+Steps up: ${params.stepsUp || 0}
+Steps down: ${params.stepsDown || 0}
 
-${recommendation}`
+${recommendation.recommendation}`
 
       setImageAnalysis(analysisText)
       setPlatformReasoning(analysisText)
@@ -684,7 +682,7 @@ ${recommendation}`
       // Always update the role, even if the font ID is null
       updatePlatform(activePlatform, {
         currentFontRole: role,
-        fontId: fontId
+        fontId: fontId || undefined
       });
       
       // Update local state to ensure UI updates immediately
