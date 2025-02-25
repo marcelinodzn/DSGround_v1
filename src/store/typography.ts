@@ -475,6 +475,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         .select('*')
         .eq('platform_id', platformId)
         .single()
+        
+      console.log('Typography settings response:', { data, error, platformId })
 
       if (error) {
         if (error.code === 'PGRST116') {

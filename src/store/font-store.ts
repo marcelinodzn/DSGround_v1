@@ -1,15 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { Font, FontFamily, uploadFont, createFontFamily, getFontFamilies, getFontsByFamily, getFonts, deleteFont } from '@/lib/fonts'
 import { useAuth } from '@/providers/auth-provider'
 import { supabase } from '@/lib/supabase'
 import { useTypographyStore } from '@/store/typography'
 import { usePlatformStore } from '@/store/platform-store'
-
-const supabaseClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 interface UploadFontParams {
   id: string
@@ -176,13 +170,39 @@ export const useFontStore = create<FontState>((set, get) => ({
   loadFonts: async () => {
     set({ isLoading: true, error: null })
     try {
-      const fonts = await getFonts()
-      set({ fonts })
+      console.log('Fetching fonts from database...');
+      const fonts = await getFonts();
+      
+      if (!fonts || fonts.length === 0) {
+        console.warn('No fonts returned from database, retrying with direct query...');
+        
+        // Make a direct query as a fallback
+        const { data, error } = await supabase
+          .from('fonts')
+          .select('*')
+          .order('family', { ascending: true });
+          
+        if (error) {
+          throw new Error(`Direct font query failed: ${error.message}`);
+        }
+        
+        if (data && data.length > 0) {
+          console.log(`Retrieved ${data.length} fonts with direct query`);
+          set({ fonts: data });
+        } else {
+          console.warn('Still no fonts found with direct query');
+          set({ fonts: [] });
+        }
+      } else {
+        console.log(`Successfully loaded ${fonts.length} fonts`);
+        set({ fonts });
+      }
     } catch (error) {
-      set({ error: (error as Error).message })
-      throw error
+      console.error('Error loading fonts:', error);
+      set({ error: (error as Error).message });
+      throw error;
     } finally {
-      set({ isLoading: false })
+      set({ isLoading: false });
     }
   },
 
@@ -266,18 +286,54 @@ export const useFontStore = create<FontState>((set, get) => ({
         const platformStore = usePlatformStore.getState()
         
         if (platformStore.currentPlatform && typographyStore.updatePlatform) {
-          const currentRole = data.primary_font_id ? 'primary' : 
-                            data.secondary_font_id ? 'secondary' : 
-                            data.tertiary_font_id ? 'tertiary' : undefined
-
-          const fontId = data.primary_font_id || 
-                        data.secondary_font_id || 
-                        data.tertiary_font_id
-
-          typographyStore.updatePlatform(platformStore.currentPlatform, {
-            currentFontRole: currentRole,
-            fontId
-          })
+          // Determine which font role was updated
+          if (typography.primary_font_id !== undefined) {
+            typographyStore.updatePlatform(platformStore.currentPlatform, {
+              currentFontRole: 'primary',
+              fontId: typography.primary_font_id
+            })
+          } else if (typography.secondary_font_id !== undefined) {
+            typographyStore.updatePlatform(platformStore.currentPlatform, {
+              currentFontRole: 'secondary',
+              fontId: typography.secondary_font_id
+            })
+          } else if (typography.tertiary_font_id !== undefined) {
+            typographyStore.updatePlatform(platformStore.currentPlatform, {
+              currentFontRole: 'tertiary',
+              fontId: typography.tertiary_font_id
+            })
+          }
+          
+          // Also reload the font to ensure it's available in the document
+          setTimeout(async () => {
+            // Get the font ID that was just set
+            const fontId = typography.primary_font_id !== undefined ? typography.primary_font_id :
+                          typography.secondary_font_id !== undefined ? typography.secondary_font_id :
+                          typography.tertiary_font_id;
+            
+            if (fontId) {
+              const font = get().fonts.find(f => f.id === fontId);
+              if (font?.file_url) {
+                try {
+                  console.log(`Re-loading font after selection: ${font.family}`);
+                  const fontFace = new FontFace(
+                    font.family,
+                    `url(${font.file_url})`,
+                    {
+                      weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                      style: font.style || 'normal',
+                    }
+                  );
+                  
+                  const loadedFont = await fontFace.load();
+                  document.fonts.add(loadedFont);
+                  console.log(`Font reloaded successfully: ${font.family}`);
+                } catch (error) {
+                  console.error(`Error reloading font ${font.family}:`, error);
+                }
+              }
+            }
+          }, 100);  // Small delay to ensure state has been updated
         }
       }
     } catch (error) {
@@ -289,9 +345,12 @@ export const useFontStore = create<FontState>((set, get) => ({
   loadBrandTypography: async (brandId: string) => {
     console.log('Loading brand typography for brand:', brandId)
     try {
+      // First ensure fonts are loaded
+      await get().loadFonts();
+      
       const { data, error } = await supabase
         .from('brand_typography')
-        .select('*, primary_font:primary_font_id(*), secondary_font:secondary_font_id(*), tertiary_font:tertiary_font_id(*)')
+        .select('*')
         .eq('brand_id', brandId)
         .single()
 
@@ -314,7 +373,7 @@ export const useFontStore = create<FontState>((set, get) => ({
               secondary_font_styles: null,
               tertiary_font_styles: null
             })
-            .select('*, primary_font:primary_font_id(*), secondary_font:secondary_font_id(*), tertiary_font:tertiary_font_id(*)')
+            .select('*')
             .single()
 
           if (insertError) throw insertError
@@ -328,6 +387,35 @@ export const useFontStore = create<FontState>((set, get) => ({
           return
         }
         throw error
+      }
+
+      // Now let's preload the font files for immediate use
+      const fontIds = [data.primary_font_id, data.secondary_font_id, data.tertiary_font_id].filter(Boolean);
+      const { fonts } = get();
+      
+      // Load web fonts for any fonts that are set
+      for (const fontId of fontIds) {
+        const font = fonts.find(f => f.id === fontId);
+        if (font?.file_url) {
+          try {
+            // Create and load a web font
+            const fontFace = new FontFace(
+              font.family,
+              `url(${font.file_url})`,
+              {
+                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                style: font.style || 'normal',
+              }
+            );
+            
+            // Load the font and add it to the document
+            const loadedFont = await fontFace.load();
+            document.fonts.add(loadedFont);
+            console.log(`Font loaded successfully: ${font.family}`);
+          } catch (error) {
+            console.error(`Error loading font ${font.family}:`, error);
+          }
+        }
       }
 
       set(state => ({

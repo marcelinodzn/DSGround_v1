@@ -291,21 +291,44 @@ export function PropertiesPanel() {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        await loadFonts()
+        console.log('Loading fonts from properties panel...');
+        await loadFonts();
+        
         if (currentBrand?.id) {
-          await loadBrandTypography(currentBrand.id)
+          console.log('Loading brand typography for brand:', currentBrand.id);
+          await loadBrandTypography(currentBrand.id);
+          
+          // Force-load fonts again if fonts array is empty
+          const currentFonts = useFontStore.getState().fonts;
+          if (currentFonts.length === 0) {
+            console.warn('Fonts array is empty, attempting to reload...');
+            setTimeout(() => loadFonts(), 1000);
+          }
         }
       } catch (error) {
-        console.error('Error loading fonts and typography:', error)
+        console.error('Error loading fonts and typography:', error);
       }
-    }
+    };
 
-    initializeData()
+    initializeData();
+    
+    // Add a delayed check to ensure fonts are loaded
+    const fontsCheck = setTimeout(() => {
+      const currentFonts = useFontStore.getState().fonts;
+      console.log(`Fonts check after delay: ${currentFonts.length} fonts loaded`);
+      
+      if (currentFonts.length === 0) {
+        console.warn('Fonts still not loaded after delay, forcing reload...');
+        loadFonts();
+      }
+    }, 2000);
     
     // Debug logs
-    console.log('Current Brand:', currentBrand)
-    console.log('Brand Typography:', brandTypography)
-    console.log('Fonts:', fonts)
+    console.log('Current Brand:', currentBrand);
+    console.log('Brand Typography:', brandTypography);
+    console.log('Fonts:', fonts);
+    
+    return () => clearTimeout(fontsCheck);
   }, [currentBrand?.id, loadFonts, loadBrandTypography])
 
   useEffect(() => {
@@ -313,10 +336,17 @@ export function PropertiesPanel() {
       initializePlatform(activePlatform)
     }
   }, [activePlatform, typographyPlatforms, initializePlatform])
-
+  
   // Find current settings
   const currentSettings = typographyPlatforms.find(p => p.id === activePlatform)
   const currentPlatformSettings = platformSettings.find(p => p.id === activePlatform)
+  
+  // When currentSettings.currentFontRole changes, update the local state
+  useEffect(() => {
+    if (currentSettings?.currentFontRole) {
+      setCurrentFontRole(currentSettings.currentFontRole);
+    }
+  }, [currentSettings?.currentFontRole])
   
   if (!currentSettings) {
     return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
@@ -639,17 +669,61 @@ ${recommendation}`
     console.log('Current typography:', currentTypography)
     console.log('Available fonts:', fonts)
     
-    if (!currentBrand?.id || !currentTypography) return
+    if (!currentBrand?.id) return
     
     try {
-      const fontId = currentTypography[`${role}_font_id`]
-      console.log('Selected font ID:', fontId)
+      // Even if we don't have a font ID, we should still set the role
+      let fontId = null;
       
+      // Try to get the font ID if typography exists
+      if (currentTypography) {
+        fontId = currentTypography[`${role}_font_id`];
+        console.log('Selected font ID:', fontId);
+      }
+      
+      // Always update the role, even if the font ID is null
+      updatePlatform(activePlatform, {
+        currentFontRole: role,
+        fontId: fontId
+      });
+      
+      // Update local state to ensure UI updates immediately
+      setCurrentFontRole(role);
+      
+      // Force a font load if we have a font ID
       if (fontId) {
-        updatePlatform(activePlatform, {
-          currentFontRole: role,
-          fontId: fontId
-        })
+        const font = fonts.find(f => f.id === fontId);
+        if (font?.file_url) {
+          try {
+            console.log(`Loading font for role ${role}:`, font.family);
+            const fontFace = new FontFace(
+              font.family,
+              `url(${font.file_url})`,
+              {
+                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                style: font.style || 'normal',
+              }
+            );
+            
+            const loadedFont = await fontFace.load();
+            document.fonts.add(loadedFont);
+            console.log(`Font loaded for role ${role}:`, font.family);
+            
+            // Force a CSS update by creating a style tag
+            const styleTag = document.createElement('style');
+            styleTag.textContent = `
+              .font-preview {
+                font-family: "${font.family}", ${font.category || 'sans-serif'} !important;
+              }
+              .font-preview-container {
+                font-family: "${font.family}", ${font.category || 'sans-serif'} !important;
+              }
+            `;
+            document.head.appendChild(styleTag);
+          } catch (err) {
+            console.error(`Error loading font for role ${role}:`, err);
+          }
+        }
       }
     } catch (error) {
       console.error('Error updating font role:', error)
@@ -733,63 +807,104 @@ ${recommendation}`
 
       <div className="px-4 py-4">
         <Label className="text-xs mb-2 block">Font Role</Label>
-        <Select 
-          value={currentSettings.currentFontRole || ''}
-          onValueChange={(value) => handleFontRoleChange(value as 'primary' | 'secondary' | 'tertiary')}
-        >
-          <SelectTrigger className="text-xs h-8">
-            <SelectValue>
-              {currentSettings.currentFontRole ? 
-                `${currentSettings.currentFontRole.charAt(0).toUpperCase() + 
-                  currentSettings.currentFontRole.slice(1)} Font` : 
-                "Select font role"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {(['primary', 'secondary', 'tertiary'] as const).map((role) => {
-              const fontId = currentTypography?.[`${role}_font_id`]
-              const font = fonts.find(f => f.id === fontId)
-              
-              return (
-                <SelectItem key={role} value={role}>
-                  <div className="flex flex-col">
-                    <span>{role.charAt(0).toUpperCase() + role.slice(1)} Font</span>
-                    {font ? (
-                      <span className="text-xs text-muted-foreground">
-                        {font.family}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        No font selected
-                      </span>
-                    )}
-                  </div>
-                </SelectItem>
-              )
-            })}
-          </SelectContent>
-        </Select>
+        <div className="relative">
+          <Select 
+            value={currentFontRole || 'primary'} 
+            onValueChange={(value) => {
+              const typedValue = value as 'primary' | 'secondary' | 'tertiary';
+              handleFontRoleChange(typedValue);
+              // Force update the current settings with the new value
+              updatePlatform(activePlatform, {
+                currentFontRole: typedValue
+              });
+              // Set local state to make UI update immediately
+              setCurrentFontRole(typedValue);
+            }}
+          >
+            <SelectTrigger className="text-xs">
+              <div className="flex items-center justify-between w-full">
+                {(() => {
+                  // Custom rendering of the selected item
+                  const role = currentFontRole || 'primary';
+                  const roleName = role.charAt(0).toUpperCase() + role.slice(1);
+                  const fontId = currentTypography?.[`${role}_font_id`];
+                  const font = fonts.find(f => f.id === fontId);
+                  
+                  return (
+                    <div className="flex flex-col items-start gap-0.5">
+                      <div className="flex items-center">
+                        <span className="font-medium">{roleName}</span>
+                        {font && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                            Font Set
+                          </span>
+                        )}
+                      </div>
+                      {font && (
+                        <span className="text-xs text-muted-foreground">
+                          Font: {font.family}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {(['primary', 'secondary', 'tertiary'] as const).map((role) => {
+                const fontId = currentTypography?.[`${role}_font_id`]
+                const font = fonts.find(f => f.id === fontId)
+                const roleName = role.charAt(0).toUpperCase() + role.slice(1);
+                
+                return (
+                  <SelectItem key={role} value={role}>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center">
+                        <span className="font-medium">{roleName}</span>
+                        {font && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+                            Font Set
+                          </span>
+                        )}
+                      </div>
+                      {font ? (
+                        <div className="flex items-center">
+                          <span className="text-xs text-muted-foreground mr-1">Font:</span>
+                          <span className="text-xs font-medium">
+                            {font.family}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">
+                          Select on typography page
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+        </div>
 
-        {/* Show current font info */}
-        {currentSettings.currentFontRole && currentTypography && (
+        {/* Only show font info if we have a valid font */}
+        {currentFontRole && currentTypography?.[`${currentFontRole}_font_id`] && (
           <div className="mt-4">
             <div className="rounded-md border p-3 bg-muted/5">
               {(() => {
-                const fontId = currentTypography[`${currentSettings.currentFontRole}_font_id`]
-                const font = fonts.find(f => f.id === fontId)
-                
-                if (!font) {
-                  return (
-                    <div className="text-sm text-muted-foreground">
-                      No font selected for {currentSettings.currentFontRole} role
-                    </div>
-                  )
+                const fontId = currentTypography?.[`${currentFontRole}_font_id`]
+                if (!fontId) {
+                  return null; // No message when no font is selected
                 }
+
+                const font = fonts.find(f => f.id === fontId)
+                if (!font) return null;
 
                 return (
                   <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Current Font Role</h3>
                     <div className="text-xs text-muted-foreground">
-                      {getRoleDescription(currentSettings.currentFontRole)}
+                      {getRoleDescription(currentFontRole)}
                     </div>
                     <div className="font-preview" style={{
                       fontFamily: `"${font.family}", ${font.category}`,
@@ -800,10 +915,22 @@ ${recommendation}`
                       The quick brown fox jumps over the lazy dog
                     </div>
                     <div className="text-xs space-y-1 text-muted-foreground">
-                      <div>Font: {font.family}</div>
-                      <div>Weight: {font.is_variable ? 'Variable (1-1000)' : font.weight}</div>
-                      <div>Style: {font.style || 'Normal'}</div>
-                      <div>Format: {font.format.toUpperCase()}</div>
+                      <div className="flex items-center">
+                        <span className="font-medium">Name: </span>
+                        <span className="ml-2">{font.family}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-medium">Category: </span>
+                        <span className="ml-2">{font.category || 'sans-serif'}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-medium">Weight: </span>
+                        <span className="ml-2">{font.is_variable ? 'Variable (1-1000)' : font.weight}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-medium">Format: </span>
+                        <span className="ml-2">{font.format?.toUpperCase() || 'TTF'}</span>
+                      </div>
                     </div>
                   </div>
                 )

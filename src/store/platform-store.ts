@@ -67,24 +67,56 @@ function isRawPlatform(obj: unknown): obj is RawPlatform {
   if (!obj || typeof obj !== 'object') return false;
   
   const p = obj as any;
-  return (
-    typeof p.id === 'string' &&
-    typeof p.brand_id === 'string' &&
-    typeof p.name === 'string' &&
-    (p.description === null || typeof p.description === 'string') &&
-    typeof p.units === 'object' &&
-    typeof p.units.typography === 'string' &&
-    typeof p.units.spacing === 'string' &&
-    typeof p.units.borderWidth === 'string' &&
-    typeof p.units.borderRadius === 'string' &&
-    typeof p.layout === 'object' &&
-    typeof p.layout.gridColumns === 'number' &&
-    typeof p.layout.gridGutter === 'number' &&
-    typeof p.layout.containerPadding === 'number' &&
-    (p.layout.icon === undefined || typeof p.layout.icon === 'string') &&
-    typeof p.created_at === 'string' &&
-    typeof p.updated_at === 'string'
-  );
+  
+  // Basic required attributes check
+  if (
+    typeof p.id !== 'string' ||
+    typeof p.brand_id !== 'string' ||
+    typeof p.name !== 'string' ||
+    (p.description !== null && typeof p.description !== 'string') ||
+    typeof p.created_at !== 'string' ||
+    typeof p.updated_at !== 'string'
+  ) {
+    console.warn('Platform missing basic required attributes:', p);
+    return false;
+  }
+  
+  // Units check with defaults if missing
+  if (!p.units || typeof p.units !== 'object') {
+    console.warn('Platform missing units, will add defaults:', p.id);
+    p.units = {
+      typography: 'rem',
+      spacing: 'rem',
+      borderWidth: 'px',
+      borderRadius: 'px'
+    };
+  } else {
+    // Ensure all unit properties exist
+    if (typeof p.units.typography !== 'string') p.units.typography = 'rem';
+    if (typeof p.units.spacing !== 'string') p.units.spacing = 'rem';
+    if (typeof p.units.borderWidth !== 'string') p.units.borderWidth = 'px';
+    if (typeof p.units.borderRadius !== 'string') p.units.borderRadius = 'px';
+  }
+  
+  // Layout check with defaults if missing
+  if (!p.layout || typeof p.layout !== 'object') {
+    console.warn('Platform missing layout, will add defaults:', p.id);
+    p.layout = {
+      gridColumns: 12,
+      gridGutter: 16,
+      containerPadding: 16
+    };
+  } else {
+    // Ensure all layout properties exist
+    if (typeof p.layout.gridColumns !== 'number') p.layout.gridColumns = 12;
+    if (typeof p.layout.gridGutter !== 'number') p.layout.gridGutter = 16;
+    if (typeof p.layout.containerPadding !== 'number') p.layout.containerPadding = 16;
+    if (p.layout.icon !== undefined && typeof p.layout.icon !== 'string') {
+      delete p.layout.icon; // Remove invalid icon
+    }
+  }
+  
+  return true;
 }
 
 // Convert raw platform to Platform type

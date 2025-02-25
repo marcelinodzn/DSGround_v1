@@ -7,6 +7,8 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { useBrandStore } from "@/store/brand-store"
 import { useFontStore } from "@/store/font-store"
+import { useTypographyStore } from "@/store/typography"
+import { usePlatformStore } from "@/store/platform-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { useRouter } from 'next/navigation'
@@ -39,11 +41,46 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
     const initPage = async () => {
       if (brandId) {
         try {
-          await Promise.all([
-            fetchBrand(brandId),
-            loadFonts(),
-            loadBrandTypography(brandId)
-          ])
+          // First load fonts, then brand, then typography settings
+          await loadFonts()
+          await fetchBrand(brandId)
+          await loadBrandTypography(brandId)
+          
+          // Preload font files to ensure they display correctly
+          const typography = useFontStore.getState().brandTypography[brandId]
+          if (typography) {
+            const fontIds = [
+              typography.primary_font_id,
+              typography.secondary_font_id, 
+              typography.tertiary_font_id
+            ].filter(Boolean)
+            
+            const allFonts = useFontStore.getState().fonts
+            
+            // Load each font that exists
+            for (const fontId of fontIds) {
+              const font = allFonts.find(f => f.id === fontId)
+              if (font?.file_url) {
+                try {
+                  console.log(`Loading font: ${font.family}`)
+                  const fontFace = new FontFace(
+                    font.family,
+                    `url(${font.file_url})`,
+                    {
+                      weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                      style: font.style || 'normal',
+                    }
+                  )
+                  
+                  const loadedFont = await fontFace.load()
+                  document.fonts.add(loadedFont)
+                  console.log(`Font loaded: ${font.family}`)
+                } catch (err) {
+                  console.error(`Error loading font ${font.family}:`, err)
+                }
+              }
+            }
+          }
         } catch (error) {
           console.error('Error initializing page:', error)
           toast.error('Failed to load typography settings')
@@ -69,9 +106,61 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
     if (!brandId) return
 
     try {
+      const effectiveFontId = fontId === 'none' ? null : fontId;
+      
+      // If a font is selected, preload it
+      if (effectiveFontId) {
+        const font = fonts.find(f => f.id === effectiveFontId)
+        if (font?.file_url) {
+          try {
+            console.log(`Loading font on selection: ${font.family}`)
+            const fontFace = new FontFace(
+              font.family,
+              `url(${font.file_url})`,
+              {
+                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                style: font.style || 'normal',
+              }
+            )
+            
+            // Load the font
+            const loadedFont = await fontFace.load()
+            document.fonts.add(loadedFont)
+          } catch (err) {
+            console.error(`Error loading font ${font?.family}:`, err)
+          }
+        }
+      }
+
+      // First update the local store to immediately reflect the change
+      const storeUpdatedTypography = {
+        ...brandTypography[brandId],
+        [`${type}_font_id`]: effectiveFontId
+      };
+      
+      useFontStore.setState(state => ({
+        brandTypography: {
+          ...state.brandTypography,
+          [brandId]: storeUpdatedTypography
+        }
+      }));
+      
+      // Also update the typography store directly to ensure preview updates
+      // This makes the preview update immediately without waiting for the server
+      const typographyStore = useTypographyStore.getState();
+      const platformStore = usePlatformStore.getState();
+      
+      if (platformStore.currentPlatform) {
+        typographyStore.updatePlatform(platformStore.currentPlatform, {
+          currentFontRole: type,
+          fontId: effectiveFontId
+        });
+      }
+
+      // Then save to server
       const updatedTypography = {
         brand_id: brandId,
-        [`${type}_font_id`]: fontId === 'none' ? null : fontId,
+        [`${type}_font_id`]: effectiveFontId,
         updated_at: new Date().toISOString()
       }
 

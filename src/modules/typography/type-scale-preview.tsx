@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useTypographyStore, TypeStyle } from "@/store/typography"
 import { usePlatformStore, Platform } from "@/store/platform-store"
 import { useBrandStore } from "@/store/brand-store"
@@ -52,6 +52,48 @@ function convertToUnit(pixels: number, unit: string, baseSize: number = 16) {
 
 // Create a dynamic version of ScaleView with SSR disabled
 const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize, fontFamily, typographyUnit }: ScaleViewProps) => {
+  // Load font if provided and ensure it's available for the preview
+  useEffect(() => {
+    if (fontFamily && typeof document !== 'undefined') {
+      // The fontFamily string should be in format: "Font Name, category"
+      const fontName = fontFamily.split(',')[0]?.replace(/["']/g, '');
+      if (fontName) {
+        console.log(`Using font in preview: ${fontName}`);
+        
+        // Forcibly load the font to ensure it's available
+        document.fonts.ready.then(() => {
+          console.log(`Fonts ready, applying: ${fontName}`);
+          
+          // Add a style tag with @font-face to ensure the font is prioritized
+          const styleTag = document.createElement('style');
+          styleTag.textContent = `
+            .font-preview-container {
+              font-family: "${fontName}", var(--fallback-fonts);
+            }
+          `;
+          document.head.appendChild(styleTag);
+          
+          // Force browser to recognize font change
+          setTimeout(() => {
+            // Find and update all preview containers
+            document.querySelectorAll('.font-preview-container').forEach(element => {
+              // Apply inline style directly to ensure it overrides any cascading styles
+              (element as HTMLElement).style.fontFamily = `"${fontName}", var(--fallback-fonts)`;
+              element.classList.add('font-loaded');
+              
+              // Force a repaint
+              const currentDisplay = (element as HTMLElement).style.display;
+              (element as HTMLElement).style.display = 'none';
+              void element.offsetHeight; // Trigger a reflow
+              (element as HTMLElement).style.display = currentDisplay;
+            });
+            console.log(`Applied font to all preview containers: ${fontName}`);
+          }, 100);
+        });
+      }
+    }
+  }, [fontFamily]);
+
   return (
     <Table>
       <TableHeader>
@@ -66,8 +108,9 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize, fontFa
           <TableRow key={item.label}>
             <TableCell className="font-medium py-6">{item.label}</TableCell>
             <TableCell className="py-6">
-              <div className="min-w-0">
+              <div className="min-w-0 font-preview-container">
                 <div 
+                  className="font-preview-text overflow-hidden" 
                   style={{ 
                     fontSize: `${item.size}px`,
                     lineHeight: 1.2,
@@ -76,11 +119,17 @@ const ScaleView = dynamic(() => Promise.resolve(({ scaleValues, baseSize, fontFa
                     whiteSpace: 'normal',
                     minHeight: `${Math.max(item.size * 1.2, 48)}px`,
                     display: 'flex',
-                    alignItems: 'center',
-                    fontFamily: fontFamily
+                    alignItems: 'center'
                   }} 
                 >
-                  The quick brown fox jumps over the lazy dog
+                  <span 
+                    style={{
+                      fontFamily: fontFamily ? `${fontFamily} !important` : 'inherit'
+                    }}
+                    data-font-name={fontFamily?.split(',')[0]?.replace(/["']/g, '')}
+                  >
+                    The quick brown fox jumps over the lazy dog
+                  </span>
                 </div>
               </div>
             </TableCell>
@@ -125,39 +174,95 @@ const getFontCategoryFallback = (category: string) => {
 function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   const { platforms, currentPlatform } = useTypographyStore()
   const { platforms: platformSettings } = usePlatformStore()
-  const { fonts } = useFontStore()
+  const { fonts, brandTypography } = useFontStore()
+  const { currentBrand } = useBrandStore()
   
-  // Get the current platform settings
+  // Get the current platform and font information
   const currentPlatformSettings = platformSettings.find(p => p.id === currentPlatform)
   const typographyUnit = currentPlatformSettings?.units.typography || 'rem'
   
-  // Load fonts when component mounts or typeStyles change
+  // Get current typography and platform for font selection
+  const currentTypography = useMemo(() => 
+    currentBrand?.id ? brandTypography[currentBrand.id] : null
+  , [currentBrand?.id, brandTypography])
+  
+  const platform = useMemo(() => 
+    platforms.find(p => p.id === currentPlatform)
+  , [platforms, currentPlatform])
+  
+  // Load all relevant fonts when component mounts
   useEffect(() => {
-    typeStyles.forEach(async (style) => {
-      const font = fonts.find(f => f.family === style.fontFamily)
-      if (!font?.file_url) return
-
-      try {
-        const fontFace = new FontFace(
-          style.fontFamily,
-          `url(${font.file_url})`,
-          {
-            weight: font.is_variable ? '1 1000' : font.weight.toString(),
-            style: font.style || 'normal',
-          }
-        )
-        const loadedFont = await fontFace.load()
-        document.fonts.add(loadedFont)
-      } catch (error) {
-        console.error('Error loading font:', error)
+    const loadFonts = async () => {
+      // First load style-specific fonts
+      const styleFontFamilies = typeStyles.map(style => style.fontFamily);
+      
+      // Then also load brand fonts if we have a current brand
+      let brandFonts: string[] = [];
+      if (currentBrand?.id && brandTypography[currentBrand.id]) {
+        const typography = brandTypography[currentBrand.id];
+        const fontIds = [
+          typography.primary_font_id, 
+          typography.secondary_font_id, 
+          typography.tertiary_font_id
+        ].filter(Boolean);
+        
+        // Find font families for each font ID
+        brandFonts = fontIds.map(id => {
+          const font = fonts.find(f => f.id === id);
+          return font ? font.family : '';
+        }).filter(Boolean);
       }
-    })
-  }, [typeStyles, fonts])
+      
+      // Combine all unique font families
+      const allFontFamilies = [...new Set([...styleFontFamilies, ...brandFonts])];
+      
+      // Load each font that exists
+      for (const fontFamily of allFontFamilies) {
+        const font = fonts.find(f => f.family === fontFamily);
+        if (!font?.file_url) continue;
+        
+        try {
+          console.log(`Loading font for styles: ${font.family}`);
+          const fontFace = new FontFace(
+            font.family,
+            `url(${font.file_url})`,
+            {
+              weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+              style: font.style || 'normal',
+            }
+          );
+          
+          const loadedFont = await fontFace.load();
+          document.fonts.add(loadedFont);
+          console.log(`Font loaded successfully: ${font.family}`);
+        } catch (error) {
+          console.error(`Error loading font ${font.family}:`, error);
+        }
+      }
+    };
+    
+    loadFonts();
+  }, [typeStyles, fonts, currentBrand?.id, brandTypography])
   
   return (
     <div className="space-y-8">
       {typeStyles.map((style, index) => {
-        const font = fonts.find(f => f.family === style.fontFamily)
+        // First try to find the style font
+        let font = fonts.find(f => f.family === style.fontFamily);
+        
+        // If not found, and we have current typography, try to use the current font role
+        if (!font && currentBrand?.id && currentTypography && platform?.currentFontRole) {
+          const fontId = currentTypography[`${platform.currentFontRole}_font_id`];
+          const roleFontMatch = fonts.find(f => f.id === fontId);
+          if (roleFontMatch) {
+            font = roleFontMatch;
+            console.log(`Using current font role (${platform.currentFontRole}) font instead of style font:`, font.family);
+          }
+        }
+        
+        // Calculate fallback fonts
+        const fallbackFonts = getFontCategoryFallback(font?.category || 'sans-serif');
+        const fontFamilyValue = font ? `"${font.family}", ${fallbackFonts}` : `system-ui, ${fallbackFonts}`;
 
         return (
           <div key={index} className="space-y-4">
@@ -168,7 +273,7 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-muted-foreground">
-                    {font?.family}
+                    {font?.family || 'System Font'}
                   </div>
                   {font?.is_variable && (
                     <Badge variant="secondary" className="text-[10px] h-4">
@@ -185,15 +290,16 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
               </div>
             </div>
             <div 
+              className="font-preview-container break-words"
               style={{ 
-                fontFamily: `"${font?.family}", ${getFontCategoryFallback(font?.category || 'sans-serif')}`,
+                fontFamily: `${fontFamilyValue} !important`,
                 fontSize: `${style.scaleStep}px`,
                 fontWeight: style.fontWeight,
                 lineHeight: style.lineHeight,
                 letterSpacing: style.letterSpacing,
                 fontVariationSettings: font?.is_variable ? `'wght' ${style.fontWeight}` : undefined,
               }}
-              className="break-words"
+              data-font-name={font?.family}
             >
               The quick brown fox jumps over the lazy dog
             </div>
@@ -265,18 +371,45 @@ export function TypeScalePreview() {
   const fontFamily = useMemo(() => {
     if (!currentTypography || !platform?.currentFontRole) return undefined
     const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
+    if (!fontId) return undefined
+    
     const font = fonts.find(f => f.id === fontId)
-    return font ? `"${font.family}", ${font.category}` : undefined
+    
+    // Define fallback fonts based on category
+    let fallbackFonts = 'sans-serif';
+    if (font?.category) {
+      switch(font.category) {
+        case 'serif': fallbackFonts = 'Georgia, Times, serif'; break;
+        case 'monospace': fallbackFonts = 'Consolas, "Courier New", monospace'; break;
+        case 'display': fallbackFonts = 'Impact, fantasy'; break;
+        case 'handwriting': fallbackFonts = 'cursive'; break;
+        default: fallbackFonts = 'Arial, Helvetica, sans-serif';
+      }
+    }
+    
+    // Add CSS variable for fallbacks
+    if (typeof document !== 'undefined' && font) {
+      const styleEl = document.createElement('style');
+      styleEl.textContent = `:root { --fallback-fonts: ${fallbackFonts}; }`;
+      document.head.appendChild(styleEl);
+      
+      // Set the font family on the document root to ensure it loads
+      document.documentElement.style.setProperty('--current-font', `"${font.family}"`);
+    }
+    
+    return font ? `"${font.family}", ${fallbackFonts}` : undefined
   }, [currentTypography, platform?.currentFontRole, fonts])
 
   const currentFontInfo = useMemo(() => {
     if (!currentTypography || !platform?.currentFontRole) return null
     const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
+    if (!fontId) return null
+    
     const font = fonts.find(f => f.id === fontId)
     return font ? {
       name: font.family,
       role: platform.currentFontRole,
-      category: font.category
+      category: font.category || 'sans-serif'
     } : null
   }, [currentTypography, platform?.currentFontRole, fonts])
 
@@ -347,19 +480,7 @@ export function TypeScalePreview() {
 
   return (
     <div className="relative w-full">
-      {currentFontInfo && (
-        <div className="mb-4 text-sm">
-          <span className="font-medium">Current Font: </span>
-          <span>{currentFontInfo.name}</span>
-          <span className="text-muted-foreground ml-2">
-            ({currentFontInfo.role} font - {currentFontInfo.category})
-          </span>
-        </div>
-      )}
-      
-      <div className="relative w-full" style={{ 
-        fontFamily: fontFamily || 'inherit',
-      }}>
+      <div className="relative w-full">
         <div className="-mt-[25px] relative w-screen -ml-[calc(50vw-50%)]">
           <Separator className="w-screen" />
         </div>
@@ -371,6 +492,14 @@ export function TypeScalePreview() {
             Scale Ratio: {scale.ratio} • 
             Steps Up: {scale.stepsUp} • 
             Steps Down: {scale.stepsDown}
+            {platform?.currentFontRole && fontFamily && (
+              <>
+                <span className="ml-2">•</span>
+                <span className="ml-2 text-xs border px-2 py-1 rounded bg-gray-50 dark:bg-gray-800">
+                  Using <span className="font-medium">{platform.currentFontRole}</span> font: {fontFamily.split(',')[0].replace(/['"]/g, '')}
+                </span>
+              </>
+            )}
           </div>
           <AnimatedTabs
             tabs={viewTabs}
