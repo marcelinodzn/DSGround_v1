@@ -89,7 +89,7 @@ export const useFontStore = create<FontState>((set, get) => ({
   createFamily: async (family: Partial<FontFamily>) => {
     try {
       // Create basic family first with required fields only
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('font_families')
         .insert({
           id: family.id,
@@ -105,7 +105,7 @@ export const useFontStore = create<FontState>((set, get) => ({
       if (error) {
         if (error.code === '23505') {
           // Handle duplicate family name
-          const { data: existingFamily } = await supabaseClient
+          const { data: existingFamily } = await supabase
             .from('font_families')
             .select()
             .eq('name', family.name)
@@ -118,7 +118,7 @@ export const useFontStore = create<FontState>((set, get) => ({
 
       // Try to update with additional properties
       try {
-        const { error: updateError } = await supabaseClient
+        const { error: updateError } = await supabase
           .from('font_families')
           .update({
             is_variable: family.is_variable || false,

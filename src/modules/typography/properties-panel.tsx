@@ -312,47 +312,26 @@ export function PropertiesPanel() {
   }, [platforms, typographyPlatforms, activePlatform, initializePlatform, setCurrentPlatform])
 
   useEffect(() => {
-    const initializeData = async () => {
-      try {
+    // Add a flag to prevent multiple loads
+    const loadFontsOnce = async () => {
+      // Use a static flag to prevent multiple loads
+      if (!(window as any).__fontsLoaded) {
         console.log('Loading fonts from properties panel...');
         await loadFonts();
+        (window as any).__fontsLoaded = true;
         
         if (currentBrand?.id) {
           console.log('Loading brand typography for brand:', currentBrand.id);
           await loadBrandTypography(currentBrand.id);
-          
-          // Force-load fonts again if fonts array is empty
-          const currentFonts = useFontStore.getState().fonts;
-          if (currentFonts.length === 0) {
-            console.warn('Fonts array is empty, attempting to reload...');
-            setTimeout(() => loadFonts(), 1000);
-          }
         }
-      } catch (error) {
-        console.error('Error loading fonts and typography:', error);
       }
     };
 
-    initializeData();
+    loadFontsOnce();
     
-    // Add a delayed check to ensure fonts are loaded
-    const fontsCheck = setTimeout(() => {
-      const currentFonts = useFontStore.getState().fonts;
-      console.log(`Fonts check after delay: ${currentFonts.length} fonts loaded`);
-      
-      if (currentFonts.length === 0) {
-        console.warn('Fonts still not loaded after delay, forcing reload...');
-        loadFonts();
-      }
-    }, 2000);
+    // Remove any delayed checks or other font loading triggers
     
-    // Debug logs
-    console.log('Current Brand:', currentBrand);
-    console.log('Brand Typography:', brandTypography);
-    console.log('Fonts:', fonts);
-    
-    return () => clearTimeout(fontsCheck);
-  }, [currentBrand?.id, loadFonts, loadBrandTypography])
+  }, [currentBrand?.id]); // Remove loadFonts and loadBrandTypography from dependencies
 
   useEffect(() => {
     if (activePlatform && !typographyPlatforms.find(p => p.id === activePlatform)) {
@@ -372,12 +351,11 @@ export function PropertiesPanel() {
   }, [currentSettings?.currentFontRole])
   
   useEffect(() => {
-    console.log('Current Typography:', currentTypography);
-    console.log('Primary Font Name:', primaryFontName);
-    console.log('Secondary Font Name:', secondaryFontName);
-    console.log('Tertiary Font Name:', tertiaryFontName);
-    console.log('Available Fonts:', fonts);
-  }, [currentTypography, primaryFontName, secondaryFontName, tertiaryFontName, fonts]);
+    // Only log once when fonts are loaded
+    if (fonts.length > 0) {
+      console.log('Fonts loaded:', fonts.length);
+    }
+  }, [fonts.length]); // Only depend on the length, not the entire array
 
   if (!currentSettings) {
     return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
