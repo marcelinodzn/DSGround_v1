@@ -122,19 +122,12 @@ const defaultTypeStyles: TypeStyle[] = [
   }
 ]
 
-const defaultUnits = {
-  typography: 'px',
-  spacing: 'px',
-  dimensions: 'px'
-}
-
 const initialPlatforms: Platform[] = [
   {
     id: 'web',
     name: 'Web',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 50,
       visualAcuity: 1,
@@ -151,7 +144,6 @@ const initialPlatforms: Platform[] = [
     name: 'Mobile',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 30,
       visualAcuity: 1,
@@ -168,7 +160,6 @@ const initialPlatforms: Platform[] = [
     name: 'Outdoor',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 300,
       visualAcuity: 1,
@@ -185,7 +176,6 @@ const initialPlatforms: Platform[] = [
     name: 'Print',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 40,
       visualAcuity: 1,
@@ -202,7 +192,6 @@ const initialPlatforms: Platform[] = [
     name: 'In-store',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 100,
       visualAcuity: 1,
@@ -219,7 +208,6 @@ const initialPlatforms: Platform[] = [
     name: 'VR',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 20,
       visualAcuity: 1,
@@ -236,7 +224,6 @@ const initialPlatforms: Platform[] = [
     name: 'TV',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
-    units: { ...defaultUnits },
     distanceScale: {
       viewingDistance: 250,
       visualAcuity: 1,
@@ -276,18 +263,12 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
 
     const defaultSettings = {
       id: platformId,
-      name: platformData.name || 'New Platform',
       scaleMethod: 'modular' as ScaleMethod,
       scale: {
         baseSize: 16,
         ratio: 1.2,
         stepsUp: 3,
         stepsDown: 2
-      },
-      units: {
-        typography: 'px',
-        spacing: 'px',
-        dimensions: 'px'
       },
       distanceScale: {
         viewingDistance: 400,

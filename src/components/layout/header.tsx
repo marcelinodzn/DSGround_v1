@@ -1,97 +1,72 @@
 'use client'
 
-import { useEffect } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useBrandStore } from "@/store/brand-store"
+import { Button } from "@/components/ui/button"
+import { usePathname, useRouter } from "next/navigation"
+import { FileText } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useBrandStore } from "@/store/brand-store"
 
-export function Header() {
+export function Header({ 
+  onDocumentationClick 
+}: { 
+  onDocumentationClick?: () => void 
+}) {
   const pathname = usePathname()
-  const { currentBrand, brands, fetchBrands, setCurrentBrand } = useBrandStore()
-  
-  useEffect(() => {
-    fetchBrands()
-  }, [fetchBrands])
-  
-  const handleBrandChange = (brandId: string) => {
-    const brand = brands.find(b => b.id === brandId)
-    if (brand) {
-      setCurrentBrand(brand)
+  const router = useRouter()
+  const isTypographyPage = pathname === "/foundations/typography"
+  const { brands, isLoading, currentBrand, setCurrentBrand } = useBrandStore()
+
+  const handleBrandChange = async (brandId: string) => {
+    try {
+      await setCurrentBrand(brandId)
+      if (pathname.includes('/brands/')) {
+        const newPath = pathname.replace(/\/brands\/[^\/]+/, `/brands/${brandId}`)
+        router.push(newPath)
+      }
+    } catch (error) {
+      console.error('Error changing brand:', error)
     }
   }
-  
-  // Skip brand selector on certain pages
-  const shouldShowBrandSelector = !pathname.includes('/login') && 
-                                 !pathname.includes('/register') &&
-                                 !pathname.includes('/brands/new')
-  
+
   return (
-    <header className="border-b">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="font-semibold text-lg">
-            Design System
-          </Link>
-          
-          <nav className="hidden md:flex items-center gap-6">
-            <Link 
-              href="/brands" 
-              className={`text-sm ${pathname.includes('/brands') ? 'font-medium' : ''}`}
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="flex items-center space-x-4 flex-1">
+          <a className="flex items-center space-x-2" href="/">
+            <span className="font-bold sm:inline-block">
+              Design System
+            </span>
+          </a>
+          {!isLoading && brands.length > 0 && (
+            <Select
+              value={currentBrand?.id}
+              onValueChange={handleBrandChange}
             >
-              Brands
-            </Link>
-            <Link 
-              href="/platforms" 
-              className={`text-sm ${pathname.includes('/platforms') ? 'font-medium' : ''}`}
-            >
-              Platforms
-            </Link>
-            <Link 
-              href="/foundations/typography" 
-              className={`text-sm ${pathname.includes('/foundations/typography') ? 'font-medium' : ''}`}
-            >
-              Typography
-            </Link>
-            <Link 
-              href="/foundations/colors" 
-              className={`text-sm ${pathname.includes('/foundations/colors') ? 'font-medium' : ''}`}
-            >
-              Colors
-            </Link>
-          </nav>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select brand" />
+              </SelectTrigger>
+              <SelectContent>
+                {brands.map((brand) => (
+                  <SelectItem key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-        
-        {shouldShowBrandSelector && (
-          <div className="flex items-center gap-4">
-            <div className="w-48">
-              {brands.length > 0 ? (
-                <Select 
-                  value={currentBrand?.id || ""} 
-                  onValueChange={handleBrandChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map(brand => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Link 
-                  href="/brands/new"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Create a brand
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="flex items-center justify-end space-x-2">
+          {isTypographyPage && onDocumentationClick && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDocumentationClick}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Documentation
+            </Button>
+          )}
+        </div>
       </div>
     </header>
   )
