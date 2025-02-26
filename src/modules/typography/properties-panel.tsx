@@ -357,6 +357,27 @@ export function PropertiesPanel() {
     }
   }, [fonts.length]); // Only depend on the length, not the entire array
 
+  // Add a useEffect to ensure platforms are loaded and available for selection
+  useEffect(() => {
+    // Make sure platforms are loaded for the token view
+    if (platforms.length > 0 && !activePlatform) {
+      // Set the first platform as active if none is selected
+      setCurrentPlatform(platforms[0].id);
+      
+      // Also initialize typography for this platform if needed
+      if (!typographyPlatforms.find(p => p.id === platforms[0].id)) {
+        initializePlatform(platforms[0].id);
+      }
+    }
+  }, [platforms, activePlatform, typographyPlatforms, setCurrentPlatform, initializePlatform]);
+
+  // Add debug logging to help diagnose platform issues
+  useEffect(() => {
+    console.log('Available platforms:', platforms);
+    console.log('Current active platform:', activePlatform);
+    console.log('Platform settings:', platformSettings);
+  }, [platforms, activePlatform, platformSettings]);
+
   if (!currentSettings) {
     return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
   }
@@ -855,18 +876,14 @@ ${recommendation}`
           onValueChange={setCurrentPlatform}
         >
           <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 [&>svg:last-child]:hidden text-left">
-            <SelectValue>
-              {
-                formatText(
-                  platformSettings.find(p => p.id === activePlatform)?.name || "Select platform"
-                )
-              }
+            <SelectValue placeholder="Select platform">
+              {platformSettings.find(p => p.id === activePlatform)?.name || "Select platform"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {platforms.map((platform) => (
-              <SelectItem key={platform.id} value={platform.id}>
-                {platform.name}
+            {platforms.map((platform, index) => (
+              <SelectItem key={`platform-${platform.id}-${index}`} value={platform.id}>
+                {platform.name || `Platform ${index + 1}`}
               </SelectItem>
             ))}
           </SelectContent>

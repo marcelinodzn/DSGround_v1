@@ -548,9 +548,9 @@ export const typography = {
                               <SelectValue placeholder="Select platform" />
                             </SelectTrigger>
                             <SelectContent>
-                              {platforms.map(platform => (
-                                <SelectItem key={platform.id} value={platform.id}>
-                                  {platform.name}
+                              {platforms.map((platform, index) => (
+                                <SelectItem key={`brand-platform-${index}`} value={platform.id}>
+                                  {platform.name || "Unnamed Platform"}
                                 </SelectItem>
                               ))}
                             </SelectContent>
