@@ -20,6 +20,7 @@ export default function TokensPage() {
         tabs={tokenTabs}
         defaultTab="typography"
         onChange={setActiveTab}
+        layoutId="tokens-tabs"
       />
       
       {/* Content sections */}
