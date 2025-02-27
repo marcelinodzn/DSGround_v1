@@ -293,7 +293,7 @@ export const useTypographyStore = create(
           return
         }
 
-        const defaultSettings = {
+        const defaultSettings: Platform = {
           id: platformId,
           name: platformData.name,
           scaleMethod: 'modular' as ScaleMethod,
@@ -354,12 +354,55 @@ export const useTypographyStore = create(
         
         const { baseSize, ratio, stepsUp, stepsDown } = platform.scale
         
-        // Create an array of scale steps
+        // Additional calculations for distance-based scaling
+        if (platform.scaleMethod === 'distance') {
+          const distanceAdjustedBaseSize = calculateDistanceBasedSize(
+            platform.distanceScale.viewingDistance,
+            platform.distanceScale.visualAcuity,
+            platform.distanceScale.meanLengthRatio,
+            platform.distanceScale.textType,
+            platform.distanceScale.lighting,
+            platform.distanceScale.ppi
+          )
+          
+          // Create an array of scale steps using the distance-adjusted base size
+          const steps: { size: number; ratio: number; label: string }[] = []
+          
+          // Calculate steps below base
+          for (let i = stepsDown; i > 0; i--) {
+            const size = distanceAdjustedBaseSize / Math.pow(ratio, i)
+            steps.push({
+              size,
+              ratio,
+              label: `f-${i}`
+            })
+          }
+          
+          // Add base size (f0)
+          steps.push({
+            size: distanceAdjustedBaseSize,
+            ratio,
+            label: 'f0'
+          })
+          
+          // Calculate steps above base
+          for (let i = 1; i <= stepsUp; i++) {
+            const size = distanceAdjustedBaseSize * Math.pow(ratio, i)
+            steps.push({
+              size,
+              ratio,
+              label: `f${i}`
+            })
+          }
+          
+          return steps
+        }
+        
+        // For non-distance methods, use the original calculation
         const steps: { size: number; ratio: number; label: string }[] = []
         
         // Calculate steps below base
         for (let i = stepsDown; i > 0; i--) {
-          // For steps below base, we divide by the ratio
           const size = baseSize / Math.pow(ratio, i)
           steps.push({
             size,
@@ -377,32 +420,11 @@ export const useTypographyStore = create(
         
         // Calculate steps above base
         for (let i = 1; i <= stepsUp; i++) {
-          // For steps above base, we multiply by the ratio
           const size = baseSize * Math.pow(ratio, i)
           steps.push({
             size,
             ratio,
             label: `f${i}`
-          })
-        }
-        
-        // Additional calculations for distance-based scaling
-        if (platform.scaleMethod === 'distance') {
-          return steps.map(step => {
-            const distanceAdjustedSize = calculateDistanceBasedSize({
-              fontSizePx: step.size,
-              viewingDistanceCm: platform.distanceScale.viewingDistance,
-              visualAcuity: platform.distanceScale.visualAcuity,
-              meanLetterWidthRatio: platform.distanceScale.meanLengthRatio,
-              textType: platform.distanceScale.textType,
-              lighting: platform.distanceScale.lighting,
-              ppi: platform.distanceScale.ppi
-            })
-            
-            return {
-              ...step,
-              size: distanceAdjustedSize
-            }
           })
         }
         
@@ -526,10 +548,10 @@ export const useTypographyStore = create(
           }
           
           // Update local state
-          set((state: TypographyState) => ({
+          set((state: TypographyState): TypographyState => ({
             ...state,
             platforms: state.platforms.map((p: Platform) => 
-              p.id === platformId ? { ...p, ...settings } : p
+              p.id === platformId ? { ...p, ...settings } as Platform : p
             ),
             isLoading: false,
             error: null
@@ -596,22 +618,22 @@ export const useTypographyStore = create(
             // Map database format to our state format
             const settings = {
               scaleMethod: data.scale_method as ScaleMethod,
-              scale: data.scale_config,
+              scale: data.scale_config || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
               distanceScale: {
-                viewingDistance: data.distance_scale?.viewing_distance || 0,
-                visualAcuity: data.distance_scale?.visual_acuity || 0,
-                meanLengthRatio: data.distance_scale?.mean_length_ratio || 0,
-                textType: (data.distance_scale?.text_type as TextType) || 'continuous',
-                lighting: (data.distance_scale?.lighting as LightingCondition) || 'good',
-                ppi: data.distance_scale?.ppi || 0
+                viewingDistance: data.distance_scale?.viewing_distance ?? 400,
+                visualAcuity: data.distance_scale?.visual_acuity ?? 1,
+                meanLengthRatio: data.distance_scale?.mean_length_ratio ?? 5,
+                textType: (data.distance_scale?.text_type as TextType) ?? 'continuous',
+                lighting: (data.distance_scale?.lighting as LightingCondition) ?? 'good',
+                ppi: data.distance_scale?.ppi ?? 96
               },
-              aiScale: data.ai_settings
+              aiScale: data.ai_settings || undefined
             }
             
             set((state: TypographyState): TypographyState => ({
               ...state,
               platforms: state.platforms.map((p: Platform) => 
-                p.id === platformId ? { ...p, ...settings } : p
+                p.id === platformId ? { ...p, ...settings } as Platform : p
               ),
               isLoading: false,
               error: null

@@ -4,9 +4,11 @@ import * as React from 'react'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { AuthProvider } from '@/providers/auth-provider'
 
+type Attribute = 'class' | 'data-theme' | 'data-mode'
+
 interface ProvidersProps {
   children: React.ReactNode
-  attribute?: string
+  attribute?: Attribute | Attribute[]
   defaultTheme?: string
   enableSystem?: boolean
   disableTransitionOnChange?: boolean

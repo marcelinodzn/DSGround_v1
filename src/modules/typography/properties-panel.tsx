@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTypographyStore, ScaleMethod, Platform, TypeStyle } from "@/store/typography"
+import { useTypographyStore, ScaleMethod, Platform, TypeStyle, TypographyState } from "@/store/typography"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -221,7 +221,7 @@ export function PropertiesPanel() {
     copyTypeStylesToAllPlatforms,
     platforms: typographyPlatforms,
     initializePlatform
-  } = useTypographyStore()
+  } = useTypographyStore((state): TypographyState => state as unknown as TypographyState)
   const { platforms: platformSettings } = usePlatformStore()
   const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
   const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
@@ -416,9 +416,9 @@ export function PropertiesPanel() {
 
     // Update all type styles to reflect new scale values
     if (currentSettings.typeStyles) {
-      const updatedTypeStyles = currentSettings.typeStyles.map(style => {
+      const updatedTypeStyles = currentSettings.typeStyles.map((style: TypeStyle) => {
         const scaleValues = getScaleValues(activePlatform)
-        const matchingScale = scaleValues.find(s => s.label === style.scaleStep)
+        const matchingScale = scaleValues.find((s: { label: string }) => s.label === style.scaleStep)
         if (matchingScale) {
           return {
             ...style,
@@ -473,12 +473,12 @@ export function PropertiesPanel() {
     if (!activePlatform || !currentSettings) return;
 
     // Create a new array of type styles
-    const updatedTypeStyles = currentSettings.typeStyles.map(style => {
+    const updatedTypeStyles = currentSettings.typeStyles.map((style: TypeStyle) => {
       if (style.id === id) {
         // If we're updating the scale step
         if ('scaleStep' in updates) {
           const scaleValues = getScaleValues();
-          const scaleValue = scaleValues.find(s => s.label === updates.scaleStep);
+          const scaleValue = scaleValues.find((s: { label: string }) => s.label === updates.scaleStep);
           
           if (scaleValue) {
             return {
@@ -500,24 +500,33 @@ export function PropertiesPanel() {
 
     // Update the platform with all changes
     updatePlatform(activePlatform, {
-      typeStyles: updatedTypeStyles
+      typeStyles: updatedTypeStyles as TypeStyle[]
     });
   };
 
-  const getScaleValues = () => {
-    return useTypographyStore.getState().getScaleValues(activePlatform)
+  const getScaleValues = (platformId?: string) => {
+    const platform = platformId 
+      ? typographyPlatforms.find(p => p.id === platformId) 
+      : currentSettings;
+      
+    if (!platform) return [];
+    return useTypographyStore.getState().getScaleValues(platformId || activePlatform)
   }
 
   const handleAddTypeStyle = () => {
+    if (!activePlatform || !currentSettings) return;
+    
+    // Create a new type style with default values
     const newStyle: TypeStyle = {
       id: crypto.randomUUID(),
-      name: 'New Style',
-      scaleStep: 'f0',
+      name: `Style ${currentSettings.typeStyles.length + 1}`,
+      scaleStep: 'base',
+      fontFamily: currentSettings.typeStyles[0]?.fontFamily || 'sans-serif',
       fontWeight: 400,
       lineHeight: 1.5,
-      opticalSize: 16,
-      letterSpacing: 0
-    }
+      letterSpacing: 0,
+      opticalSize: 16
+    };
     
     updatePlatform(activePlatform, {
       typeStyles: [...(currentSettings.typeStyles || []), newStyle]
@@ -1049,6 +1058,35 @@ ${recommendation}`
 
             {currentSettings.scaleMethod === 'distance' && (
               <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Scale Type</Label>
+                  <Select
+                    value={currentSettings.scale.ratio.toString()}
+                    onValueChange={(value) => {
+                      updatePlatform(activePlatform, {
+                        scale: {
+                          ...currentSettings.scale,
+                          ratio: parseFloat(value)
+                        }
+                      })
+                    }}
+                  >
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                      <SelectValue placeholder="Select scale type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
+                      <SelectItem value="1.125">Major Second (1.125)</SelectItem>
+                      <SelectItem value="1.2">Minor Third (1.2)</SelectItem>
+                      <SelectItem value="1.25">Major Third (1.25)</SelectItem>
+                      <SelectItem value="1.333">Perfect Fourth (1.333)</SelectItem>
+                      <SelectItem value="1.414">Augmented Fourth (1.414)</SelectItem>
+                      <SelectItem value="1.5">Perfect Fifth (1.5)</SelectItem>
+                      <SelectItem value="1.618">Golden Ratio (1.618)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-xs">
                     Base Size ({currentPlatformSettings?.units.typography || 'px'})
@@ -1740,38 +1778,6 @@ function TypeScaleTab({ platform }: { platform: Platform }) {
   )
 }
 
-function ModularScaleTab({
-  platform,
-  currentSettings,
-  updatePlatform,
-}: {
-  platform: Platform;
-  currentSettings: any;
-  updatePlatform: (id: string, updates: Partial<Platform>) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
-        <Input
-          type="number"
-          value={platform.scale.baseSize}
-          onChange={(e) => {
-            updatePlatform(platform.id, {
-              scale: {
-                ...platform.scale,
-                baseSize: Number(e.target.value)
-              }
-            })
-          }}
-          className="text-xs h-8"
-        />
-      </div>
-      {/* ... rest of the component */}
-    </div>
-  )
-}
-
 function DistanceBasedTab({
   platform,
   currentSettings,
@@ -1795,6 +1801,45 @@ function DistanceBasedTab({
 
   return (
     <div className="space-y-4">
+      <div>
+        <RadioGroup
+          value={platform.scaleMethod} 
+          onValueChange={(value) => updatePlatform(platform.id, { scaleMethod: value as ScaleMethod })}
+          className="grid grid-cols-3 gap-4"
+        >
+          <div>
+            <RadioGroupItem value="modular" id="modular-distance" className="peer sr-only" />
+            <Label
+              htmlFor="modular-distance"
+              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+            >
+              <LineChart className="h-6 w-6" />
+              <div className="mt-2 text-xs">Modular</div>
+            </Label>
+          </div>
+          <div>
+            <RadioGroupItem value="distance" id="distance-distance" className="peer sr-only" />
+            <Label
+              htmlFor="distance-distance"
+              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+            >
+              <ScanEye className="h-6 w-6" />
+              <div className="mt-2 text-xs">Distance</div>
+            </Label>
+          </div>
+          <div>
+            <RadioGroupItem value="ai" id="ai-distance" className="peer sr-only" />
+            <Label
+              htmlFor="ai-distance"
+              className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+            >
+              <Sparkles className="h-6 w-6" />
+              <div className="mt-2 text-xs">AI</div>
+            </Label>
+          </div>
+        </RadioGroup>
+      </div>
+
       <div>
         <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
         <Input
@@ -1827,6 +1872,38 @@ function DistanceBasedTab({
         />
       </div>
       {/* ... rest of the distance inputs ... */}
+    </div>
+  )
+}
+
+function ModularScaleTab({
+  platform,
+  currentSettings,
+  updatePlatform,
+}: {
+  platform: Platform;
+  currentSettings: any;
+  updatePlatform: (id: string, updates: Partial<Platform>) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
+        <Input
+          type="number"
+          value={platform.scale.baseSize}
+          onChange={(e) => {
+            updatePlatform(platform.id, {
+              scale: {
+                ...platform.scale,
+                baseSize: Number(e.target.value)
+              }
+            })
+          }}
+          className="text-xs h-8"
+        />
+      </div>
+      {/* ... rest of the component */}
     </div>
   )
 }
