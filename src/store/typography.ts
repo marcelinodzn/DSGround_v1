@@ -128,6 +128,11 @@ const initialPlatforms: Platform[] = [
     name: 'Web',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
+    units: {
+      typography: 'rem',
+      spacing: 'rem',
+      dimensions: 'rem'
+    },
     distanceScale: {
       viewingDistance: 50,
       visualAcuity: 1,
@@ -144,6 +149,11 @@ const initialPlatforms: Platform[] = [
     name: 'Mobile',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
+    units: {
+      typography: 'sp',
+      spacing: 'dp',
+      dimensions: 'dp'
+    },
     distanceScale: {
       viewingDistance: 30,
       visualAcuity: 1,
@@ -160,6 +170,11 @@ const initialPlatforms: Platform[] = [
     name: 'Outdoor',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
+    units: {
+      typography: 'px',
+      spacing: 'px',
+      dimensions: 'px'
+    },
     distanceScale: {
       viewingDistance: 300,
       visualAcuity: 1,
@@ -176,6 +191,11 @@ const initialPlatforms: Platform[] = [
     name: 'Print',
     scaleMethod: 'modular',
     scale: { ...defaultScale },
+    units: {
+      typography: 'pt',
+      spacing: 'mm',
+      dimensions: 'mm'
+    },
     distanceScale: {
       viewingDistance: 40,
       visualAcuity: 1,
@@ -192,6 +212,11 @@ const initialPlatforms: Platform[] = [
     name: 'In-store',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
+    units: {
+      typography: 'px',
+      spacing: 'px',
+      dimensions: 'px'
+    },
     distanceScale: {
       viewingDistance: 100,
       visualAcuity: 1,
@@ -208,6 +233,11 @@ const initialPlatforms: Platform[] = [
     name: 'VR',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
+    units: {
+      typography: 'px',
+      spacing: 'px',
+      dimensions: 'px'
+    },
     distanceScale: {
       viewingDistance: 20,
       visualAcuity: 1,
@@ -224,6 +254,11 @@ const initialPlatforms: Platform[] = [
     name: 'TV',
     scaleMethod: 'distance',
     scale: { ...defaultScale },
+    units: {
+      typography: 'px',
+      spacing: 'px',
+      dimensions: 'px'
+    },
     distanceScale: {
       viewingDistance: 250,
       visualAcuity: 1,
@@ -263,12 +298,18 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
 
     const defaultSettings = {
       id: platformId,
+      name: platformData.name,
       scaleMethod: 'modular' as ScaleMethod,
       scale: {
         baseSize: 16,
         ratio: 1.2,
         stepsUp: 3,
         stepsDown: 2
+      },
+      units: {
+        typography: 'px',
+        spacing: 'px',
+        dimensions: 'px'
       },
       distanceScale: {
         viewingDistance: 400,
@@ -285,7 +326,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
       typeStyles: []
     }
 
-    set(state => ({
+    set((state): TypographyState => ({
+      ...state,
       platforms: [...state.platforms, { ...defaultSettings }]
     }))
 
@@ -294,7 +336,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   },
 
   updatePlatform: (platformId: string, updates: Partial<Platform>) => {
-    set(state => ({
+    set((state): TypographyState => ({
+      ...state,
       platforms: state.platforms.map(platform => 
         platform.id === platformId 
           ? { ...platform, ...updates }
@@ -360,7 +403,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   },
 
   copyTypeStylesToAllPlatforms: (sourceTypeStyles: TypeStyle[]) => {
-    set((state) => ({
+    set((state): TypographyState => ({
+      ...state,
       platforms: state.platforms.map(platform => {
         // Get existing type styles for this platform to preserve scale steps
         const existingTypeStyles = platform.typeStyles || [];
@@ -420,8 +464,15 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
           platform_id: platformId,
           scale_method: settings.scaleMethod,
           scale_config: settings.scale,
-          distance_scale: settings.distanceScale,
-          ai_settings: settings.aiSettings
+          distance_scale: {
+            viewing_distance: settings.distanceScale?.viewingDistance,
+            visual_acuity: settings.distanceScale?.visualAcuity,
+            mean_length_ratio: settings.distanceScale?.meanLengthRatio,
+            text_type: settings.distanceScale?.textType,
+            lighting: settings.distanceScale?.lighting,
+            ppi: settings.distanceScale?.ppi,
+          },
+          ai_settings: settings.aiScale
         })
       if (error) throw error
     } catch (error) {
@@ -452,7 +503,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         opticalSize: style.optical_size
       }))
 
-      set(state => ({
+      set((state): TypographyState => ({
+        ...state,
         platforms: state.platforms.map(p => 
           p.id === platformId ? { ...p, typeStyles: styles } : p
         ),
@@ -487,7 +539,8 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         throw error
       }
 
-      set(state => ({
+      set((state): TypographyState => ({
+        ...state,
         platforms: state.platforms.map(p => 
           p.id === platformId ? { ...p, ...data } : p
         ),
@@ -503,6 +556,6 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   }
 }),
 {
-  name: 'typography-store',
+  name: 'typography-store'
 }
 )
