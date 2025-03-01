@@ -59,8 +59,15 @@ const ScaleView = dynamic(() => Promise.resolve(({ baseSize, fontFamily, typogra
   const scaleValues = useMemo(() => {
     if (!platformId) return [];
     const values = getScaleValues(platformId);
-    console.log(`ScaleView fetched ${values.length} scale values for platform ${platformId}`);
-    return values;
+    
+    // Ensure all size values are rounded
+    const roundedValues = values.map(value => ({
+      ...value,
+      size: Math.round(value.size)
+    }));
+    
+    console.log(`ScaleView fetched ${roundedValues.length} scale values for platform ${platformId}`);
+    return roundedValues;
   }, [platformId, getScaleValues])
 
   // Add debugging to log received props
@@ -157,7 +164,7 @@ const ScaleView = dynamic(() => Promise.resolve(({ baseSize, fontFamily, typogra
               </div>
             </TableCell>
             <TableCell className="py-6 text-right">
-              {(item?.size || 16).toFixed(2)}{typographyUnit}
+              {Math.round(item?.size || 16)}{typographyUnit}
             </TableCell>
           </TableRow>
         ))}

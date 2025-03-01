@@ -717,7 +717,27 @@ ${recommendation}`
       }, 0)
     } catch (error) {
       console.error('Error in handleGenerateFromImage:', error)
-      setAiError(error instanceof Error ? error.message : 'Failed to analyze image')
+      
+      // Provide more specific error messages for different types of errors
+      let errorMessage = 'Failed to analyze image';
+      
+      if (error instanceof Error) {
+        // Check for specific Gemini API errors
+        if (error.message.includes('gemini-pro-vision has been deprecated')) {
+          errorMessage = 'The Gemini model has been updated. Please refresh the page to use the latest version.';
+        } else if (error.message.includes('404')) {
+          errorMessage = 'The AI service returned a 404 error. Please check your API key or try again later.';
+        } else if (error.message.includes('429')) {
+          errorMessage = 'Too many requests to the AI service. Please try again later.';
+        } else if (error.message.includes('403')) {
+          errorMessage = 'Access denied to the AI service. Please check your API key.';
+        } else {
+          // Use the original error message for other cases
+          errorMessage = error.message;
+        }
+      }
+      
+      setAiError(errorMessage);
     } finally {
       setIsAnalyzing(false)
       setTimeout(() => setProgress(0), 500)

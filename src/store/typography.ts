@@ -385,7 +385,7 @@ export const useTypographyStore = create(
           
           // Calculate steps below base
           for (let i = stepsDown; i > 0; i--) {
-            const size = distanceAdjustedBaseSize / Math.pow(ratio, i)
+            const size = Math.round(distanceAdjustedBaseSize / Math.pow(ratio, i));
             steps.push({
               size,
               ratio,
@@ -395,14 +395,14 @@ export const useTypographyStore = create(
           
           // Add base size (f0)
           steps.push({
-            size: distanceAdjustedBaseSize,
+            size: Math.round(distanceAdjustedBaseSize),
             ratio,
             label: 'f0'
           })
           
           // Calculate steps above base
           for (let i = 1; i <= stepsUp; i++) {
-            const size = distanceAdjustedBaseSize * Math.pow(ratio, i)
+            const size = Math.round(distanceAdjustedBaseSize * Math.pow(ratio, i));
             steps.push({
               size,
               ratio,
@@ -421,7 +421,7 @@ export const useTypographyStore = create(
         
         // Calculate steps below base
         for (let i = stepsDown; i > 0; i--) {
-          const size = baseSize / Math.pow(ratio, i)
+          const size = Math.round(baseSize / Math.pow(ratio, i));
           steps.push({
             size,
             ratio,
@@ -431,14 +431,14 @@ export const useTypographyStore = create(
         
         // Add base size (f0)
         steps.push({
-          size: baseSize,
+          size: Math.round(baseSize),
           ratio,
           label: 'f0'
         })
         
         // Calculate steps above base
         for (let i = 1; i <= stepsUp; i++) {
-          const size = baseSize * Math.pow(ratio, i)
+          const size = Math.round(baseSize * Math.pow(ratio, i));
           steps.push({
             size,
             ratio,

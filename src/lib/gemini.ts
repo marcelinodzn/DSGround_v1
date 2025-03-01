@@ -19,8 +19,8 @@ interface AIRecommendation {
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
-// Use Gemini 2.0 Flash model
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-001" });
+// Use Gemini 1.5 Flash model which supports both text and vision
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export async function generateTypeScale({
   deviceType = '',
@@ -33,8 +33,8 @@ export async function generateTypeScale({
   console.log('Starting Gemini type scale generation...')
   
   try {
-    // Configure the model
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' })
+    // Configure the model - use gemini-1.5-flash which supports both text and vision
+    const visionModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Create the prompt
     let prompt = `You are a typography expert. Analyze this UI design and determine the recommended base font size, ratio, and number of steps for a modular scale.
@@ -54,30 +54,31 @@ export async function generateTypeScale({
     
     Then, provide a brief explanation of your recommendation.`
 
-    let result
+    let result;
     if (image) {
       // Convert base64 string to a GoogleGenerativeAI.Part
-      const imageData = image.split(',')[1] // Remove the data:image/jpeg;base64, part
+      const imageData = image.split(',')[1]; // Remove the data:image/jpeg;base64, part
       const imagePart = {
         inlineData: {
           data: imageData,
           mimeType: 'image/jpeg',
         },
-      }
+      };
 
-      // Generate content with image
-      const result = await model.generateContent([prompt, imagePart])
-      const response = await result.response
-      const text = response.text()
+      // Generate content with image using the new model
+      console.log('Generating content with image using gemini-1.5-flash...');
+      result = await visionModel.generateContent([prompt, imagePart]);
+      const response = await result.response;
+      const text = response.text();
       
       console.log('Gemini response received')
       return text // Return the text response, not an object
     } else {
-      // Text-only request to gemini-pro
-      const textModel = genAI.getGenerativeModel({ model: 'gemini-pro' })
-      const result = await textModel.generateContent(prompt)
-      const response = await result.response
-      return response.text() // Return the text response, not an object
+      // Text-only request using the same model for consistency
+      console.log('Generating content with text-only using gemini-1.5-flash...');
+      result = await visionModel.generateContent(prompt);
+      const response = await result.response;
+      return response.text(); // Return the text response, not an object
     }
   } catch (error) {
     console.error('Error in Gemini AI generation:', error)
