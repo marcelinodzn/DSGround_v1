@@ -352,7 +352,20 @@ export const useTypographyStore = create(
           return []
         }
         
-        const { baseSize, ratio, stepsUp, stepsDown } = platform.scale
+        // Ensure we have valid scale values with defaults if missing
+        const baseSize = platform.scale?.baseSize || 16;
+        const ratio = platform.scale?.ratio || 1.2;
+        const stepsUp = platform.scale?.stepsUp || 3;
+        const stepsDown = platform.scale?.stepsDown || 2;
+        
+        console.log("Store getScaleValues:", {
+          platformId,
+          scaleMethod: platform.scaleMethod,
+          baseSize,
+          ratio,
+          stepsUp,
+          stepsDown
+        });
         
         // Additional calculations for distance-based scaling
         if (platform.scaleMethod === 'distance') {
@@ -364,6 +377,8 @@ export const useTypographyStore = create(
             platform.distanceScale.lighting,
             platform.distanceScale.ppi
           )
+          
+          console.log("Distance adjusted base size:", distanceAdjustedBaseSize);
           
           // Create an array of scale steps using the distance-adjusted base size
           const steps: { size: number; ratio: number; label: string }[] = []
@@ -395,11 +410,14 @@ export const useTypographyStore = create(
             })
           }
           
+          console.log(`Generated ${steps.length} scale values for distance method`);
           return steps
         }
         
         // For non-distance methods, use the original calculation
         const steps: { size: number; ratio: number; label: string }[] = []
+        
+        console.log(`Generating scale with baseSize=${baseSize}, ratio=${ratio}, stepsUp=${stepsUp}, stepsDown=${stepsDown}`);
         
         // Calculate steps below base
         for (let i = stepsDown; i > 0; i--) {
@@ -428,6 +446,7 @@ export const useTypographyStore = create(
           })
         }
         
+        console.log(`Generated ${steps.length} scale values for ${platform.scaleMethod} method`);
         return steps
       },
 

@@ -403,35 +403,23 @@ export function PropertiesPanel() {
   }
 
   const handleScaleChange = (ratio: number, baseSize: number) => {
-    const updatedScale = {
-      ...currentSettings.scale,
-      ratio,
-      baseSize
-    }
+    if (!activePlatform || !currentSettings?.scale) return;
     
-    // Update the scale
-    updatePlatform(activePlatform, {
-      scale: updatedScale
-    })
-
-    // Update all type styles to reflect new scale values
-    if (currentSettings.typeStyles) {
-      const updatedTypeStyles = currentSettings.typeStyles.map((style: TypeStyle) => {
-        const scaleValues = getScaleValues(activePlatform)
-        const matchingScale = scaleValues.find((s: { label: string }) => s.label === style.scaleStep)
-        if (matchingScale) {
-          return {
-            ...style,
-            fontSize: matchingScale.size
-          }
-        }
-        return style
-      })
-
+    console.log("Updating scale:", { ratio, baseSize, stepsUp: currentSettings.scale.stepsUp, stepsDown: currentSettings.scale.stepsDown });
+    
+    // Use setTimeout to ensure this update happens in a separate tick
+    setTimeout(() => {
       updatePlatform(activePlatform, {
-        typeStyles: updatedTypeStyles
+        scale: {
+          ...(currentSettings.scale || {}),
+          ratio,
+          baseSize,
+          // Ensure stepsUp and stepsDown are maintained - they might be missing if not explicitly set
+          stepsUp: currentSettings.scale.stepsUp || 3,
+          stepsDown: currentSettings.scale.stepsDown || 2
+        }
       })
-    }
+    }, 0);
   };
 
   const handleDistanceScaleChange = (updates: Partial<Platform['distanceScale']>) => {
@@ -457,7 +445,7 @@ export function PropertiesPanel() {
     updatePlatform(activePlatform, {
       distanceScale: updatedDistanceScale,
       scale: {
-        ...currentSettings.scale,
+        ...(currentSettings.scale || {}),
         baseSize: roundedBaseSize // Update the main scale base size
       }
     });
@@ -510,7 +498,18 @@ export function PropertiesPanel() {
       : currentSettings;
       
     if (!platform) return [];
-    return useTypographyStore.getState().getScaleValues(platformId || activePlatform)
+    
+    const scaleValues = useTypographyStore.getState().getScaleValues(platformId || activePlatform);
+    console.log("Scale values:", {
+      platformId: platformId || activePlatform,
+      scaleMethod: platform.scaleMethod,
+      baseSize: platform.scale?.baseSize,
+      ratio: platform.scale?.ratio,
+      stepsUp: platform.scale?.stepsUp,
+      stepsDown: platform.scale?.stepsDown,
+      valueCount: scaleValues.length
+    });
+    return scaleValues;
   }
 
   const handleAddTypeStyle = () => {
@@ -612,7 +611,7 @@ export function PropertiesPanel() {
           recommendations: response.recommendation
         },
         scale: {
-          ...currentSettings.scale,
+          ...(currentSettings.scale || {}),
           baseSize: convertedSize
         }
       });
@@ -675,8 +674,13 @@ export function PropertiesPanel() {
         throw new Error('No recommendation received from AI')
       }
 
-      const params = parseAIRecommendation(recommendation)
+      console.log("AI recommendation:", recommendation);
 
+      // Safely parse the recommendation with type checking
+      const params = parseAIRecommendation(recommendation)
+      
+      console.log("Parsed AI recommendation:", params);
+      
       // Format the analysis text
       const analysisText = `Scale Parameters:
 Base size: ${params.baseSize}px
@@ -686,14 +690,31 @@ Steps down: ${params.stepsDown}
 
 ${recommendation}`
 
+      // Update state safely outside of render
       setImageAnalysis(analysisText)
       setPlatformReasoning(analysisText)
 
-      updatePlatform(activePlatform, {
-        scale: {
-          ...params
+      // Use setTimeout to ensure this update happens in a separate tick
+      // to prevent "Cannot update a component during render" errors
+      setTimeout(() => {
+        if (activePlatform && currentSettings) {
+          console.log("Updating platform with AI recommendations:", {
+            activePlatform,
+            currentScale: currentSettings.scale,
+            newParams: params
+          });
+          
+          updatePlatform(activePlatform, {
+            scale: {
+              ...(currentSettings.scale || {}),
+              baseSize: params.baseSize,
+              ratio: params.ratio,
+              stepsUp: params.stepsUp,
+              stepsDown: params.stepsDown
+            }
+          })
         }
-      })
+      }, 0)
     } catch (error) {
       console.error('Error in handleGenerateFromImage:', error)
       setAiError(error instanceof Error ? error.message : 'Failed to analyze image')
@@ -701,7 +722,7 @@ ${recommendation}`
       setIsAnalyzing(false)
       setTimeout(() => setProgress(0), 500)
     }
-  }
+  };
 
   const handleFontRoleChange = async (role: 'primary' | 'secondary' | 'tertiary') => {
     console.log('Changing font role to:', role)
@@ -980,8 +1001,9 @@ ${recommendation}`
                 <div className="space-y-2">
                   <Label className="text-xs">Scale Type</Label>
                   <Select
-                    value={currentSettings.scale.ratio.toString()}
+                    value={currentSettings?.scale?.ratio?.toString() || "1.2"}
                     onValueChange={(value) => {
+                      if (!currentSettings?.scale) return;
                       handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
                     }}
                   >
@@ -1007,9 +1029,22 @@ ${recommendation}`
                   </Label>
                   <Input
                     type="number"
+                    min="8"
+                    max="40"
                     value={currentSettings.scale.baseSize}
                     onChange={(e) => {
-                      handleScaleChange(currentSettings.scale.ratio, parseFloat(e.target.value))
+                      const newBaseSize = parseFloat(e.target.value);
+                      console.log("Setting Base Size to:", newBaseSize);
+                      
+                      // Use setTimeout to ensure this update happens in a separate tick
+                      setTimeout(() => {
+                        updatePlatform(activePlatform, {
+                          scale: {
+                            ...(currentSettings.scale || {}),
+                            baseSize: newBaseSize
+                          }
+                        });
+                      }, 0);
                     }}
                     className="text-xs h-8"
                   />
@@ -1024,12 +1059,17 @@ ${recommendation}`
                       max="10"
                       value={currentSettings.scale.stepsUp}
                       onChange={(e) => {
-                        updatePlatform(activePlatform, {
-                          scale: {
-                            ...currentSettings.scale,
-                            stepsUp: parseInt(e.target.value)
-                          }
-                        })
+                        const newValue = parseInt(e.target.value);
+                        console.log("Setting Steps Up to:", newValue);
+                        // Use setTimeout to ensure this update happens in a separate tick
+                        setTimeout(() => {
+                          updatePlatform(activePlatform, {
+                            scale: {
+                              ...(currentSettings.scale || {}),
+                              stepsUp: newValue
+                            }
+                          })
+                        }, 0);
                       }}
                       className="text-xs h-8"
                     />
@@ -1042,12 +1082,17 @@ ${recommendation}`
                       max="10"
                       value={currentSettings.scale.stepsDown}
                       onChange={(e) => {
-                        updatePlatform(activePlatform, {
-                          scale: {
-                            ...currentSettings.scale,
-                            stepsDown: parseInt(e.target.value)
-                          }
-                        })
+                        const newValue = parseInt(e.target.value);
+                        console.log("Setting Steps Down to:", newValue);
+                        // Use setTimeout to ensure this update happens in a separate tick
+                        setTimeout(() => {
+                          updatePlatform(activePlatform, {
+                            scale: {
+                              ...(currentSettings.scale || {}),
+                              stepsDown: newValue
+                            }
+                          })
+                        }, 0);
                       }}
                       className="text-xs h-8"
                     />
@@ -1065,7 +1110,7 @@ ${recommendation}`
                     onValueChange={(value) => {
                       updatePlatform(activePlatform, {
                         scale: {
-                          ...currentSettings.scale,
+                          ...(currentSettings.scale || {}),
                           ratio: parseFloat(value)
                         }
                       })
@@ -1211,12 +1256,17 @@ ${recommendation}`
                       max="10"
                       value={currentSettings.scale.stepsUp}
                       onChange={(e) => {
-                        updatePlatform(activePlatform, {
-                          scale: {
-                            ...currentSettings.scale,
-                            stepsUp: parseInt(e.target.value)
-                          }
-                        })
+                        const newValue = parseInt(e.target.value);
+                        console.log("Setting Steps Up to:", newValue);
+                        // Use setTimeout to ensure this update happens in a separate tick
+                        setTimeout(() => {
+                          updatePlatform(activePlatform, {
+                            scale: {
+                              ...(currentSettings.scale || {}),
+                              stepsUp: newValue
+                            }
+                          })
+                        }, 0);
                       }}
                       className="text-xs h-8"
                     />
@@ -1229,12 +1279,17 @@ ${recommendation}`
                       max="10"
                       value={currentSettings.scale.stepsDown}
                       onChange={(e) => {
-                        updatePlatform(activePlatform, {
-                          scale: {
-                            ...currentSettings.scale,
-                            stepsDown: parseInt(e.target.value)
-                          }
-                        })
+                        const newValue = parseInt(e.target.value);
+                        console.log("Setting Steps Down to:", newValue);
+                        // Use setTimeout to ensure this update happens in a separate tick
+                        setTimeout(() => {
+                          updatePlatform(activePlatform, {
+                            scale: {
+                              ...(currentSettings.scale || {}),
+                              stepsDown: newValue
+                            }
+                          })
+                        }, 0);
                       }}
                       className="text-xs h-8"
                     />
@@ -1384,7 +1439,7 @@ ${recommendation}`
                                         )
                                       },
                                       scale: {
-                                        ...currentSettings.scale,
+                                        ...(currentSettings.scale || {}),
                                         baseSize: newValue
                                       }
                                     });
@@ -1403,7 +1458,7 @@ ${recommendation}`
                                   onValueChange={(value) => {
                                     updatePlatform(activePlatform, {
                                       scale: {
-                                        ...currentSettings.scale,
+                                        ...(currentSettings.scale || {}),
                                         ratio: parseFloat(value)
                                       }
                                     });
@@ -1434,12 +1489,17 @@ ${recommendation}`
                                     max="10"
                                     value={currentSettings.scale.stepsUp}
                                     onChange={(e) => {
-                                      updatePlatform(activePlatform, {
-                                        scale: {
-                                          ...currentSettings.scale,
-                                          stepsUp: parseInt(e.target.value)
-                                        }
-                                      });
+                                      const newValue = parseInt(e.target.value);
+                                      console.log("Setting Steps Up to:", newValue);
+                                      // Use setTimeout to ensure this update happens in a separate tick
+                                      setTimeout(() => {
+                                        updatePlatform(activePlatform, {
+                                          scale: {
+                                            ...(currentSettings.scale || {}),
+                                            stepsUp: newValue
+                                          }
+                                        })
+                                      }, 0);
                                     }}
                                     className="text-xs h-8"
                                   />
@@ -1452,12 +1512,17 @@ ${recommendation}`
                                     max="10"
                                     value={currentSettings.scale.stepsDown}
                                     onChange={(e) => {
-                                      updatePlatform(activePlatform, {
-                                        scale: {
-                                          ...currentSettings.scale,
-                                          stepsDown: parseInt(e.target.value)
-                                        }
-                                      })
+                                      const newValue = parseInt(e.target.value);
+                                      console.log("Setting Steps Down to:", newValue);
+                                      // Use setTimeout to ensure this update happens in a separate tick
+                                      setTimeout(() => {
+                                        updatePlatform(activePlatform, {
+                                          scale: {
+                                            ...(currentSettings.scale || {}),
+                                            stepsDown: newValue
+                                          }
+                                        })
+                                      }, 0);
                                     }}
                                     className="text-xs h-8"
                                   />
@@ -1561,7 +1626,7 @@ ${recommendation}`
                                   onChange={(e) => {
                                     updatePlatform(activePlatform, {
                                       scale: {
-                                        ...currentSettings.scale,
+                                        ...(currentSettings.scale || {}),
                                         baseSize: parseFloat(e.target.value)
                                       }
                                     })
@@ -1577,7 +1642,7 @@ ${recommendation}`
                                   onValueChange={(value) => {
                                     updatePlatform(activePlatform, {
                                       scale: {
-                                        ...currentSettings.scale,
+                                        ...(currentSettings.scale || {}),
                                         ratio: parseFloat(value)
                                       }
                                     })
@@ -1608,12 +1673,17 @@ ${recommendation}`
                                     max="10"
                                     value={currentSettings.scale.stepsUp}
                                     onChange={(e) => {
-                                      updatePlatform(activePlatform, {
-                                        scale: {
-                                          ...currentSettings.scale,
-                                          stepsUp: parseInt(e.target.value)
-                                        }
-                                      })
+                                      const newValue = parseInt(e.target.value);
+                                      console.log("Setting Steps Up to:", newValue);
+                                      // Use setTimeout to ensure this update happens in a separate tick
+                                      setTimeout(() => {
+                                        updatePlatform(activePlatform, {
+                                          scale: {
+                                            ...(currentSettings.scale || {}),
+                                            stepsUp: newValue
+                                          }
+                                        })
+                                      }, 0);
                                     }}
                                     className="text-xs h-8"
                                   />
@@ -1626,12 +1696,17 @@ ${recommendation}`
                                     max="10"
                                     value={currentSettings.scale.stepsDown}
                                     onChange={(e) => {
-                                      updatePlatform(activePlatform, {
-                                        scale: {
-                                          ...currentSettings.scale,
-                                          stepsDown: parseInt(e.target.value)
-                                        }
-                                      })
+                                      const newValue = parseInt(e.target.value);
+                                      console.log("Setting Steps Down to:", newValue);
+                                      // Use setTimeout to ensure this update happens in a separate tick
+                                      setTimeout(() => {
+                                        updatePlatform(activePlatform, {
+                                          scale: {
+                                            ...(currentSettings.scale || {}),
+                                            stepsDown: newValue
+                                          }
+                                        })
+                                      }, 0);
                                     }}
                                     className="text-xs h-8"
                                   />
@@ -1888,17 +1963,50 @@ function ModularScaleTab({
   return (
     <div className="space-y-4">
       <div>
-        <Label className="text-xs">Base Size ({currentSettings.units.typography})</Label>
+        <Label className="text-xs">Base Size ({currentSettings.units?.typography})</Label>
         <Input
           type="number"
+          min="8"
+          max="40"
           value={platform.scale.baseSize}
           onChange={(e) => {
-            updatePlatform(platform.id, {
-              scale: {
-                ...platform.scale,
-                baseSize: Number(e.target.value)
-              }
-            })
+            const newBaseSize = parseFloat(e.target.value);
+            console.log("Setting Base Size to:", newBaseSize);
+            
+            // Use setTimeout to ensure this update happens in a separate tick
+            setTimeout(() => {
+              updatePlatform(platform.id, {
+                scale: {
+                  ...(platform.scale || {}),
+                  baseSize: newBaseSize
+                }
+              });
+            }, 0);
+          }}
+          className="text-xs h-8"
+        />
+      </div>
+      <div className="flex items-center space-x-1">
+        <Label className="text-xs">Ratio</Label>
+        <Input
+          type="number"
+          min="1.05"
+          max="2"
+          step="0.01"
+          value={platform.scale.ratio}
+          onChange={(e) => {
+            const newRatio = parseFloat(e.target.value);
+            console.log("Setting Ratio to:", newRatio);
+            
+            // Use setTimeout to ensure this update happens in a separate tick
+            setTimeout(() => {
+              updatePlatform(platform.id, {
+                scale: {
+                  ...(platform.scale || {}),
+                  ratio: newRatio
+                }
+              });
+            }, 0);
           }}
           className="text-xs h-8"
         />
