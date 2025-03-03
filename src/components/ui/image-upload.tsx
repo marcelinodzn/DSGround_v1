@@ -15,7 +15,7 @@ export function ImageUpload() {
     handleFileChange,
     handleRemove,
   } = useImageUpload({
-    onUpload: (url) => console.log("Uploaded image URL:", url),
+    onUpload: (url: string) => console.log("Uploaded image URL:", url),
   })
 
   const [isDragging, setIsDragging] = useState(false)
@@ -45,11 +45,12 @@ export function ImageUpload() {
 
       const file = e.dataTransfer.files?.[0]
       if (file && file.type.startsWith("image/")) {
+        // Create a fake change event that properly casts to the required type
         const fakeEvent = {
           target: {
             files: [file],
           },
-        } as React.ChangeEvent<HTMLInputElement>
+        } as unknown as React.ChangeEvent<HTMLInputElement>;
         handleFileChange(fakeEvent)
       }
     },
