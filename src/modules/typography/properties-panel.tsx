@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTypographyStore, ScaleMethod, Platform, TypeStyle, TypographyState } from "@/store/typography"
+import { useTypographyStore, ScaleMethod, Platform, TypeStyle, TypographyState, uploadImageToStorage } from "@/store/typography"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -339,9 +340,21 @@ export function PropertiesPanel() {
     }
   }, [activePlatform, typographyPlatforms, initializePlatform])
   
-  // Find current settings
-  const currentSettings = typographyPlatforms.find(p => p.id === activePlatform)
-  const currentPlatformSettings = platformSettings.find(p => p.id === activePlatform)
+  // Find current settings with fallbacks
+  const currentSettings = typographyPlatforms.find(p => p.id === activePlatform) || {
+    id: activePlatform || 'default',
+    name: 'Default',
+    scaleMethod: 'modular' as ScaleMethod,
+    scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
+    units: { typography: 'px', spacing: 'px', dimensions: 'px' },
+    typeStyles: []
+  }
+  
+  const currentPlatformSettings = platformSettings.find(p => p.id === activePlatform) || {
+    id: activePlatform || 'default',
+    name: 'Default',
+    units: { typography: 'px', spacing: 'px', dimensions: 'px' }
+  }
   
   // When currentSettings.currentFontRole changes, update the local state
   useEffect(() => {
@@ -378,30 +391,69 @@ export function PropertiesPanel() {
     console.log('Platform settings:', platformSettings);
   }, [platforms, activePlatform, platformSettings]);
 
-  if (!currentSettings) {
-    return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
-  }
+  // Ensure AI settings are initialized when component mounts
+  useEffect(() => {
+    if (activePlatform && currentSettings && currentSettings.scaleMethod === 'ai') {
+      // Check if AI settings exist and are complete
+      if (!currentSettings.aiScale || 
+          currentSettings.aiScale.recommendedBaseSize === undefined || 
+          currentSettings.aiScale.originalSizeInPx === undefined) {
+        
+        console.log("Initializing missing AI settings");
+        const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
+        
+        updatePlatform(activePlatform, {
+          aiScale: {
+            recommendedBaseSize: currentScale.baseSize,
+            originalSizeInPx: currentScale.baseSize,
+            recommendations: currentSettings.aiScale?.recommendations || '',
+            summaryTable: currentSettings.aiScale?.summaryTable || ''
+          }
+        });
+      }
+    }
+  }, [activePlatform, currentSettings, updatePlatform]);
 
-  // Ensure typeStyles exists
-  const typeStyles = currentSettings.typeStyles || []
-  const typographyUnit = currentSettings.units?.typography || 'px'
+  // Helper function to ensure AI scale settings are properly updated
+  const updateAIScaleSettings = useCallback((method: ScaleMethod) => {
+    if (!activePlatform) return;
+    
+    console.log(`Changing scale method to: ${method}`);
+    
+    // If switching to AI method, ensure AI settings are initialized
+    if (method === 'ai') {
+      // Initialize AI settings if they don't exist or are incomplete
+      const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
+      
+      updatePlatform(activePlatform, {
+        scaleMethod: method,
+        aiScale: currentSettings.aiScale || {
+          recommendedBaseSize: currentScale.baseSize,
+          originalSizeInPx: currentScale.baseSize,
+          recommendations: '',
+          summaryTable: ''
+        },
+        // Set default tabs for AI method
+        viewTab: currentSettings.viewTab || 'scale',
+        analysisTab: currentSettings.analysisTab || 'platform'
+      });
+    } else {
+      // For other methods, just update the scale method
+      updatePlatform(activePlatform, { 
+        scaleMethod: method 
+      });
+    }
+    
+    // The updatePlatform function now automatically saves to Supabase
+  }, [activePlatform, currentSettings, updatePlatform]);
 
-  // Constants
-  const viewTabs = [
-    { id: 'scale', label: 'Scale View' },
-    { id: 'styles', label: 'Styles View' }
-  ]
-
-  const analysisTabs = [
-    { id: 'platform', label: 'Platform Analysis' },
-    { id: 'image', label: 'Image Analysis' }
-  ]
+  // Use this function when changing scale method
+  const handleScaleMethodChange = useCallback((method: ScaleMethod) => {
+    if (!activePlatform) return;
+    updateAIScaleSettings(method);
+  }, [activePlatform, updateAIScaleSettings]);
 
   // Event handlers
-  const handleScaleMethodChange = (method: ScaleMethod) => {
-    updatePlatform(activePlatform, { scaleMethod: method })
-  }
-
   const handleScaleChange = (ratio: number, baseSize: number) => {
     if (!activePlatform || !currentSettings?.scale) return;
     
@@ -452,8 +504,14 @@ export function PropertiesPanel() {
   };
 
   const handleAccessibilityChange = (updates: Partial<Platform['accessibility']>) => {
+    // Define default accessibility values
+    const defaultAccessibility = {
+      minContrastBody: 4.5,
+      minContrastLarge: 3.0
+    };
+    
     updatePlatform(activePlatform, {
-      accessibility: { ...currentSettings.accessibility, ...updates }
+      accessibility: { ...(currentSettings.accessibility || defaultAccessibility), ...updates }
     })
   }
 
@@ -605,10 +663,12 @@ export function PropertiesPanel() {
 
       // Update both aiScale and scale settings
       updatePlatform(activePlatform, {
+        scaleMethod: 'ai',
         aiScale: {
           recommendedBaseSize: convertedSize,
           originalSizeInPx: recommendedSizeInPx,
-          recommendations: response.recommendation
+          recommendations: response.recommendation,
+          summaryTable: response.summaryTable || ''
         },
         scale: {
           ...(currentSettings.scale || {}),
@@ -649,72 +709,140 @@ export function PropertiesPanel() {
   }
 
   const handleGenerateFromImage = async (base64Image: string) => {
-    try {
-      setAiError(null)
-      setIsAnalyzing(true)
-      setProgress(0)
-      setPlatformReasoning(null)
-      
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90))
-      }, 500)
+    if (!base64Image) {
+      setAiError('Please select an image to analyze');
+      return;
+    }
 
-      // Call Gemini directly
-      const recommendation = await generateTypeScale({
+    setIsAnalyzing(true);
+    setAiError(null);
+    setProgress(10);
+    
+    // Upload the image to Supabase storage
+    let storedImageUrl = null;
+    try {
+      // Get the current brand ID
+      const brandId = currentBrand || brandStoreCurrentBrand || 'default';
+      
+      if (brandId && activePlatform) {
+        storedImageUrl = await uploadImageToStorage(base64Image, brandId, activePlatform);
+        console.log('Image uploaded successfully:', storedImageUrl);
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      // Continue with analysis even if image upload fails
+    }
+    
+    setProgress(20);
+
+    try {
+      // Call the image analysis function
+      const result = await generateTypeScale({
         deviceType: platforms.find(p => p.id === activePlatform)?.name,
         context: selectedContext,
         location: selectedLocation,
         image: base64Image
-      })
-
-      clearInterval(progressInterval)
-      setProgress(100)
-
-      if (!recommendation) {
-        throw new Error('No recommendation received from AI')
+      });
+      if (!result) {
+        throw new Error('Failed to analyze image');
       }
 
-      console.log("AI recommendation:", recommendation);
+      setProgress(80);
 
-      // Safely parse the recommendation with type checking
-      const params = parseAIRecommendation(recommendation)
-      
-      console.log("Parsed AI recommendation:", params);
-      
-      // Format the analysis text
-      const analysisText = `Scale Parameters:
-Base size: ${params.baseSize}px
-Ratio: ${params.ratio}
-Steps up: ${params.stepsUp}
-Steps down: ${params.stepsDown}
+      // Extract the parameters from the result
+      const params = {
+        baseSize: result.baseSize || 16,
+        ratio: result.ratio || 1.2,
+        stepsUp: result.stepsUp || 3,
+        stepsDown: result.stepsDown || 2
+      };
 
-${recommendation}`
+      // Format the recommendation text
+      const recommendation = `
+## Typography Analysis Results
+
+Based on the image analysis, I recommend the following typography scale:
+
+- **Base Size**: ${params.baseSize}px
+- **Scale Ratio**: ${params.ratio}
+- **Steps Up**: ${params.stepsUp}
+- **Steps Down**: ${params.stepsDown}
+
+${result.recommendations || 'No additional recommendations provided.'}
+
+${result.summaryTable || ''}
+
+${result.reasoning || ''}
+`;
 
       // Update state safely outside of render
-      setImageAnalysis(analysisText)
-      setPlatformReasoning(analysisText)
+      setImageAnalysis(recommendation)
+      setPlatformReasoning(recommendation)
 
-      // Use setTimeout to ensure this update happens in a separate tick
-      // to prevent "Cannot update a component during render" errors
-      setTimeout(() => {
-        if (activePlatform && currentSettings) {
-          console.log("Updating platform with AI recommendations:", {
-            activePlatform,
-            currentScale: currentSettings.scale,
-            newParams: params
-          });
-          
-          updatePlatform(activePlatform, {
-            scale: {
-              ...(currentSettings.scale || {}),
-              baseSize: params.baseSize,
-              ratio: params.ratio,
-              stepsUp: params.stepsUp,
-              stepsDown: params.stepsDown
-            }
-          })
-        }
-      }, 0)
+      // Use try/catch block for updating the platform
+      try {
+        // Use setTimeout to ensure this update happens in a separate tick
+        // to prevent "Cannot update a component during render" errors
+        setTimeout(() => {
+          if (activePlatform && currentSettings) {
+            console.log("Updating platform with AI recommendations:", {
+              activePlatform,
+              currentScale: currentSettings.scale,
+              newParams: params
+            });
+            
+            // Update the platform with new scale settings and AI recommendations
+            updatePlatform(activePlatform, {
+              scale: {
+                ...(currentSettings.scale || {}),
+                baseSize: params.baseSize,
+                ratio: params.ratio,
+                stepsUp: params.stepsUp,
+                stepsDown: params.stepsDown
+              },
+              aiScale: {
+                ...(currentSettings.aiScale || {}),
+                recommendedBaseSize: params.baseSize,
+                originalSizeInPx: params.baseSize,
+                recommendations: result.recommendations || '',
+                summaryTable: result.summaryTable || '',
+                reasoning: result.reasoning || '',
+                // Add new prompt to history
+                prompts: [
+                  // Create a new prompt entry
+                  {
+                    timestamp: Date.now(),
+                    deviceType: platforms.find(p => p.id === activePlatform)?.name,
+                    context: selectedContext,
+                    location: selectedLocation,
+                    imageUrl: selectedImage,
+                    storedImageUrl: storedImageUrl, // Add the stored image URL
+                    result: {
+                      recommendedBaseSize: params.baseSize,
+                      ratio: params.ratio,
+                      stepsUp: params.stepsUp,
+                      stepsDown: params.stepsDown,
+                      recommendations: result.recommendations || '',
+                      summaryTable: result.summaryTable || '',
+                      reasoning: result.reasoning || ''
+                    }
+                  },
+                  // Include previous prompts if they exist
+                  ...(currentSettings.aiScale?.prompts || [])
+                ]
+              },
+              // Ensure the current tab selections are saved
+              viewTab: currentSettings.viewTab || 'scale',
+              analysisTab: activeAnalysisTab || 'platform',
+              // Ensure scale method is set to AI
+              scaleMethod: 'ai'
+            });
+          }
+        }, 0);
+      } catch (updateError) {
+        console.error('Error updating platform settings:', updateError);
+        setAiError('Successfully analyzed image but failed to save settings. Please try again.');
+      }
     } catch (error) {
       console.error('Error in handleGenerateFromImage:', error)
       
@@ -731,6 +859,8 @@ ${recommendation}`
           errorMessage = 'Too many requests to the AI service. Please try again later.';
         } else if (error.message.includes('403')) {
           errorMessage = 'Access denied to the AI service. Please check your API key.';
+        } else if (error.message.includes('PGRST116')) {
+          errorMessage = 'Database error: Multiple rows found. We\'re fixing this issue, please try again.';
         } else {
           // Use the original error message for other cases
           errorMessage = error.message;
@@ -739,8 +869,8 @@ ${recommendation}`
       
       setAiError(errorMessage);
     } finally {
-      setIsAnalyzing(false)
-      setTimeout(() => setProgress(0), 500)
+      setIsAnalyzing(false);
+      setProgress(100);
     }
   };
 
@@ -890,6 +1020,107 @@ ${recommendation}`
     return '—';
   };
 
+  // Use platform tab settings if available and initialize AI settings if needed
+  useEffect(() => {
+    if (activePlatform && currentSettings) {
+      // Set active tabs from platform settings if available
+      if (currentSettings.viewTab) {
+        setActiveViewTab(currentSettings.viewTab);
+      }
+      if (currentSettings.analysisTab) {
+        setActiveAnalysisTab(currentSettings.analysisTab);
+      }
+      
+      // Handle AI settings
+      if (currentSettings.scaleMethod === 'ai') {
+        // Initialize AI scale settings if they don't exist or are incomplete
+        if (!currentSettings.aiScale || 
+            currentSettings.aiScale.recommendedBaseSize === undefined || 
+            currentSettings.aiScale.originalSizeInPx === undefined) {
+          
+          console.log("Initializing missing AI settings");
+          const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
+          
+          updatePlatform(activePlatform, {
+            aiScale: {
+              recommendedBaseSize: currentScale.baseSize,
+              originalSizeInPx: currentScale.baseSize,
+              recommendations: currentSettings.aiScale?.recommendations || '',
+              summaryTable: currentSettings.aiScale?.summaryTable || '',
+              reasoning: currentSettings.aiScale?.reasoning || ''
+            }
+          });
+        }
+        
+        // Restore AI recommendations if they exist
+        else if (currentSettings.aiScale && currentSettings.aiScale.recommendations) {
+          console.log("Restoring AI settings from platform:", currentSettings.aiScale);
+          
+          const formattedRecommendation = `
+## Typography Analysis Results
+
+Based on the image analysis, I recommend the following typography scale:
+
+- **Base Size**: ${currentSettings.aiScale.recommendedBaseSize}px
+- **Scale Ratio**: ${currentSettings.scale?.ratio || 1.2}
+- **Steps Up**: ${currentSettings.scale?.stepsUp || 3}
+- **Steps Down**: ${currentSettings.scale?.stepsDown || 2}
+
+${currentSettings.aiScale.recommendations || ''}
+
+${currentSettings.aiScale.summaryTable || ''}
+
+${currentSettings.aiScale.reasoning || ''}
+`;
+          
+          // Set the AI analysis text based on which tab is active
+          if (currentSettings.analysisTab === 'platform') {
+            setPlatformReasoning(formattedRecommendation);
+          } else if (currentSettings.analysisTab === 'image') {
+            setImageAnalysis(formattedRecommendation);
+          }
+        }
+      }
+    }
+  }, [activePlatform, currentSettings, updatePlatform]);
+
+  // Save tab selections when they change
+  const handleViewTabChange = useCallback((tab: string) => {
+    setActiveViewTab(tab);
+    if (activePlatform) {
+      updatePlatform(activePlatform, { viewTab: tab });
+    }
+  }, [activePlatform, updatePlatform]);
+
+  const handleAnalysisTabChange = useCallback((tab: string) => {
+    setActiveAnalysisTab(tab);
+    if (activePlatform) {
+      updatePlatform(activePlatform, { analysisTab: tab });
+    }
+  }, [activePlatform, updatePlatform]);
+
+  if (!currentSettings) {
+    return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
+  }
+
+  // Ensure typeStyles exists
+  const typeStyles = currentSettings.typeStyles || []
+  const typographyUnit = currentSettings.units?.typography || 'px'
+
+  // Constants
+  const viewTabs = [
+    { id: 'scale', label: 'Scale View' },
+    { id: 'styles', label: 'Styles View' }
+  ]
+
+  const analysisTabs = [
+    { id: 'platform', label: 'Platform Analysis' },
+    { id: 'image', label: 'Image Analysis' }
+  ]
+
+  // This useEffect was consolidated with the one above
+  // to avoid the "Rendered more hooks than during the previous render" error
+
   return (
     <div className="h-full">
       <div className="px-4 py-4">
@@ -981,11 +1212,39 @@ ${recommendation}`
           <div className="px-4 py-4">
             <RadioGroup
               value={currentSettings.scaleMethod} 
-              onValueChange={(value) => handleScaleMethodChange(value as ScaleMethod)}
+              onValueChange={(value) => {
+                const method = value as ScaleMethod;
+                console.log(`Changing scale method to: ${method}`);
+                
+                // If switching to AI method, ensure AI settings are initialized
+                if (method === 'ai') {
+                  // Initialize AI settings if they don't exist or are incomplete
+                  const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
+                  
+                  updatePlatform(activePlatform, {
+                    scaleMethod: method,
+                    aiScale: currentSettings.aiScale || {
+                      recommendedBaseSize: currentScale.baseSize,
+                      originalSizeInPx: currentScale.baseSize,
+                      recommendations: '',
+                      summaryTable: '',
+                      reasoning: ''
+                    },
+                    // Set default tabs for AI method
+                    viewTab: currentSettings.viewTab || 'scale',
+                    analysisTab: currentSettings.analysisTab || 'platform'
+                  });
+                } else {
+                  // For other methods, just update the scale method
+                  updatePlatform(activePlatform, { 
+                    scaleMethod: method 
+                  });
+                }
+              }}
               className="grid grid-cols-3 gap-4"
             >
               <div>
-                <RadioGroupItem value="modular" id="modular" className="peer sr-only" />
+                <RadioGroupItem value="modular" id="modular" className="peer sr-only" defaultChecked={currentSettings.scaleMethod === 'modular'} />
                 <Label
                   htmlFor="modular"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -995,7 +1254,7 @@ ${recommendation}`
                 </Label>
               </div>
               <div>
-                <RadioGroupItem value="distance" id="distance" className="peer sr-only" />
+                <RadioGroupItem value="distance" id="distance" className="peer sr-only" defaultChecked={currentSettings.scaleMethod === 'distance'} />
                 <Label
                   htmlFor="distance"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -1005,7 +1264,7 @@ ${recommendation}`
                 </Label>
               </div>
               <div>
-                <RadioGroupItem value="ai" id="ai" className="peer sr-only" />
+                <RadioGroupItem value="ai" id="ai" className="peer sr-only" defaultChecked={currentSettings.scaleMethod === 'ai'} />
                 <Label
                   htmlFor="ai"
                   className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -1322,9 +1581,10 @@ ${recommendation}`
               <div className="mt-4 space-y-4">
                 <AnimatedTabs
                   tabs={analysisTabs}
-                  defaultTab="platform"
+                  defaultTab={currentSettings.analysisTab || "platform"}
+                  value={activeAnalysisTab}
                   onChange={(value) => {
-                    setActiveAnalysisTab(value);
+                    handleAnalysisTabChange(value);
                     setAiError(null);
                     setPlatformReasoning(null);
                     setImageAnalysis(null);
@@ -1624,7 +1884,7 @@ ${recommendation}`
 
                         {imageAnalysis && (
                           <div className="mt-4 p-4 bg-muted rounded-lg">
-                            <h4 className="text-xs font-medium mb-2">Image Analysis Results</h4>
+                            <h4 className="text-xs font-medium">Image Analysis Results</h4>
                             <p className="text-xs text-muted-foreground whitespace-pre-wrap">
                               {imageAnalysis}
                             </p>
@@ -1736,6 +1996,144 @@ ${recommendation}`
                           </div>
                         )}
 
+                        {/* Prompt History Section */}
+                        {currentSettings.aiScale?.prompts && currentSettings.aiScale.prompts.length > 0 && (
+                          <div className="mt-6 mb-6 space-y-4 border-t pt-4">
+                            <h4 className="text-xs font-medium">Prompt History</h4>
+                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                              {currentSettings.aiScale.prompts.map((prompt) => (
+                                <div key={prompt.timestamp} className="border rounded-md p-3 text-xs space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">{new Date(prompt.timestamp).toLocaleString()}</span>
+                                    <Badge variant="outline" className="text-[0.65rem]">
+                                      {prompt.deviceType || 'Unknown Device'}
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                                    {prompt.context && (
+                                      <div>
+                                        <span className="font-medium">Context:</span> {prompt.context}
+                                      </div>
+                                    )}
+                                    {prompt.location && (
+                                      <div>
+                                        <span className="font-medium">Location:</span> {prompt.location}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Display the stored image if available */}
+                                  {(prompt.storedImageUrl || prompt.imageUrl) && (
+                                    <div className="mt-2">
+                                      <img 
+                                        src={prompt.storedImageUrl || prompt.imageUrl} 
+                                        alt="Reference image" 
+                                        className="w-full h-auto max-h-32 object-contain rounded border"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <span className="font-medium text-muted-foreground">Base Size:</span> {prompt.result?.recommendedBaseSize || 16}px
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-muted-foreground">Ratio:</span> {prompt.result?.ratio || 1.2}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-muted-foreground">Steps Up:</span> {prompt.result?.stepsUp || 3}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-muted-foreground">Steps Down:</span> {prompt.result?.stepsDown || 2}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex justify-between pt-1">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-6 text-xs"
+                                      onClick={() => {
+                                        // Apply this prompt's settings
+                                        if (activePlatform && currentSettings && prompt.result) {
+                                          updatePlatform(activePlatform, {
+                                            scale: {
+                                              ...(currentSettings.scale || {}),
+                                              baseSize: prompt.result.recommendedBaseSize || 16,
+                                              ratio: prompt.result.ratio || 1.2,
+                                              stepsUp: prompt.result.stepsUp || 3,
+                                              stepsDown: prompt.result.stepsDown || 2
+                                            },
+                                            aiScale: {
+                                              ...(currentSettings.aiScale || {}),
+                                              recommendedBaseSize: prompt.result.recommendedBaseSize || 16,
+                                              originalSizeInPx: prompt.result.recommendedBaseSize || 16,
+                                              recommendations: prompt.result.recommendations || '',
+                                              summaryTable: prompt.result.summaryTable || '',
+                                              reasoning: prompt.result.reasoning || ''
+                                            }
+                                          });
+                                          
+                                          // Set the AI analysis text
+                                          const formattedRecommendation = `
+## Typography Analysis Results
+
+Based on the image analysis, I recommend the following typography scale:
+
+- **Base Size**: ${prompt.result?.recommendedBaseSize || 16}px
+- **Scale Ratio**: ${prompt.result?.ratio || 1.2}
+- **Steps Up**: ${prompt.result?.stepsUp || 3}
+- **Steps Down**: ${prompt.result?.stepsDown || 2}
+
+${prompt.result?.recommendations || ''}
+
+${prompt.result?.summaryTable || ''}
+
+${prompt.result?.reasoning || ''}
+`;
+                                          
+                                          // Update the analysis text based on active tab
+                                          if (activeAnalysisTab === 'platform') {
+                                            setPlatformReasoning(formattedRecommendation);
+                                          } else if (activeAnalysisTab === 'image') {
+                                            setImageAnalysis(formattedRecommendation);
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      Apply Settings
+                                    </Button>
+                                    
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="h-6 text-xs text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        // Remove this prompt from history
+                                        if (activePlatform && currentSettings && currentSettings.aiScale) {
+                                          const updatedPrompts = currentSettings.aiScale.prompts?.filter(
+                                            (p) => p.timestamp !== prompt.timestamp
+                                          ) || [];
+                                          
+                                          updatePlatform(activePlatform, {
+                                            aiScale: {
+                                              ...(currentSettings.aiScale || {}),
+                                              prompts: updatedPrompts
+                                            }
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <Button 
                           className="w-full text-xs"
                           onClick={() => handleGenerateFromImage(selectedImage)}
@@ -1827,7 +2225,7 @@ ${recommendation}`
               <Input
                 type="number"
                 step="0.1"
-                value={currentSettings.accessibility.minContrastBody}
+                value={currentSettings.accessibility?.minContrastBody || 4.5}
                 onChange={(e) => {
                   handleAccessibilityChange({
                     minContrastBody: Number(e.target.value),
@@ -1842,7 +2240,7 @@ ${recommendation}`
               <Input
                 type="number"
                 step="0.1"
-                value={currentSettings.accessibility.minContrastLarge}
+                value={currentSettings.accessibility?.minContrastLarge || 3.0}
                 onChange={(e) => {
                   handleAccessibilityChange({
                     minContrastLarge: Number(e.target.value),
@@ -1903,7 +2301,7 @@ function DistanceBasedTab({
           className="grid grid-cols-3 gap-4"
         >
           <div>
-            <RadioGroupItem value="modular" id="modular-distance" className="peer sr-only" />
+            <RadioGroupItem value="modular" id="modular-distance" className="peer sr-only" defaultChecked={platform.scaleMethod === 'modular'} />
             <Label
               htmlFor="modular-distance"
               className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -1913,7 +2311,7 @@ function DistanceBasedTab({
             </Label>
           </div>
           <div>
-            <RadioGroupItem value="distance" id="distance-distance" className="peer sr-only" />
+            <RadioGroupItem value="distance" id="distance-distance" className="peer sr-only" defaultChecked={platform.scaleMethod === 'distance'} />
             <Label
               htmlFor="distance-distance"
               className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
@@ -1923,7 +2321,7 @@ function DistanceBasedTab({
             </Label>
           </div>
           <div>
-            <RadioGroupItem value="ai" id="ai-distance" className="peer sr-only" />
+            <RadioGroupItem value="ai" id="ai-distance" className="peer sr-only" defaultChecked={platform.scaleMethod === 'ai'} />
             <Label
               htmlFor="ai-distance"
               className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-transparent p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"

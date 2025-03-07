@@ -298,27 +298,50 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
   setCurrentPlatform: async (id: string | null) => {
     try {
       if (!id) {
-        set({ currentPlatform: null })
+        set({ currentPlatform: null, error: null })
         return
       }
 
+      // First check if the platform exists in the current state
+      const existingPlatform = get().platforms.find(p => p.id === id)
+      if (existingPlatform) {
+        set({ currentPlatform: existingPlatform, error: null })
+        return
+      }
+
+      // If not found in state, try to fetch from database
       const { data: rawData, error } = await supabase
         .from('platforms')
         .select('*')
         .eq('id', id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.code === 'PGRST116') { // Not found error
+          console.warn(`Platform with ID ${id} not found in database`)
+          set({ currentPlatform: null, error: `Platform with ID ${id} not found` })
+          return
+        }
+        throw error
+      }
 
-      if (!rawData) throw new Error('Platform not found')
+      if (!rawData) {
+        console.warn(`Platform with ID ${id} not found (no data returned)`)
+        set({ currentPlatform: null, error: `Platform with ID ${id} not found` })
+        return
+      }
       
       if (!isRawPlatform(rawData)) {
         throw new Error('Invalid platform data received from server')
       }
 
-      set({ currentPlatform: convertToPlatform(rawData) })
+      set({ currentPlatform: convertToPlatform(rawData), error: null })
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'An error occurred' })
+      console.error('Error setting current platform:', error)
+      set({ 
+        currentPlatform: null, 
+        error: error instanceof Error ? error.message : 'An error occurred' 
+      })
     }
   },
 

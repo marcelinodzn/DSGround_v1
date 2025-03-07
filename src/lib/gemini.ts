@@ -14,6 +14,7 @@ interface AIRecommendation {
   ratio: number
   stepsUp: number
   stepsDown: number
+  originalSizeInPx: number
 }
 
 // Initialize Gemini
@@ -95,7 +96,8 @@ export function parseAIRecommendation(response: string | any): AIRecommendation 
         baseSize: 16,
         ratio: 1.2,
         stepsUp: 3,
-        stepsDown: 2
+        stepsDown: 2,
+        originalSizeInPx: 16
       };
     }
     
@@ -109,6 +111,11 @@ export function parseAIRecommendation(response: string | any): AIRecommendation 
     const baseMatch = response.match(/(?:recommended|base)\s+size(?:\s+is|\s+of)?:\s*(\d+(?:\.\d+)?)\s*px/i) || 
                      response.match(/base\s+size\s+of\s*(\d+(?:\.\d+)?)\s*px/i);
     const baseSize = baseMatch ? parseFloat(baseMatch[1]) : 16;
+    
+    // Look for original size pattern
+    const originalSizeMatch = response.match(/original\s+size(?:\s+is|\s+of)?:\s*(\d+(?:\.\d+)?)\s*px/i) || 
+                             response.match(/original\s+size\s+of\s*(\d+(?:\.\d+)?)\s*px/i);
+    const originalSizeInPx = originalSizeMatch ? parseFloat(originalSizeMatch[1]) : baseSize;
     
     // Look for ratio pattern with more flexibility
     const ratioMatch = response.match(/(?:recommended\s+)?ratio(?:\s+is|\s+of)?:\s*(\d+(?:\.\d+)?)/i) || 
@@ -125,13 +132,14 @@ export function parseAIRecommendation(response: string | any): AIRecommendation 
                            response.match(/(\d+)\s+steps?\s+down/i);
     const stepsDown = stepsDownMatch ? parseInt(stepsDownMatch[1]) : 2;
     
-    console.log("Parsed values:", { baseSize, ratio, stepsUp, stepsDown });
+    console.log("Parsed values:", { baseSize, originalSizeInPx, ratio, stepsUp, stepsDown });
     
     return {
       baseSize,
       ratio,
       stepsUp,
-      stepsDown
+      stepsDown,
+      originalSizeInPx
     };
   } catch (error) {
     console.error('Error parsing AI recommendation:', error);
@@ -139,7 +147,8 @@ export function parseAIRecommendation(response: string | any): AIRecommendation 
       baseSize: 16,
       ratio: 1.2,
       stepsUp: 3,
-      stepsDown: 2
+      stepsDown: 2,
+      originalSizeInPx: 16
     };
   }
-} 
+}
