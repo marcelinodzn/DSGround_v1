@@ -26,49 +26,20 @@ export default function ColorsPage() {
     setCurrentPalette 
   } = useColorStore()
 
-  // When brand changes, fetch platforms and select a platform
+  // Fetch platforms when brand changes
   useEffect(() => {
-    const fetchAndSelectPlatform = async () => {
-      if (!currentBrand) {
-        setCurrentPlatform(null)
-        return
-      }
-      
-      try {
-        await fetchPlatformsByBrand(currentBrand.id)
-        
-        // Get fresh platforms after fetch
-        const currentPlatforms = usePlatformStore.getState().platforms
-        if (currentPlatforms && currentPlatforms.length > 0) {
-          // Select the first platform if none is selected
-          if (!currentPlatform) {
-            try {
-              await setCurrentPlatform(currentPlatforms[0].id)
-            } catch (err) {
-              console.error('Error setting current platform:', err)
-              // If there's an error setting the current platform, just set it to null
-              setCurrentPlatform(null)
-            }
-          }
-        } else {
-          setCurrentPlatform(null)
-        }
-      } catch (error) {
-        console.error('Error fetching platforms:', error)
-        setCurrentPlatform(null)
-      }
+    if (currentBrand?.id) {
+      fetchPlatformsByBrand(currentBrand.id);
     }
+  }, [currentBrand?.id, fetchPlatformsByBrand]);
 
-    fetchAndSelectPlatform()
-  }, [currentBrand, fetchPlatformsByBrand, setCurrentPlatform, currentPlatform])
-
-  // When brand changes, fetch color palettes
+  // Fetch palettes when brand changes
   useEffect(() => {
-    if (currentBrand) {
-      fetchPalettesByBrand(currentBrand.id)
+    if (currentBrand?.id) {
+      fetchPalettesByBrand(currentBrand.id);
     }
-  }, [currentBrand, fetchPalettesByBrand])
-
+  }, [currentBrand?.id, fetchPalettesByBrand]);
+  
   return (
     <div className={cn(
       "h-full flex transition-all duration-300 ease-in-out",

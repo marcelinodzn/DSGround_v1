@@ -43,12 +43,24 @@ export interface ColorPalette {
   isCore: boolean; // Whether this is a core palette or a secondary/accent palette
 }
 
+// Configuration state for palette generation
+interface PaletteConfig {
+  numSteps: number;
+  useLightness: boolean;
+  lightnessRange: [number, number];
+  chromaRange: [number, number];
+  lightnessPreset: 'linear' | 'curved' | 'custom';
+  chromaPreset: 'constant' | 'decrease' | 'increase' | 'custom';
+  hueShift: number;
+}
+
 // Interface for the color store
 interface ColorStore {
   palettes: ColorPalette[];
   currentPaletteId: string | null;
   isLoading: boolean;
   error: string | null;
+  paletteConfig: PaletteConfig;
   
   // Palette CRUD operations
   fetchPalettesByBrand: (brandId: string) => Promise<void>;
@@ -66,6 +78,9 @@ interface ColorStore {
   convertColor: (color: string, fromFormat: ColorFormat, toFormat: ColorFormat) => string;
   generatePalette: (baseColor: ColorValues, numSteps: number) => ColorStep[];
   calculateAccessibility: (color: string) => ColorStep['accessibility'];
+  
+  // Palette configuration operations
+  updatePaletteConfig: (config: Partial<PaletteConfig>) => void;
 }
 
 // Color conversion and accessibility functions are now imported from @/lib/color-utils
@@ -75,6 +90,15 @@ export const useColorStore = create<ColorStore>((set, get) => ({
   currentPaletteId: null,
   isLoading: false,
   error: null,
+  paletteConfig: {
+    numSteps: 9,
+    useLightness: true,
+    lightnessRange: [0.05, 0.95],
+    chromaRange: [0.01, 0.4],
+    lightnessPreset: 'linear',
+    chromaPreset: 'constant',
+    hueShift: 0,
+  },
 
   fetchPalettesByBrand: async (brandId: string) => {
     set({ isLoading: true });
@@ -459,7 +483,47 @@ export const useColorStore = create<ColorStore>((set, get) => ({
 
   calculateAccessibility: (color) => {
     return checkAccessibility(color);
-  }
+  },
+
+  updatePaletteConfig: (config) => {
+    set((state) => ({
+      paletteConfig: { ...state.paletteConfig, ...config }
+    }));
+    
+    // Regenerate the current palette with the new config
+    const state = get();
+    regenerateCurrentPalette(state);
+  },
 }), {
   name: 'color-store'
 });
+
+// Add this function to the store implementation
+const regenerateCurrentPalette = async (state: ColorStore) => {
+  if (!state.currentPaletteId) return;
+  
+  const currentPalette = state.palettes.find(p => p.id === state.currentPaletteId);
+  if (!currentPalette) return;
+  
+  // Create palette generation options from the current config
+  const paletteOptions = {
+    lightnessPreset: state.paletteConfig.lightnessPreset,
+    chromaPreset: state.paletteConfig.chromaPreset,
+    lightnessRange: state.paletteConfig.lightnessRange,
+    chromaRange: state.paletteConfig.chromaRange,
+    hueShift: state.paletteConfig.hueShift
+  };
+  
+  // Generate steps for the palette using the current config
+  const generatedSteps = generatePaletteUtil(
+    currentPalette.baseColor, 
+    state.paletteConfig.numSteps,
+    state.paletteConfig.useLightness,
+    paletteOptions
+  );
+  
+  // Update the palette in the store and database
+  await state.updatePalette(currentPalette.id, {
+    steps: generatedSteps
+  });
+};

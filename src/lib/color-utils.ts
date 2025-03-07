@@ -120,7 +120,7 @@ export function convertColor(color: string, fromFormat: ColorFormat, toFormat: C
 /**
  * Convert a color to all supported formats
  */
-export function convertToAllFormats(color: string, format: ColorFormat): ColorValues {
+export function convertToAllFormats(color: string): ColorValues {
   try {
     // Handle empty or invalid color values
     if (!color) {
@@ -131,23 +131,62 @@ export function convertToAllFormats(color: string, format: ColorFormat): ColorVa
       };
     }
     
-    const hex = format === 'hex' ? color : convertColor(color, format, 'hex');
-    const rgb = format === 'rgb' ? color : convertColor(color, format, 'rgb');
-    const oklch = format === 'oklch' ? color : convertColor(color, format, 'oklch');
-    const cmyk = format === 'cmyk' ? color : convertColor(color, format, 'cmyk');
+    // Normalize the color to hex first
+    let hex = color;
     
-    return {
-      hex,
-      rgb,
-      oklch,
-      cmyk
-    };
+    if (!hex.startsWith('#')) {
+      if (hex.startsWith('rgb')) {
+        // Convert RGB to HEX
+        const rgbMatch = hex.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (rgbMatch) {
+          const r = parseInt(rgbMatch[1]);
+          const g = parseInt(rgbMatch[2]);
+          const b = parseInt(rgbMatch[3]);
+          hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+      } else if (hex.startsWith('oklch')) {
+        // For now, we'll use a placeholder conversion
+        // In a real app, you'd use a proper color library to convert OKLCH to RGB to HEX
+        try {
+          const parsed = parse(hex);
+          if (parsed) {
+            hex = formatHex(parsed);
+          } else {
+            hex = '#3264C8'; // Default blue as a fallback
+          }
+        } catch (e) {
+          hex = '#3264C8'; // Default blue as a fallback
+        }
+      }
+    }
+    
+    // Now convert hex to other formats
+    try {
+      const parsed = parse(hex);
+      if (!parsed) throw new Error('Failed to parse hex color');
+      
+      const rgbColor = rgb(parsed);
+      const oklchColor = oklch(parsed);
+      
+      return {
+        hex: hex,
+        rgb: `rgb(${Math.round(rgbColor.r * 255)}, ${Math.round(rgbColor.g * 255)}, ${Math.round(rgbColor.b * 255)})`,
+        oklch: `oklch(${Math.round(oklchColor.l * 100)}% ${oklchColor.c.toFixed(2)} ${oklchColor.h?.toFixed(0) || '0'})`
+      };
+    } catch (e) {
+      console.error('Error converting color formats:', e);
+      return {
+        hex: hex,
+        rgb: 'rgb(50, 100, 200)',
+        oklch: 'oklch(60% 0.15 240)'
+      };
+    }
   } catch (error) {
-    console.error('Error converting to all formats:', error);
+    console.error('Error in convertToAllFormats:', error);
     return {
-      hex: '#000000',
-      rgb: 'rgb(0, 0, 0)',
-      oklch: 'oklch(0% 0 0)'
+      hex: '#3264C8',
+      rgb: 'rgb(50, 100, 200)',
+      oklch: 'oklch(60% 0.15 240)'
     };
   }
 }
@@ -262,29 +301,49 @@ interface PaletteOptions {
  * @param options Advanced options for generating the palette
  */
 export function generatePalette(
-  baseColor: string, 
+  baseColor: ColorValues | string, 
   numSteps: number, 
-  lightness = true,
-  options: PaletteOptions = {}
-) {
+  lightness: boolean = true, 
+  options: {
+    lightnessPreset?: 'linear' | 'curved' | 'custom',
+    chromaPreset?: 'constant' | 'decrease' | 'increase' | 'custom',
+    lightnessRange?: [number, number],
+    chromaRange?: [number, number],
+    hueShift?: number
+  } = {}
+): ColorStep[] {
   try {
     console.log('Color utils - generating palette:', { baseColor, numSteps, lightness });
     
     // Handle invalid input
-    if (!baseColor || typeof baseColor !== 'string') {
+    if (!baseColor) {
       console.error('Invalid base color:', baseColor);
       throw new Error('Invalid base color');
     }
     
-    const parsed = parse(baseColor);
+    // Convert string to ColorValues if needed
+    let baseColorValues: ColorValues;
+    if (typeof baseColor === 'string') {
+      baseColorValues = convertToAllFormats(baseColor);
+    } else {
+      baseColorValues = baseColor;
+    }
+    
+    // Make sure we have an OKLCH value to work with
+    if (!baseColorValues.oklch) {
+      console.error('Missing OKLCH value in base color:', baseColorValues);
+      throw new Error('Missing OKLCH value in base color');
+    }
+    
+    const parsed = parse(baseColorValues.oklch);
     if (!parsed) {
-      console.error('Could not parse color:', baseColor);
+      console.error('Could not parse color:', baseColorValues.oklch);
       throw new Error('Could not parse color');
     }
     
     const oklchBase = oklch(parsed);
     if (!oklchBase) {
-      console.error('Could not convert to oklch:', baseColor);
+      console.error('Could not convert to oklch:', parsed);
       throw new Error('Could not convert to oklch');
     }
     
@@ -296,12 +355,13 @@ export function generatePalette(
       oklchBase.h = oklchBase.h || 240; // Default to blue hue
     }
     
-    // Set default options if not provided
+    // Extract options with defaults
     const {
       lightnessPreset = 'linear',
       chromaPreset = 'constant',
       lightnessRange = [0.05, 0.95],
-      chromaRange = [0.01, 0.4]
+      chromaRange = [0.01, 0.4],
+      hueShift = 0
     } = options;
     
     console.log('Generating palette with options:', { 
@@ -310,6 +370,11 @@ export function generatePalette(
       lightnessRange, 
       chromaRange 
     });
+    
+    // Apply hue shift to the base color if specified
+    if (hueShift && oklchBase.h) {
+      oklchBase.h = (oklchBase.h + hueShift + 360) % 360;
+    }
     
     const steps = [];
     
