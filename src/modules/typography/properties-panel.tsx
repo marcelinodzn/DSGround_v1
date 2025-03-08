@@ -177,23 +177,23 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                     className="text-xs h-8 flex-1"
                   />
                   <Select
-                    value={typeStyle.lineHeightUnit || 'number'}
+                    value={typeStyle.lineHeightUnit || 'percent'}
                     onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { 
-                      lineHeightUnit: value as 'number' | 'percent',
+                      lineHeightUnit: value as 'multiplier' | 'percent',
                       // Convert the value when changing units
-                      lineHeight: value === 'percent' && typeStyle.lineHeightUnit === 'number'
+                      lineHeight: value === 'percent' && typeStyle.lineHeightUnit === 'multiplier'
                         ? typeStyle.lineHeight // No need to convert as we'll display it differently
-                        : value === 'number' && typeStyle.lineHeightUnit === 'percent'
+                        : value === 'multiplier' && typeStyle.lineHeightUnit === 'percent'
                           ? typeStyle.lineHeight // No need to convert as we'll display it differently
                           : typeStyle.lineHeight
                     })}
                   >
-                    <SelectTrigger className="text-xs h-8 w-20">
+                    <SelectTrigger className="text-xs h-8 w-16">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="percent">Percent</SelectItem>
+                      <SelectItem value="multiplier">×</SelectItem>
+                      <SelectItem value="percent">%</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -241,9 +241,9 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="uppercase">UPPERCASE</SelectItem>
-                    <SelectItem value="lowercase">lowercase</SelectItem>
-                    <SelectItem value="capitalize">Title Case</SelectItem>
+                    <SelectItem value="uppercase">UPPER</SelectItem>
+                    <SelectItem value="lowercase">lower</SelectItem>
+                    <SelectItem value="capitalize">Title</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -350,13 +350,12 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
               </TableCell>
               <TableCell className="py-4 text-right">
                 {fontSize}{typographyUnit}
-                <div className="text-xs text-muted-foreground mt-1">
-                  {style.lineHeightUnit === 'percent' 
-                    ? `${Math.round(style.lineHeight * 100)}%` 
-                    : style.lineHeight} line height
+                <div className="text-xs text-muted-foreground">
+                  Line Height: {style.lineHeightUnit === 'multiplier' 
+                    ? `${style.lineHeight.toFixed(2)}×` 
+                    : `${(style.lineHeight * 100).toFixed(0)}%`}
                   {style.textTransform && style.textTransform !== 'none' && 
-                    `, ${style.textTransform}`
-                  }
+                    `, Transform: ${style.textTransform}`}
                 </div>
               </TableCell>
             </TableRow>

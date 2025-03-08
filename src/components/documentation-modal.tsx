@@ -146,7 +146,11 @@ export function DocumentationModal({
                 <TableCell className="text-right">
                   {scaleValue ? `${Math.round(scaleValue.size)}px` : '-'}
                 </TableCell>
-                <TableCell className="text-right">{style.lineHeight}</TableCell>
+                <TableCell className="text-right">
+                  {style.lineHeightUnit === 'multiplier' 
+                    ? `${style.lineHeight.toFixed(2)}×` 
+                    : `${(style.lineHeight * 100).toFixed(0)}%`}
+                </TableCell>
                 <TableCell className="text-right">{style.letterSpacing}em</TableCell>
                 <TableCell className="text-right">{style.fontWeight}</TableCell>
                 <TableCell>{style.scaleStep}</TableCell>
@@ -308,7 +312,11 @@ export function DocumentationModal({
                       ? `${Math.round(scaleValue.size)}${typographyData.units.typography}` 
                       : '-'}
                   </TableCell>
-                  <TableCell>{style.lineHeight}</TableCell>
+                  <TableCell>
+                    {style.lineHeightUnit === 'multiplier' 
+                      ? `${style.lineHeight.toFixed(2)}×` 
+                      : `${(style.lineHeight * 100).toFixed(0)}%`}
+                  </TableCell>
                   <TableCell>{style.letterSpacing}em</TableCell>
                   <TableCell>{style.fontWeight}</TableCell>
                   <TableCell>{style.scaleStep}</TableCell>
@@ -324,14 +332,13 @@ export function DocumentationModal({
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-5xl h-[85vh] p-6 flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+        <DialogHeader className="flex-shrink-0 mb-6">
           <DialogTitle>Typography Documentation</DialogTitle>
         </DialogHeader>
         
         <div className="flex flex-col flex-1 gap-6 overflow-hidden">
           <div className="flex items-center justify-between gap-4 flex-shrink-0">
             <div className="flex items-center gap-4">
-              <Label htmlFor="platformSelect">Platform:</Label>
               <Select
                 value={selectedPlatform}
                 onValueChange={setSelectedPlatform}

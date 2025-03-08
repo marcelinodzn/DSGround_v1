@@ -68,7 +68,7 @@ export interface TypeStyle {
   fontFamily: string
   fontWeight: number
   lineHeight: number
-  lineHeightUnit?: 'number' | 'percent'
+  lineHeightUnit?: 'multiplier' | 'percent'
   letterSpacing: number
   opticalSize: number
   fontSize?: number
