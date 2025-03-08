@@ -340,6 +340,7 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
                     fontWeight: style.fontWeight,
                     lineHeight: style.lineHeight,
                     letterSpacing: style.letterSpacing,
+                    textTransform: style.textTransform || 'none',
                     fontVariationSettings: font?.is_variable ? `'wght' ${style.fontWeight}` : undefined,
                   }}
                   data-font-name={font?.family}
@@ -349,6 +350,14 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
               </TableCell>
               <TableCell className="py-4 text-right">
                 {fontSize}{typographyUnit}
+                <div className="text-xs text-muted-foreground mt-1">
+                  {style.lineHeightUnit === 'percent' 
+                    ? `${Math.round(style.lineHeight * 100)}%` 
+                    : style.lineHeight} line height
+                  {style.textTransform && style.textTransform !== 'none' && 
+                    `, ${style.textTransform}`
+                  }
+                </div>
               </TableCell>
             </TableRow>
           )

@@ -162,17 +162,41 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
 
               <div>
                 <Label className="text-xs">Line Height</Label>
-                <Input
-                  type="number"
-                  min="0.5"
-                  max="3"
-                  step="0.1"
-                  value={typeStyle.lineHeight}
-                  onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { 
-                    lineHeight: parseFloat(e.target.value) 
-                  })}
-                  className="text-xs h-8"
-                />
+                <div className="flex gap-1">
+                  <Input
+                    type="number"
+                    min="0.5"
+                    max={typeStyle.lineHeightUnit === 'percent' ? 300 : 3}
+                    step={typeStyle.lineHeightUnit === 'percent' ? 5 : 0.1}
+                    value={typeStyle.lineHeightUnit === 'percent' ? typeStyle.lineHeight * 100 : typeStyle.lineHeight}
+                    onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { 
+                      lineHeight: typeStyle.lineHeightUnit === 'percent' 
+                        ? parseFloat(e.target.value) / 100 
+                        : parseFloat(e.target.value) 
+                    })}
+                    className="text-xs h-8 flex-1"
+                  />
+                  <Select
+                    value={typeStyle.lineHeightUnit || 'number'}
+                    onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { 
+                      lineHeightUnit: value as 'number' | 'percent',
+                      // Convert the value when changing units
+                      lineHeight: value === 'percent' && typeStyle.lineHeightUnit === 'number'
+                        ? typeStyle.lineHeight // No need to convert as we'll display it differently
+                        : value === 'number' && typeStyle.lineHeightUnit === 'percent'
+                          ? typeStyle.lineHeight // No need to convert as we'll display it differently
+                          : typeStyle.lineHeight
+                    })}
+                  >
+                    <SelectTrigger className="text-xs h-8 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="percent">Percent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
@@ -202,6 +226,26 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                   })}
                   className="text-xs h-8"
                 />
+              </div>
+              
+              <div>
+                <Label className="text-xs">Text Transform</Label>
+                <Select
+                  value={typeStyle.textTransform || 'none'}
+                  onValueChange={(value) => props.handleTypeStyleChange(typeStyle.id, { 
+                    textTransform: value as 'none' | 'uppercase' | 'lowercase' | 'capitalize'
+                  })}
+                >
+                  <SelectTrigger className="text-xs h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="uppercase">UPPERCASE</SelectItem>
+                    <SelectItem value="lowercase">lowercase</SelectItem>
+                    <SelectItem value="capitalize">Title Case</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

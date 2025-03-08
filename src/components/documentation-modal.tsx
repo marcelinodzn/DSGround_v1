@@ -323,12 +323,9 @@ export function DocumentationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-4xl h-[85vh] p-6 flex flex-col">
+      <DialogContent className="max-w-5xl h-[85vh] p-6 flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Typography Documentation</DialogTitle>
-          <DialogDescription>
-            Export and review your typography system
-          </DialogDescription>
         </DialogHeader>
         
         <div className="flex flex-col flex-1 gap-6 overflow-hidden">

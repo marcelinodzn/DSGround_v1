@@ -68,9 +68,11 @@ export interface TypeStyle {
   fontFamily: string
   fontWeight: number
   lineHeight: number
+  lineHeightUnit?: 'number' | 'percent'
   letterSpacing: number
   opticalSize: number
   fontSize?: number
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
 }
 
 export interface AIPrompt {
