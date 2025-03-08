@@ -432,67 +432,155 @@ export function DocumentationModal({
                   Export as PDF
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  // Generate SVG content 
+                  // Generate SVG content with table-like styling
                   const svgWidth = 1200;
-                  const svgHeight = 800;
+                  let svgHeight = 1600; // Increased height for more content
                   const initialPadding = 40;
                   
                   let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
                     <style>
                       text { font-family: system-ui, sans-serif; }
-                      .heading { font-weight: bold; font-size: 20px; }
-                      .platform-name { font-weight: bold; font-size: 16px; }
-                      .style-name { font-weight: 500; }
+                      .heading { font-weight: bold; font-size: 24px; }
+                      .platform-name { font-weight: bold; font-size: 20px; }
+                      .style-name { font-weight: 500; font-size: 16px; }
+                      .table-header { font-weight: 600; font-size: 14px; fill: #6b7280; }
+                      .table-row-odd { fill: #f9fafb; }
+                      .table-row-even { fill: #ffffff; }
+                      .table-cell { font-size: 14px; }
+                      .table-cell-small { font-size: 12px; fill: #6b7280; }
+                      .table-border { stroke: #e5e7eb; stroke-width: 1; }
                     </style>
                     <rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />
                     <text x="${initialPadding}" y="${initialPadding}" class="heading">Typography Documentation</text>`;
                   
-                  let yOffset = initialPadding + 40;
-                  let xPadding = initialPadding;
+                  let yOffset = initialPadding + 60;
                   
+                  // Function to create a table
+                  const createTable = (
+                    x: number, 
+                    y: number, 
+                    width: number, 
+                    headers: string[], 
+                    rows: Array<Array<string | { main: string; sub?: string }>>,
+                    rowHeight = 60
+                  ): number => {
+                    const colWidths: number[] = [];
+                    const headerHeight = 40;
+                    
+                    // Calculate column widths based on header content
+                    let totalWidth = 0;
+                    headers.forEach((header, i) => {
+                      let colWidth: number;
+                      if (i === 0) colWidth = width * 0.3; // Style name column
+                      else if (i === 1) colWidth = width * 0.5; // Preview column
+                      else colWidth = width * 0.2; // Size column
+                      colWidths.push(colWidth);
+                      totalWidth += colWidth;
+                    });
+                    
+                    // Draw table header
+                    svg += `<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" fill="#f9fafb" class="table-border" />`;
+                    
+                    let xPos = x;
+                    headers.forEach((header, i) => {
+                      const textX = xPos + (i === headers.length - 1 ? colWidths[i] - 10 : 10);
+                      const textAnchor = i === headers.length - 1 ? 'end' : 'start';
+                      svg += `<text x="${textX}" y="${y + 25}" class="table-header" text-anchor="${textAnchor}">${header}</text>`;
+                      
+                      // Draw vertical line after each column except the last
+                      if (i < headers.length - 1) {
+                        svg += `<line x1="${xPos + colWidths[i]}" y1="${y}" x2="${xPos + colWidths[i]}" y2="${y + headerHeight + rows.length * rowHeight}" class="table-border" />`;
+                      }
+                      
+                      xPos += colWidths[i];
+                    });
+                    
+                    // Draw rows
+                    rows.forEach((row, rowIndex) => {
+                      const rowY = y + headerHeight + rowIndex * rowHeight;
+                      const fillClass = rowIndex % 2 === 0 ? 'table-row-even' : 'table-row-odd';
+                      
+                      // Draw row background
+                      svg += `<rect x="${x}" y="${rowY}" width="${width}" height="${rowHeight}" fill="${fillClass === 'table-row-odd' ? '#f9fafb' : '#ffffff'}" class="table-border" />`;
+                      
+                      // Draw row content
+                      xPos = x;
+                      row.forEach((cell, cellIndex) => {
+                        const textX = xPos + (cellIndex === row.length - 1 ? colWidths[cellIndex] - 10 : 10);
+                        const textAnchor = cellIndex === row.length - 1 ? 'end' : 'start';
+                        
+                        if (typeof cell === 'object') {
+                          // Complex cell with main text and subtext
+                          svg += `<text x="${textX}" y="${rowY + 25}" class="table-cell" text-anchor="${textAnchor}">${cell.main}</text>`;
+                          if (cell.sub) {
+                            svg += `<text x="${textX}" y="${rowY + 45}" class="table-cell-small" text-anchor="${textAnchor}">${cell.sub}</text>`;
+                          }
+                        } else {
+                          // Simple cell with just text
+                          svg += `<text x="${textX}" y="${rowY + rowHeight/2 + 5}" class="table-cell" text-anchor="${textAnchor}">${cell}</text>`;
+                        }
+                        
+                        xPos += colWidths[cellIndex];
+                      });
+                      
+                      // Draw horizontal line after each row
+                      svg += `<line x1="${x}" y1="${rowY + rowHeight}" x2="${x + width}" y2="${rowY + rowHeight}" class="table-border" />`;
+                    });
+                    
+                    return y + headerHeight + rows.length * rowHeight;
+                  };
+                  
+                  // Process each platform
                   platforms.forEach((platform, platformIndex) => {
                     // Get typography data from the store
                     const platformData = getTypographyData(platform.id);
                     if (!platformData) return;
                     
                     const typeStyles = platformData.typeStyles || [];
+                    if (typeStyles.length === 0) return;
                     
-                    svg += `<text x="${xPadding}" y="${yOffset}" class="platform-name">${platform.name}</text>`;
-                    yOffset += 30;
-                    
-                    const scaleMethod = platformData.scaleMethod || 'None';
-                    svg += `<text x="${xPadding}" y="${yOffset}">Scale Method: ${scaleMethod}</text>`;
-                    
-                    const scale = platformData.scale;
-                    if (scale) {
-                      yOffset += 20;
-                      svg += `<text x="${xPadding}" y="${yOffset}">Base Size: ${scale.baseSize}px, Ratio: ${scale.ratio}</text>`;
-                    }
-                    
+                    // Add platform heading
+                    svg += `<text x="${initialPadding}" y="${yOffset}" class="platform-name">${platform.name}</text>`;
                     yOffset += 40;
                     
-                    // Add type styles
-                    typeStyles.forEach((style, styleIndex) => {
-                      if (styleIndex > 0 && styleIndex % 10 === 0) {
-                        // Start a new column after 10 styles
-                        yOffset = initialPadding + 40;
-                        xPadding += 300;
-                      }
+                    // Create table headers
+                    const headers = ['Style', 'Preview', `Size (${platform.units?.typography || 'px'})`];
+                    
+                    // Create table rows
+                    const rows = typeStyles.map(style => {
+                      const scaleValue = getScaleValues(platform.id)?.find(s => s.label === style.scaleStep);
+                      const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
                       
-                      svg += `<text x="${xPadding}" y="${yOffset}" class="style-name">${style.name || 'Unnamed'}</text>`;
-                      yOffset += 20;
-                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Size: ${style.fontSize || ''}px</text>`;
-                      yOffset += 20;
-                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Weight: ${style.fontWeight || ''}</text>`;
-                      yOffset += 20;
-                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Line Height: ${style.lineHeight || ''}</text>`;
-                      yOffset += 30;
+                      // Format line height based on unit
+                      const lineHeight = style.lineHeightUnit === 'multiplier' 
+                        ? `${style.lineHeight.toFixed(2)}×` 
+                        : `${(style.lineHeight * 100).toFixed(0)}%`;
+                      
+                      // Format text transform if present
+                      const textTransform = style.textTransform && style.textTransform !== 'none' 
+                        ? `, Transform: ${style.textTransform}` 
+                        : '';
+                      
+                      return [
+                        { main: style.name, sub: style.fontFamily || 'System Font' },
+                        'The quick brown fox jumps over the lazy dog',
+                        { main: `${fontSize}${platform.units?.typography || 'px'}`, sub: `Line Height: ${lineHeight}${textTransform}` }
+                      ];
                     });
                     
-                    yOffset += 40;
-                    if (yOffset > svgHeight - 100) {
-                      yOffset = initialPadding + 40;
-                      xPadding += 300;
+                    // Create the table
+                    const tableWidth = svgWidth - (initialPadding * 2);
+                    yOffset = createTable(initialPadding, yOffset, tableWidth, headers, rows);
+                    
+                    // Add spacing between platform tables
+                    yOffset += 60;
+                    
+                    // If we're running out of space, increase the SVG height
+                    if (yOffset > svgHeight - 200) {
+                      const newHeight = yOffset + 200;
+                      svg = svg.replace(`height="${svgHeight}"`, `height="${newHeight}"`);
+                      svg = svg.replace(`viewBox="0 0 ${svgWidth} ${svgHeight}"`, `viewBox="0 0 ${svgWidth} ${newHeight}"`);
+                      svgHeight = newHeight;
                     }
                   });
                   
