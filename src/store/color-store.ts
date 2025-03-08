@@ -30,11 +30,13 @@ export interface ColorStep {
     wcagAALarge: boolean;
     wcagAAA: boolean;
   };
+  isBaseColor?: boolean; // Flag to indicate if this is the base color
 }
 
 // Color palette
 export interface ColorPalette {
   id: string;
+  brandId: string;
   name: string;
   description?: string;
   baseColor: ColorValues;
@@ -49,9 +51,12 @@ interface PaletteConfig {
   useLightness: boolean;
   lightnessRange: [number, number];
   chromaRange: [number, number];
-  lightnessPreset: 'linear' | 'curved' | 'custom';
+  lightnessPreset: 'linear' | 'curved' | 'easeIn' | 'easeOut' | 'custom';
   chromaPreset: 'constant' | 'decrease' | 'increase' | 'custom';
   hueShift: number;
+  lockBaseColor: boolean;
+  customLightnessValues: number[];
+  customChromaValues: number[];
 }
 
 // Interface for the color store
@@ -98,6 +103,9 @@ export const useColorStore = create<ColorStore>((set, get) => ({
     lightnessPreset: 'linear',
     chromaPreset: 'constant',
     hueShift: 0,
+    lockBaseColor: true,
+    customLightnessValues: [],
+    customChromaValues: [],
   },
 
   fetchPalettesByBrand: async (brandId: string) => {
@@ -511,7 +519,10 @@ const regenerateCurrentPalette = async (state: ColorStore) => {
     chromaPreset: state.paletteConfig.chromaPreset,
     lightnessRange: state.paletteConfig.lightnessRange,
     chromaRange: state.paletteConfig.chromaRange,
-    hueShift: state.paletteConfig.hueShift
+    hueShift: state.paletteConfig.hueShift,
+    lockBaseColor: state.paletteConfig.lockBaseColor,
+    customLightnessValues: state.paletteConfig.customLightnessValues,
+    customChromaValues: state.paletteConfig.customChromaValues
   };
   
   // Generate steps for the palette using the current config

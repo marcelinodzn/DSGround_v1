@@ -438,6 +438,16 @@ export function ColorPalettePreview() {
     )
   }
 
+  // Handle deleting a color step
+  const handleDeleteColorStep = async (paletteId: string, stepId: string) => {
+    try {
+      await deleteColorStep(paletteId, stepId);
+      console.log('Color step deleted successfully');
+    } catch (error) {
+      console.error('Error deleting color step:', error);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div dir="ltr" data-orientation="horizontal">
@@ -476,18 +486,62 @@ export function ColorPalettePreview() {
                 </TabsList>
               </div>
               
-              <TabsContent value="core" className="space-y-6">
-                <div className="grid grid-cols-1 gap-8">
+              <TabsContent value="core" className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
                   {corePalettes.map(palette => (
-                    <div key={palette.id} onClick={() => setCurrentPalette(palette.id)}>
-                      {/* Content removed since we want to keep only the preview scale above */}
-                    </div>
+                    <PaletteCard
+                      key={palette.id}
+                      palette={palette}
+                      isSelected={palette.id === currentPaletteId}
+                      isEditing={editingPalette === palette.id}
+                      onSelect={() => setCurrentPalette(palette.id)}
+                      onEdit={() => setEditingPalette(palette.id)}
+                      onCancelEdit={() => setEditingPalette(null)}
+                      onUpdate={(updates) => handleUpdatePalette(palette, updates)}
+                      onDelete={() => handleDeletePalette(palette.id)}
+                      onColorChange={(stepId, newColor) => handleColorChange(palette, stepId, newColor)}
+                      onAddColorStep={() => handleAddColorStep(palette.id)}
+                      onDeleteStep={(stepId) => handleDeleteColorStep(palette.id, stepId)}
+                    />
                   ))}
+                  {/* Add palette button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-24 flex items-center justify-center rounded border-dashed"
+                    onClick={() => setActiveTab('create')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Core Palette
+                  </Button>
                 </div>
               </TabsContent>
               
-              <TabsContent value="accent" className="space-y-6">
-                {/* Similarly, content removed */}
+              <TabsContent value="accent" className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  {accentPalettes.map(palette => (
+                    <PaletteCard
+                      key={palette.id}
+                      palette={palette}
+                      isSelected={palette.id === currentPaletteId}
+                      isEditing={editingPalette === palette.id}
+                      onSelect={() => setCurrentPalette(palette.id)}
+                      onEdit={() => setEditingPalette(palette.id)}
+                      onCancelEdit={() => setEditingPalette(null)}
+                      onUpdate={(updates) => handleUpdatePalette(palette, updates)}
+                      onDelete={() => handleDeletePalette(palette.id)}
+                      onColorChange={(stepId, newColor) => handleColorChange(palette, stepId, newColor)}
+                      onAddColorStep={() => handleAddColorStep(palette.id)}
+                      onDeleteStep={(stepId) => handleDeleteColorStep(palette.id, stepId)}
+                    />
+                  ))}
+                  {/* Add palette button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-24 flex items-center justify-center rounded border-dashed"
+                    onClick={() => setActiveTab('create')}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Accent Palette
+                  </Button>
+                </div>
               </TabsContent>
             </Tabs>
           </TabsContent>
@@ -629,6 +683,7 @@ interface PaletteCardProps {
   onDelete: () => void
   onColorChange: (stepId: string, newColor: string) => void
   onAddColorStep: () => void
+  onDeleteStep: (stepId: string) => void
 }
 
 function PaletteCard({ 
@@ -641,15 +696,26 @@ function PaletteCard({
   onUpdate, 
   onDelete, 
   onColorChange,
-  onAddColorStep
+  onAddColorStep,
+  onDeleteStep
 }: PaletteCardProps) {
   const [name, setName] = useState(palette.name)
   const [description, setDescription] = useState(palette.description || '')
+  const [selectedFormat, setSelectedFormat] = useState<ColorFormat>('hex')
+  const [editingStep, setEditingStep] = useState<string | null>(null)
+  const [editingColor, setEditingColor] = useState('')
   
   useEffect(() => {
     setName(palette.name)
     setDescription(palette.description || '')
   }, [palette, isEditing])
+  
+  // Handle color edit submission
+  const handleColorEditSubmit = (stepId: string) => {
+    onColorChange(stepId, editingColor);
+    setEditingStep(null);
+    setEditingColor('');
+  }
   
   return (
     <Card 
@@ -713,102 +779,123 @@ function PaletteCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-10 gap-1 h-20">
-          {palette.steps.map(step => (
-            <HoverCard key={step.id}>
-              <HoverCardTrigger asChild>
-                <div
-                  className="relative group h-full flex items-center justify-center rounded overflow-hidden"
-                  style={{ backgroundColor: step.values.hex }}
-                >
-                  <span className={cn(
-                    "font-medium text-xs opacity-0 group-hover:opacity-100 transition-opacity",
-                    getTextColor(step.values.hex)
-                  )}>
-                    {step.name}
-                  </span>
-                  
-                  <input
-                    type="color"
-                    value={step.values.hex}
-                    onChange={(e) => onColorChange(step.id, e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-64">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-6 h-6 rounded" 
-                      style={{ backgroundColor: step.values.hex }}
-                    />
-                    <div className="font-semibold">{step.name} - {step.values.hex}</div>
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    <div className="text-sm font-medium">WCAG contrast</div>
-                    <div className="flex items-center gap-2">
-                      <div className="bg-white text-black px-2 py-1 rounded text-xs">Aa</div>
-                      <div className="font-mono font-bold">
-                        {step.accessibility?.contrastWithWhite?.toFixed(2) || '1.00'}:1
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="text-xs">Large text</div>
-                        <div className={cn(
-                          "text-xs px-1 rounded",
-                          (step.accessibility?.contrastWithWhite >= 3) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        )}>
-                          {(step.accessibility?.contrastWithWhite >= 3) ? "AA" : "Fail"}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className="text-xs">Small text</div>
-                        <div className={cn(
-                          "text-xs px-1 rounded",
-                          (step.accessibility?.contrastWithWhite >= 4.5) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        )}>
-                          {(step.accessibility?.contrastWithWhite >= 4.5) ? "AA" : "Fail"}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className="text-xs">Graphics</div>
-                        <div className={cn(
-                          "text-xs px-1 rounded",
-                          (step.accessibility?.contrastWithWhite >= 3) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        )}>
-                          {(step.accessibility?.contrastWithWhite >= 3) ? "AA" : "Fail"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          ))}
+        {/* Format selector */}
+        <div className="mb-4 flex justify-between items-center">
+          <Select value={selectedFormat} onValueChange={(value: ColorFormat) => setSelectedFormat(value)}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Format" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hex">HEX</SelectItem>
+              <SelectItem value="rgb">RGB</SelectItem>
+              <SelectItem value="oklch">OKLCH</SelectItem>
+            </SelectContent>
+          </Select>
+          
           <Button 
             variant="outline" 
-            className="h-full flex items-center justify-center rounded border-dashed"
-            onClick={() => onAddColorStep()}
+            size="sm"
+            className="flex items-center justify-center rounded border-dashed"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddColorStep();
+            }}
           >
-            <PlusCircle className="h-4 w-4" />
+            <PlusCircle className="h-4 w-4 mr-1" /> Add Color
           </Button>
         </div>
         
-        <div className="grid grid-cols-10 gap-1 mt-1">
-          {palette.steps.map(step => (
-            <div key={step.id} className="text-center">
-              <span className="text-xs text-muted-foreground">{step.name}</span>
-            </div>
-          ))}
-          <div className="text-center">
-            <span className="text-xs text-muted-foreground">Add</span>
+        {/* Base color */}
+        <div className="flex items-center gap-2 p-2 rounded bg-muted/50 mb-3">
+          <div className="font-medium text-sm w-12">Base</div>
+          <div 
+            className="w-8 h-8 rounded-md" 
+            style={{ backgroundColor: palette.baseColor.hex }}
+          />
+          <code className="flex-1 text-xs bg-background p-1 rounded">
+            {palette.baseColor[selectedFormat] || palette.baseColor.hex}
+          </code>
+          <Button variant="ghost" size="icon" onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(palette.baseColor[selectedFormat] || palette.baseColor.hex);
+          }}>
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        {/* Color steps - horizontal layout */}
+        <div className="overflow-x-auto pb-2">
+          <div className="flex gap-2 min-w-max">
+            {palette.steps.map(step => (
+              <div 
+                key={step.id} 
+                className={cn(
+                  "w-32 border rounded-md p-2 hover:bg-muted/50",
+                  step.isBaseColor && "ring-2 ring-primary"
+                )}
+              >
+                {editingStep === step.id ? (
+                  <div className="space-y-2">
+                    <Input 
+                      value={editingColor}
+                      onChange={(e) => setEditingColor(e.target.value)}
+                      className="w-full"
+                    />
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="w-full" onClick={() => handleColorEditSubmit(step.id)}>
+                        <Check className="h-3 w-3 mr-1" /> Save
+                      </Button>
+                      <Button size="sm" variant="ghost" className="w-full" onClick={() => setEditingStep(null)}>
+                        <X className="h-3 w-3 mr-1" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="font-medium text-sm flex items-center gap-1">
+                        {step.name}
+                        {step.isBaseColor && (
+                          <span className="text-xs bg-primary text-primary-foreground px-1 rounded">Base</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingStep(step.id);
+                          setEditingColor(step.values.hex);
+                        }}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete color step "${step.name}"?`)) {
+                            onDeleteStep(step.id);
+                          }
+                        }}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div 
+                      className="w-full h-12 rounded-md mb-1" 
+                      style={{ backgroundColor: step.values.hex }}
+                    />
+                    <div className="flex items-center gap-1">
+                      <code className="flex-1 text-xs bg-background p-1 rounded overflow-hidden text-ellipsis">
+                        {step.values[selectedFormat] || step.values.hex}
+                      </code>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(step.values[selectedFormat] || step.values.hex);
+                      }}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </CardContent>

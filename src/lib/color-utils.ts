@@ -1,4 +1,5 @@
 import { parse, formatHex, rgb, oklch } from 'culori';
+import { v4 as uuidv4 } from 'uuid';
 
 // Create a custom CMYK mode for culori
 const cmyk = (color: any) => {
@@ -287,7 +288,7 @@ export function checkAccessibility(color: string) {
 }
 
 interface PaletteOptions {
-  lightnessPreset?: 'linear' | 'curved' | 'custom';
+  lightnessPreset?: 'linear' | 'curved' | 'custom' | 'easeIn' | 'easeOut';
   chromaPreset?: 'constant' | 'decrease' | 'increase' | 'custom';
   lightnessRange?: [number, number]; // Min and max lightness values (0-1)
   chromaRange?: [number, number]; // Min and max chroma values (0-1)
@@ -305,11 +306,14 @@ export function generatePalette(
   numSteps: number, 
   lightness: boolean = true, 
   options: {
-    lightnessPreset?: 'linear' | 'curved' | 'custom',
+    lightnessPreset?: 'linear' | 'curved' | 'custom' | 'easeIn' | 'easeOut',
     chromaPreset?: 'constant' | 'decrease' | 'increase' | 'custom',
     lightnessRange?: [number, number],
     chromaRange?: [number, number],
-    hueShift?: number
+    hueShift?: number,
+    lockBaseColor?: boolean,
+    customLightnessValues?: number[],
+    customChromaValues?: number[]
   } = {}
 ): ColorStep[] {
   try {
@@ -359,16 +363,20 @@ export function generatePalette(
     const {
       lightnessPreset = 'linear',
       chromaPreset = 'constant',
-      lightnessRange = [0.05, 0.95],
-      chromaRange = [0.01, 0.4],
-      hueShift = 0
+      lightnessRange = [0, 1], // Allow full range from 0 (black) to 1 (white)
+      chromaRange = [0, 0.4],
+      hueShift = 0,
+      lockBaseColor = true,
+      customLightnessValues = [],
+      customChromaValues = []
     } = options;
     
     console.log('Generating palette with options:', { 
       lightnessPreset, 
       chromaPreset, 
       lightnessRange, 
-      chromaRange 
+      chromaRange,
+      lockBaseColor
     });
     
     // Apply hue shift to the base color if specified
@@ -378,8 +386,16 @@ export function generatePalette(
     
     const steps = [];
     
+    // Find the base color index (middle by default)
+    const baseIndex = Math.floor(numSteps / 2);
+    
     // Function to calculate lightness based on the preset
     const calculateLightness = (index: number, total: number): number => {
+      // If we have custom lightness values and enough of them, use those
+      if (lightnessPreset === 'custom' && customLightnessValues.length >= total) {
+        return customLightnessValues[index];
+      }
+      
       const normalizedIndex = index / (total - 1); // 0 to 1
       const [minLight, maxLight] = lightnessRange;
       const range = maxLight - minLight;
@@ -399,24 +415,38 @@ export function generatePalette(
             return minLight + (1 - Math.pow(-2 * normalizedIndex + 2, 3) / 2 + 1) * range / 2;
           }
           
-        case 'custom':
+        case 'easeIn':
+          // Ease in only - slow start, fast end
+          return minLight + (normalizedIndex * normalizedIndex * normalizedIndex * range);
+          
+        case 'easeOut':
+          // Ease out only - fast start, slow end
+          return minLight + ((1 - Math.pow(1 - normalizedIndex, 3)) * range);
+          
         default:
-          // Custom range with linear distribution
+          // Custom range with linear distribution as fallback
           return minLight + (normalizedIndex * range);
       }
     };
     
     // Function to calculate chroma based on the preset
     const calculateChroma = (index: number, total: number, lightness: number): number => {
+      // If we have custom chroma values and enough of them, use those
+      if (chromaPreset === 'custom' && customChromaValues.length >= total) {
+        return customChromaValues[index];
+      }
+      
       const normalizedIndex = index / (total - 1); // 0 to 1
-      const normalizedLightness = (lightness - lightnessRange[0]) / (lightnessRange[1] - lightnessRange[0]); // 0 to 1
       const [minChroma, maxChroma] = chromaRange;
       const range = maxChroma - minChroma;
+      
+      // Calculate normalized lightness (0-1) relative to the lightness range
+      const normalizedLightness = (lightness - lightnessRange[0]) / (lightnessRange[1] - lightnessRange[0]);
       
       switch (chromaPreset) {
         case 'constant':
           // Constant chroma value (base color's chroma)
-          return oklchBase.c;
+          return maxChroma;
           
         case 'decrease':
           // Decrease chroma as lightness increases
@@ -426,56 +456,54 @@ export function generatePalette(
           // Increase chroma as lightness increases
           return minChroma + (normalizedLightness * range);
           
-        case 'custom':
-          // Custom range with linear distribution
-          return minChroma + (normalizedIndex * range);
-          
         default:
-          return oklchBase.c;
+          // Custom range with linear distribution as fallback
+          return minChroma + (normalizedIndex * range);
       }
     };
     
+    // Generate steps
     for (let i = 0; i < numSteps; i++) {
-      let oklch;
+      // If this is the base color index and we're locking the base color
+      const isBaseColorIndex = i === baseIndex;
       
-      if (lightness) {
-        // Vary lightness
-        const l = calculateLightness(i, numSteps);
-        const c = calculateChroma(i, numSteps, l);
-        
-        oklch = {
-          ...oklchBase,
-          l: Math.max(0.05, Math.min(0.95, l)), // Clamp between 5% and 95%
-          c: Math.max(0.01, Math.min(0.4, c))  // Clamp between 1% and 40%
-        };
+      // Calculate lightness and chroma
+      let l, c, h;
+      
+      if (isBaseColorIndex && lockBaseColor) {
+        // Use the original base color values
+        l = oklchBase.l;
+        c = oklchBase.c;
+        h = oklchBase.h;
       } else {
-        // Vary chroma
-        const c = calculateChroma(i, numSteps, oklchBase.l);
-        
-        oklch = {
-          ...oklchBase,
-          c: Math.max(0.01, Math.min(0.4, c)) // Clamp between 1% and 40%
-        };
+        // Calculate new values based on the distribution
+        l = lightness ? calculateLightness(i, numSteps) : oklchBase.l;
+        c = lightness ? calculateChroma(i, numSteps, l) : calculateChroma(i, numSteps, oklchBase.l);
+        h = oklchBase.h;
       }
       
-      const hex = formatHex(oklch);
-      const rgbColor = rgb(oklch);
-      const rgbString = `rgb(${Math.round(rgbColor.r * 255)}, ${Math.round(rgbColor.g * 255)}, ${Math.round(rgbColor.b * 255)})`;
-      const oklchString = `oklch(${(oklch.l * 100).toFixed(0)}% ${oklch.c.toFixed(2)} ${oklch.h?.toFixed(0) || '0'})`;
+      // Create the color in all formats
+      const oklchColor = `oklch(${Math.round(l * 100)}% ${c.toFixed(3)} ${h.toFixed(0)})`;
+      const colorValues = convertToAllFormats(oklchColor);
       
-      steps.push({
+      // Calculate accessibility metrics
+      const accessibility = checkAccessibility(colorValues.hex);
+      
+      // Create the step
+      const step: ColorStep = {
+        id: uuidv4(),
         name: `${(i + 1) * 100}`,
-        values: {
-          hex,
-          rgb: rgbString,
-          oklch: oklchString
-        }
-      });
+        values: colorValues,
+        accessibility,
+        isBaseColor: isBaseColorIndex
+      };
+      
+      steps.push(step);
     }
     
     return steps;
   } catch (error) {
     console.error('Error generating palette:', error);
-    return [];
+    throw error;
   }
 }
