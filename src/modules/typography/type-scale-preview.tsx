@@ -200,7 +200,7 @@ const getFontCategoryFallback = (category: string) => {
   }
 }
 
-// Update the StylesView component with default units
+// Update the StylesView component to use the Table component for a consistent look with the scale view
 function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   const { platforms, currentPlatform } = useTypographyStore()
   const { platforms: platformSettings } = usePlatformStore()
@@ -275,77 +275,86 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   }, [typeStyles, fonts, currentBrand?.id, brandTypography])
   
   return (
-    <div className="space-y-8">
-      {typeStyles.map((style, index) => {
-        // First try to find the style font
-        let font = fonts.find(f => f.family === style.fontFamily);
-        
-        // If not found, and we have current typography, try to use the current font role
-        if (!font && currentBrand?.id && currentTypography && platform?.currentFontRole) {
-          const fontId = currentTypography[`${platform.currentFontRole}_font_id`];
-          const roleFontMatch = fonts.find(f => f.id === fontId);
-          if (roleFontMatch) {
-            font = roleFontMatch;
-            console.log(`Using current font role (${platform.currentFontRole}) font instead of style font:`, font.family);
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Style</TableHead>
+          <TableHead>Preview</TableHead>
+          <TableHead className="text-right w-[120px]">Size ({typographyUnit})</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {typeStyles.map((style, index) => {
+          // First try to find the style font
+          let font = fonts.find(f => f.family === style.fontFamily);
+          
+          // If not found, and we have current typography, try to use the current font role
+          if (!font && currentBrand?.id && currentTypography && platform?.currentFontRole) {
+            const fontId = currentTypography[`${platform.currentFontRole}_font_id`];
+            const roleFontMatch = fonts.find(f => f.id === fontId);
+            if (roleFontMatch) {
+              font = roleFontMatch;
+              console.log(`Using current font role (${platform.currentFontRole}) font instead of style font:`, font.family);
+            }
           }
-        }
-        
-        // Calculate fallback fonts
-        const fallbackFonts = getFontCategoryFallback(font?.category || 'sans-serif');
-        const fontFamilyValue = font ? `"${font.family}", ${fallbackFonts}` : `system-ui, ${fallbackFonts}`;
+          
+          // Calculate fallback fonts
+          const fallbackFonts = getFontCategoryFallback(font?.category || 'sans-serif');
+          const fontFamilyValue = font ? `"${font.family}", ${fallbackFonts}` : `system-ui, ${fallbackFonts}`;
+          
+          // Find the actual font size from the scale values based on the style's scale step
+          const scaleValue = scaleValues.find(s => s.label === style.scaleStep);
+          const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
 
-        return (
-          <div key={index} className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">
-                  {style.name}
-                </div>
-                <div className="flex items-center gap-2">
+          return (
+            <TableRow key={style.id}>
+              <TableCell className="py-4">
+                <div className="space-y-2">
+                  <div className="font-medium">
+                    {style.name}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {font?.family || 'System Font'}
                   </div>
-                  {font?.is_variable && (
-                    <Badge variant="secondary" className="text-[10px] h-4">
-                      Variable
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {font?.is_variable && (
+                      <Badge variant="secondary" className="text-[10px] h-4">
+                        Variable
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="text-[10px] h-4">
+                      Weight: {style.fontWeight}
                     </Badge>
-                  )}
-                  <Badge variant="outline" className="text-[10px] h-4">
-                    {style.fontWeight}
-                  </Badge>
+                    <Badge variant="outline" className="text-[10px] h-4">
+                      Scale: {style.scaleStep}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {/* Find the actual font size from the scale values based on the style's scale step */}
-                {(() => {
-                  const scaleValue = scaleValues.find(s => s.label === style.scaleStep);
-                  const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
-                  return `${fontSize}${typographyUnit}`;
-                })()}
-              </div>
-            </div>
-            <div 
-              className="font-preview-container break-words"
-              style={{ 
-                fontFamily: `${fontFamilyValue} !important`,
-                fontSize: (() => {
-                  const scaleValue = scaleValues.find(s => s.label === style.scaleStep);
-                  const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
-                  return `${fontSize}${typographyUnit}`;
-                })(),
-                fontWeight: style.fontWeight,
-                lineHeight: style.lineHeight,
-                letterSpacing: style.letterSpacing,
-                fontVariationSettings: font?.is_variable ? `'wght' ${style.fontWeight}` : undefined,
-              }}
-              data-font-name={font?.family}
-            >
-              The quick brown fox jumps over the lazy dog
-            </div>
-          </div>
-        )
-      })}
-    </div>
+              </TableCell>
+              <TableCell className="py-4">
+                <div 
+                  className="font-preview-container break-words"
+                  style={{ 
+                    fontFamily: `${fontFamilyValue} !important`,
+                    fontSize: `${fontSize}${typographyUnit}`,
+                    fontWeight: style.fontWeight,
+                    lineHeight: style.lineHeight,
+                    letterSpacing: style.letterSpacing,
+                    fontVariationSettings: font?.is_variable ? `'wght' ${style.fontWeight}` : undefined,
+                  }}
+                  data-font-name={font?.family}
+                >
+                  The quick brown fox jumps over the lazy dog
+                </div>
+              </TableCell>
+              <TableCell className="py-4 text-right">
+                {fontSize}{typographyUnit}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }
 

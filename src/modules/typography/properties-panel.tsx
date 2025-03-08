@@ -86,17 +86,12 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
           <div {...listeners} className="cursor-grab">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex-1 flex items-center">
+          <div className="flex-1">
             <Input
               value={typeStyle.name}
               onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { name: e.target.value })}
               className="text-xs h-8"
             />
-            {fontSize && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {formatWithUnit(fontSize, typographyUnit)}
-              </Badge>
-            )}
           </div>
           <div className="flex items-center gap-1">
             <Button 

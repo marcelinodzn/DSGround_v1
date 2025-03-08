@@ -34,6 +34,13 @@ import { Platform, ScaleValue, TypeStyle } from '@/types/typography'
 import { useTypographyStore } from '@/store/typography'
 import { usePlatformStore } from "@/store/platform-store"
 import { Label } from "@/components/ui/label"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Download, File, FileJson } from "lucide-react"
 
 export function DocumentationModal({
   isOpen,
@@ -63,26 +70,22 @@ export function DocumentationModal({
   }
 
   const generateScaleTable = () => {
-    if (selectedPlatform === 'all') {
-      return null
-    }
-
-    const platform = platforms.find(p => p.id === selectedPlatform)
-    const typographyData = getTypographyData(selectedPlatform)
-    if (!platform || !typographyData) return null
-
-    const scaleValues = getScaleValues(selectedPlatform)
-    if (!scaleValues) return null
+    const platformId = selectedPlatform === 'all' ? platforms[0]?.id : selectedPlatform
+    if (!platformId) return null
+    
+    const typographyData = getTypographyData(platformId)
+    if (!typographyData) return null
+    
+    const scaleValues = getScaleValues(platformId)
     
     return (
       <Table>
-        <TableCaption>Type Scale Values for {platform.name}</TableCaption>
+        <TableCaption>Typography Scale for {typographyData.name || platformId}</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Step</TableHead>
             <TableHead>Size (px)</TableHead>
-            <TableHead>Size (rem)</TableHead>
-            <TableHead>Scale Factor</TableHead>
+            <TableHead>Ratio</TableHead>
             <TableHead>Type Styles</TableHead>
           </TableRow>
         </TableHeader>
@@ -94,10 +97,9 @@ export function DocumentationModal({
             
             return (
               <TableRow key={value.label}>
-                <TableCell>{value.label}</TableCell>
-                <TableCell>{value.size}px</TableCell>
-                <TableCell>{(value.size / 16).toFixed(3)}rem</TableCell>
-                <TableCell>{value.ratio}</TableCell>
+                <TableCell className="font-medium">{value.label}</TableCell>
+                <TableCell>{Math.round(value.size)}</TableCell>
+                <TableCell>{value.ratio.toFixed(2)}</TableCell>
                 <TableCell>
                   {stylesAtScale.length > 0 
                     ? stylesAtScale.map(style => style.name).join(', ')
@@ -320,34 +322,29 @@ export function DocumentationModal({
   )
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            Typography Documentation
-          </DialogTitle>
+    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+      <DialogContent className="max-w-4xl h-[85vh] p-6 flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle>Typography Documentation</DialogTitle>
+          <DialogDescription>
+            Export and review your typography system
+          </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-6">
-              <AnimatedTabs 
-                tabs={[
-                  { id: 'overview', label: 'Overview' },
-                  { id: 'preview', label: 'Preview' }
-                ]}
-                defaultTab="overview"
-                onChange={(tab) => setActiveTab(tab)}
-                layoutId="documentation-tabs"
-              />
-
-              <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select platform" />
+        
+        <div className="flex flex-col flex-1 gap-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-4 flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <Label htmlFor="platformSelect">Platform:</Label>
+              <Select
+                value={selectedPlatform}
+                onValueChange={setSelectedPlatform}
+              >
+                <SelectTrigger id="platformSelect" className="w-40">
+                  <SelectValue placeholder="Select Platform" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Platforms</SelectItem>
-                  {platforms.map((platform) => (
+                  {platforms.map(platform => (
                     <SelectItem key={platform.id} value={platform.id}>
                       {platform.name}
                     </SelectItem>
@@ -355,17 +352,55 @@ export function DocumentationModal({
                 </SelectContent>
               </Select>
             </div>
+            
+            <AnimatedTabs
+              tabs={[
+                { id: 'overview', label: 'Overview' },
+                { id: 'styles', label: 'Type Styles' },
+                { id: 'preview', label: 'Preview' },
+              ]}
+              defaultTab="overview"
+              onChange={setActiveTab}
+              layoutId="documentation-tabs"
+            />
+          </div>
 
-            <div className="flex-1 min-h-0">
-              <ScrollArea className="h-full">
+          <div className="flex-1 overflow-hidden border rounded-md">
+            <div className="h-full flex flex-col">
+              <ScrollArea className="flex-1 p-4">
                 {activeTab === 'overview' && (
-                  <div className="space-y-8">
-                    <section className="mt-6">
-                      <h2 className="text-xl font-semibold mb-4">Platform Settings</h2>
+                  <div className="space-y-6">
+                    <section>
+                      <h3 className="text-lg font-medium mb-4">Scale Method Explanation</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Description</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {Object.entries(scaleMethodExplanations).map(([method, description]) => (
+                            <TableRow key={method}>
+                              <TableCell className="font-medium">{method}</TableCell>
+                              <TableCell>{description}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </section>
+
+                    <section>
+                      <h3 className="text-lg font-medium mb-4">Platform Type Scales</h3>
                       <PlatformComparison />
                     </section>
+                  </div>
+                )}
+
+                {activeTab === 'styles' && (
+                  <div className="space-y-6">
                     <section>
-                      <h2 className="text-xl font-semibold mb-4">Type Styles</h2>
+                      <h3 className="text-lg font-medium mb-4">Type Styles</h3>
                       <TypeStylesTable />
                     </section>
                   </div>
@@ -376,13 +411,133 @@ export function DocumentationModal({
             </div>
           </div>
 
-          <div className="flex justify-end mt-4 pt-4 border-t flex-shrink-0">
-            <Button onClick={() => {
-              const doc = generatePDF(platforms)
-              doc.save('typography-documentation.pdf')
-            }}>
-              Export Documentation
-            </Button>
+          <div className="flex justify-end mt-4 pt-4 border-t flex-shrink-0 gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Export <span className="sr-only">Export Options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => {
+                  const doc = generatePDF(platforms);
+                  doc.save('typography-documentation.pdf');
+                }}>
+                  <File className="h-4 w-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  // Generate SVG content 
+                  const svgWidth = 1200;
+                  const svgHeight = 800;
+                  const initialPadding = 40;
+                  
+                  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+                    <style>
+                      text { font-family: system-ui, sans-serif; }
+                      .heading { font-weight: bold; font-size: 20px; }
+                      .platform-name { font-weight: bold; font-size: 16px; }
+                      .style-name { font-weight: 500; }
+                    </style>
+                    <rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />
+                    <text x="${initialPadding}" y="${initialPadding}" class="heading">Typography Documentation</text>`;
+                  
+                  let yOffset = initialPadding + 40;
+                  let xPadding = initialPadding;
+                  
+                  platforms.forEach((platform, platformIndex) => {
+                    // Get typography data from the store
+                    const platformData = getTypographyData(platform.id);
+                    if (!platformData) return;
+                    
+                    const typeStyles = platformData.typeStyles || [];
+                    
+                    svg += `<text x="${xPadding}" y="${yOffset}" class="platform-name">${platform.name}</text>`;
+                    yOffset += 30;
+                    
+                    const scaleMethod = platformData.scaleMethod || 'None';
+                    svg += `<text x="${xPadding}" y="${yOffset}">Scale Method: ${scaleMethod}</text>`;
+                    
+                    const scale = platformData.scale;
+                    if (scale) {
+                      yOffset += 20;
+                      svg += `<text x="${xPadding}" y="${yOffset}">Base Size: ${scale.baseSize}px, Ratio: ${scale.ratio}</text>`;
+                    }
+                    
+                    yOffset += 40;
+                    
+                    // Add type styles
+                    typeStyles.forEach((style, styleIndex) => {
+                      if (styleIndex > 0 && styleIndex % 10 === 0) {
+                        // Start a new column after 10 styles
+                        yOffset = initialPadding + 40;
+                        xPadding += 300;
+                      }
+                      
+                      svg += `<text x="${xPadding}" y="${yOffset}" class="style-name">${style.name || 'Unnamed'}</text>`;
+                      yOffset += 20;
+                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Size: ${style.fontSize || ''}px</text>`;
+                      yOffset += 20;
+                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Weight: ${style.fontWeight || ''}</text>`;
+                      yOffset += 20;
+                      svg += `<text x="${xPadding + 20}" y="${yOffset}">Line Height: ${style.lineHeight || ''}</text>`;
+                      yOffset += 30;
+                    });
+                    
+                    yOffset += 40;
+                    if (yOffset > svgHeight - 100) {
+                      yOffset = initialPadding + 40;
+                      xPadding += 300;
+                    }
+                  });
+                  
+                  svg += `</svg>`;
+                  
+                  // Download SVG
+                  const blob = new Blob([svg], { type: 'image/svg+xml' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'typography-documentation.svg';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}>
+                  <File className="h-4 w-4 mr-2" />
+                  Export as SVG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  // Generate JSON data
+                  const exportData = platforms.map(platform => {
+                    const typographyData = getTypographyData(platform.id) || {};
+                    return {
+                      id: platform.id,
+                      name: platform.name,
+                      scaleMethod: typographyData.scaleMethod,
+                      scale: typographyData.scale,
+                      typeStyles: typographyData.typeStyles
+                    };
+                  });
+                  
+                  // Download JSON
+                  const json = JSON.stringify(exportData, null, 2);
+                  const blob = new Blob([json], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'typography-documentation.json';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </DialogContent>
