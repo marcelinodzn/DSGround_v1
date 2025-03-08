@@ -30,7 +30,7 @@ export function ColorPropertiesPanel() {
   
   const [newPaletteName, setNewPaletteName] = useState('')
   const [selectedFormat, setSelectedFormat] = useState<ColorFormat>('hex')
-  const [colorModel, setColorModel] = useState<'oklch' | 'hsl' | 'rgb'>('oklch')
+  const [colorModel, setColorModel] = useState<'oklch' | 'hsl'>('oklch')
   const [baseColor, setBaseColor] = useState('#3264C8')
   const [isCore, setIsCore] = useState(true)
   const [lockBaseColor, setLockBaseColor] = useState(true)
@@ -40,32 +40,30 @@ export function ColorPropertiesPanel() {
   // Get the currently selected palette
   const currentPalette = palettes.find(p => p.id === currentPaletteId)
 
-  // When current palette changes, update the base color
+  // When current palette changes, update the base color and other settings
   useEffect(() => {
-    if (currentPalette?.baseColor?.hex) {
+    if (currentPalette) {
       setBaseColor(currentPalette.baseColor.hex);
+      // Update other settings based on the selected palette
+      updatePaletteConfig({
+        numSteps: currentPalette.steps.length,
+        lightnessRange: currentPalette.config?.lightnessRange || [0, 1],
+        chromaRange: currentPalette.config?.chromaRange || [0.01, 0.4],
+        hueShift: currentPalette.config?.hueShift || 0
+      });
     }
-  }, [currentPaletteId, currentPalette]);
-
-  // Add this effect to update the palette when the base color changes
-  useEffect(() => {
-    if (currentPalette && baseColor) {
-      handleBaseColorChange(baseColor);
-    }
-  }, [baseColor]);
+  }, [currentPaletteId]);
 
   // Handle color model change
-  const handleColorModelChange = (model: 'oklch' | 'hsl' | 'rgb') => {
+  const handleColorModelChange = (model: 'oklch' | 'hsl') => {
     setColorModel(model);
     // Update the store with appropriate default values for the selected color model
     if (model === 'hsl') {
       updatePaletteConfig({
-        // HSL uses saturation instead of chroma
         chromaRange: [0, 1], // Saturation ranges from 0-100%
       });
     } else if (model === 'oklch') {
       updatePaletteConfig({
-        // OKLCH uses chroma
         chromaRange: [0.01, 0.4], // Chroma in OKLCH typically ranges from 0-0.4
       });
     }
@@ -80,40 +78,33 @@ export function ColorPropertiesPanel() {
       
       // Convert to all formats
       const colorValues = convertToAllFormats(newColor);
-      console.log('Converted base color:', colorValues);
       
-      // Update the base color in the palette
-      await updatePalette(currentPalette.id, {
-        baseColor: colorValues
-      });
-      
-      // Regenerate the palette with the new base color
-      const paletteOptions = {
-        lightnessPreset: paletteConfig.lightnessPreset,
-        chromaPreset: paletteConfig.chromaPreset,
-        lightnessRange: paletteConfig.lightnessRange,
-        chromaRange: paletteConfig.chromaRange,
-        hueShift: paletteConfig.hueShift,
-        lockBaseColor: lockBaseColor
-      };
-      
-      const generatedSteps = generatePalette(
-        colorValues, 
-        paletteConfig.numSteps, 
-        paletteConfig.useLightness, 
-        paletteOptions
-      );
-      
-      // Update the steps in the palette
-      await updatePalette(currentPalette.id, {
-        steps: generatedSteps
-      });
-      
-      // Force an update of the preview
-      setTimeout(() => {
-        const event = new Event('paletteCreated');
-        window.dispatchEvent(event);
-      }, 100);
+      // Update the base color in the palette only if it's not locked
+      if (!lockBaseColor) {
+        await updatePalette(currentPalette.id, {
+          baseColor: colorValues
+        });
+        
+        // Regenerate the palette with the new base color
+        const paletteOptions = {
+          lightnessPreset: paletteConfig.lightnessPreset,
+          chromaPreset: paletteConfig.chromaPreset,
+          lightnessRange: paletteConfig.lightnessRange,
+          chromaRange: paletteConfig.chromaRange,
+          hueShift: paletteConfig.hueShift,
+          lockBaseColor: lockBaseColor
+        };
+        
+        const generatedSteps = generatePalette(
+          colorValues, 
+          paletteConfig.numSteps
+        );
+        
+        // Update the steps in the palette
+        await updatePalette(currentPalette.id, {
+          steps: generatedSteps
+        });
+      }
     } catch (error) {
       console.error('Error updating base color:', error);
     }
@@ -162,79 +153,48 @@ export function ColorPropertiesPanel() {
     }
   }
 
-  // Fix the updateAllPalettes function to properly identify brand palettes
-  const updateAllPalettes = async () => {
-    if (!currentBrand) return;
-    
-    try {
-      console.log('Updating all palettes for brand:', currentBrand.id);
-      
-      // Get all palettes for the current brand
-      const brandPalettes = palettes.filter(p => p.brandId === currentBrand.id);
-      console.log('Found palettes for brand:', brandPalettes.length);
-      
-      if (brandPalettes.length === 0) {
-        console.log('No palettes found for this brand');
-        return;
-      }
-      
-      // Create palette generation options based on user selections
-      const paletteOptions = {
-        lightnessPreset: paletteConfig.lightnessPreset,
-        chromaPreset: paletteConfig.chromaPreset,
-        lightnessRange: paletteConfig.lightnessRange,
-        chromaRange: paletteConfig.chromaRange,
-        hueShift: paletteConfig.hueShift,
-        lockBaseColor: lockBaseColor
-      };
-      
-      // Update each palette
-      for (const palette of brandPalettes) {
-        console.log('Updating palette:', palette.name);
-        
-        // Generate steps for the palette using the selected parameters and options
-        const generatedSteps = generatePalette(
-          palette.baseColor, 
-          paletteConfig.numSteps, 
-          paletteConfig.useLightness, 
-          paletteOptions
-        );
-        
-        // Update the palette in the store
-        await updatePalette(palette.id, {
-          steps: generatedSteps
-        });
-      }
-      
-      // Force an update of the preview
-      setTimeout(() => {
-        const event = new Event('paletteCreated');
-        window.dispatchEvent(event);
-      }, 100);
-      
-      console.log('All palettes updated successfully');
-    } catch (error) {
-      console.error('Error updating all palettes:', error);
-    }
-  };
-
-  // Make sure the useEffect dependency array includes currentBrand
+  // Update palettes when config changes
   useEffect(() => {
-    // When palette config changes, update all palettes
-    if (currentBrand) {
-      updateAllPalettes();
-    }
+    const updatePalettes = async () => {
+      if (!currentBrand) return;
+      
+      try {
+        // Get all palettes for the current brand
+        const brandPalettes = palettes.filter(p => p.brandId === currentBrand.id);
+        
+        if (brandPalettes.length === 0) return;
+        
+        // Update each palette
+        for (const palette of brandPalettes) {
+          // Generate steps for the palette
+          const generatedSteps = generatePalette(
+            palette.baseColor, 
+            paletteConfig.numSteps
+          );
+          
+          // Update the palette in the store
+          await updatePalette(palette.id, {
+            steps: generatedSteps
+          });
+        }
+      } catch (error) {
+        console.error('Error updating palettes:', error);
+      }
+    };
+
+    // Debounce the update to prevent too many rapid changes
+    const timeoutId = setTimeout(() => {
+      updatePalettes();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [
     paletteConfig.numSteps,
-    paletteConfig.useLightness,
     paletteConfig.lightnessRange,
     paletteConfig.chromaRange,
-    paletteConfig.lightnessPreset,
-    paletteConfig.chromaPreset,
     paletteConfig.hueShift,
-    currentBrand?.id, // Add this to ensure we update when the brand changes
-    lockBaseColor,
-    paletteConfig.customLightnessValues, // Add this dependency
+    currentBrand?.id,
+    lockBaseColor
   ]);
 
   // Generate default custom lightness values when number of steps changes
@@ -245,39 +205,29 @@ export function ColorPropertiesPanel() {
         return paletteConfig.lightnessRange[0] + percent * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
       });
       setCustomLightnessValues(newValues);
-      
-      // Update the store
-      updatePaletteConfig({
-        customLightnessValues: newValues
-      });
     }
-  }, [paletteConfig.numSteps, paletteConfig.lightnessPreset]);
-  
+  }, [paletteConfig.numSteps, paletteConfig.lightnessPreset, paletteConfig.lightnessRange]);
+
   // Update custom lightness value at a specific index
   const updateCustomLightnessValue = (index: number, value: number) => {
-    // Make sure we have proper custom lightness values to start with
-    let newValues = [...customLightnessValues];
-    
-    // If the array is empty or wrong size, initialize it with current distribution
+    const newValues = [...customLightnessValues];
     if (newValues.length !== paletteConfig.numSteps) {
-      newValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
+      // Initialize with current distribution if needed
+      const defaultValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
         const percent = i / (paletteConfig.numSteps - 1);
         return paletteConfig.lightnessRange[0] + percent * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
       });
+      newValues.splice(0, newValues.length, ...defaultValues);
     }
     
-    // Update the specific value
     newValues[index] = value;
     setCustomLightnessValues(newValues);
     
-    // Update the store and ensure we're using custom preset
+    // Update the store
     updatePaletteConfig({
       lightnessPreset: 'custom',
       customLightnessValues: newValues
     });
-    
-    // Force immediate update of all palettes
-    setTimeout(() => updateAllPalettes(), 10);
   };
 
   return (
@@ -296,6 +246,27 @@ export function ColorPropertiesPanel() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 py-4 space-y-4">
+            {/* Color Model Selection */}
+            <div className="space-y-2">
+              <Label>Color Model</Label>
+              <div className="flex gap-2">
+                <Button 
+                  variant={colorModel === 'oklch' ? 'default' : 'outline'} 
+                  className="flex-1" 
+                  onClick={() => handleColorModelChange('oklch')}
+                >
+                  OKLCH
+                </Button>
+                <Button 
+                  variant={colorModel === 'hsl' ? 'default' : 'outline'} 
+                  className="flex-1" 
+                  onClick={() => handleColorModelChange('hsl')}
+                >
+                  HSL
+                </Button>
+              </div>
+            </div>
+
             {/* Base Color */}
             <div className="space-y-2">
               <div className="flex justify-between">
@@ -305,10 +276,12 @@ export function ColorPropertiesPanel() {
                   <button 
                     type="button" 
                     onClick={() => {
-                      setLockBaseColor(!lockBaseColor);
-                      // Update store and refresh
-                      updatePaletteConfig({ lockBaseColor: !lockBaseColor });
-                      updateAllPalettes();
+                      const newLockState = !lockBaseColor;
+                      setLockBaseColor(newLockState);
+                      // If unlocking, update the base color to match the current palette
+                      if (!newLockState && currentPalette) {
+                        handleBaseColorChange(currentPalette.baseColor.hex);
+                      }
                     }}
                     className="h-6 w-6 flex items-center justify-center text-muted-foreground"
                   >
@@ -327,11 +300,13 @@ export function ColorPropertiesPanel() {
                   value={baseColor}
                   onChange={(e) => handleBaseColorChange(e.target.value)}
                   className="w-10 h-10 rounded-md cursor-pointer"
+                  disabled={lockBaseColor}
                 />
                 <Input 
                   value={baseColor}
                   onChange={(e) => handleBaseColorChange(e.target.value)}
                   className="flex-1"
+                  disabled={lockBaseColor}
                 />
               </div>
             </div>
@@ -431,98 +406,101 @@ export function ColorPropertiesPanel() {
                 <TabsTrigger value="chromaSettings">Chroma & Hue</TabsTrigger>
               </TabsList>
               
-              {/* Color Settings Tab - NEW */}
+              {/* Shade Generator Tab */}
               <TabsContent value="colorSettings" className="space-y-4 pt-2">
                 <div className="space-y-4">
-                  <div className="border rounded-md p-4">
-                    <h4 className="text-sm font-medium mb-2">Color Model</h4>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant={colorModel === 'oklch' ? 'default' : 'outline'} 
-                        size="sm"
-                        className="flex-1" 
-                        onClick={() => handleColorModelChange('oklch')}
-                      >
-                        OKLCH
-                      </Button>
-                      <Button 
-                        variant={colorModel === 'hsl' ? 'default' : 'outline'} 
-                        size="sm"
-                        className="flex-1" 
-                        onClick={() => handleColorModelChange('hsl')}
-                      >
-                        HSL
-                      </Button>
-                      <Button 
-                        variant={colorModel === 'rgb' ? 'default' : 'outline'} 
-                        size="sm"
-                        className="flex-1" 
-                        onClick={() => handleColorModelChange('rgb')}
-                      >
-                        RGB
-                      </Button>
-                    </div>
-                  </div>
-                  
+                  {/* Lightness Range */}
                   <div className="space-y-2">
-                    <Label>Vary By</Label>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant={paletteConfig.useLightness ? 'default' : 'outline'} 
-                        className="flex-1" 
-                        onClick={() => updatePaletteConfig({ useLightness: true })}
-                      >
-                        Lightness
-                      </Button>
-                      <Button 
-                        variant={!paletteConfig.useLightness ? 'default' : 'outline'} 
-                        className="flex-1" 
-                        onClick={() => updatePaletteConfig({ useLightness: false })}
-                      >
-                        Chroma
-                      </Button>
+                    <div className="flex justify-between">
+                      <Label>Lightness Range</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(paletteConfig.lightnessRange[0] * 100)}% - {Math.round(paletteConfig.lightnessRange[1] * 100)}%
+                      </span>
+                    </div>
+                    <Slider 
+                      value={[paletteConfig.lightnessRange[0] * 100, paletteConfig.lightnessRange[1] * 100]} 
+                      min={0} 
+                      max={100} 
+                      step={1} 
+                      onValueChange={([min, max]) => updatePaletteConfig({ 
+                        lightnessRange: [min / 100, max / 100] 
+                      })}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Defines how light or dark the colors in your scale will be
+                    </div>
+                  </div>
+
+                  {/* Saturation/Chroma Control */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>{colorModel === 'oklch' ? 'Chroma' : 'Saturation'} Range</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {(paletteConfig.chromaRange[0] * (colorModel === 'oklch' ? 100 : 100)).toFixed(0)}% - 
+                        {(paletteConfig.chromaRange[1] * (colorModel === 'oklch' ? 100 : 100)).toFixed(0)}%
+                      </span>
+                    </div>
+                    <Slider 
+                      value={[
+                        paletteConfig.chromaRange[0] * (colorModel === 'oklch' ? 100 : 100), 
+                        paletteConfig.chromaRange[1] * (colorModel === 'oklch' ? 100 : 100)
+                      ]} 
+                      min={0} 
+                      max={colorModel === 'oklch' ? 40 : 100} 
+                      step={1} 
+                      onValueChange={([min, max]) => updatePaletteConfig({ 
+                        chromaRange: [
+                          min / (colorModel === 'oklch' ? 100 : 100), 
+                          max / (colorModel === 'oklch' ? 100 : 100)
+                        ] 
+                      })}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Controls the intensity of colors across the scale
                     </div>
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <Label>Lightness Range</Label>
-                        <span className="text-xs text-muted-foreground">
-                          {Math.round(paletteConfig.lightnessRange[0] * 100)}% - {Math.round(paletteConfig.lightnessRange[1] * 100)}%
-                        </span>
-                      </div>
+                  {/* Hue Shift */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <Label>Hue Shift</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {paletteConfig.hueShift}°
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs whitespace-nowrap">-180°</span>
                       <Slider 
-                        value={[paletteConfig.lightnessRange[0] * 100, paletteConfig.lightnessRange[1] * 100]} 
+                        value={[paletteConfig.hueShift + 180]} 
                         min={0} 
-                        max={100} 
+                        max={360} 
                         step={1} 
-                        onValueChange={([min, max]) => updatePaletteConfig({ 
-                          lightnessRange: [min / 100, max / 100] 
-                        })}
+                        onValueChange={([value]) => updatePaletteConfig({ hueShift: value - 180 })}
+                        className="flex-1"
                       />
+                      <span className="text-xs whitespace-nowrap">+180°</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Adjusts how the hue changes across the scale
                     </div>
                   </div>
                 </div>
               </TabsContent>
-              
-              {/* Lightness Steps Tab - RENAMED */}
-              <TabsContent value="lightnessSteps" className="space-y-4 pt-4">
+
+              {/* Lightness Steps Tab */}
+              <TabsContent value="lightnessSteps" className="space-y-4 pt-2">
                 <div className="space-y-4">
                   {/* Show control for each step */}
                   {Array(paletteConfig.numSteps).fill(0).map((_, index) => {
-                    // Calculate default value if custom values not available
                     const defaultValue = (() => {
                       const percent = index / (paletteConfig.numSteps - 1);
                       return paletteConfig.lightnessRange[0] + percent * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
                     })();
                     
-                    // Get current value (either from custom values or default)
                     const value = customLightnessValues[index] !== undefined 
                       ? customLightnessValues[index] 
                       : defaultValue;
                     
-                    // Calculate if this is a "base color" step
                     const isBaseStep = index === Math.floor(paletteConfig.numSteps / 2);
                     
                     return (
@@ -553,34 +531,28 @@ export function ColorPropertiesPanel() {
                             <span className="text-xs text-muted-foreground">%</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs whitespace-nowrap">0%</span>
-                          <Slider
-                            value={[value * 100]}
-                            min={0}
-                            max={100}
-                            step={0.5}
-                            onValueChange={([newValue]) => {
-                              updateCustomLightnessValue(index, newValue / 100);
-                            }}
-                            className="flex-1"
-                          />
-                          <span className="text-xs whitespace-nowrap">100%</span>
-                        </div>
+                        <Slider
+                          value={[value * 100]}
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          onValueChange={([newValue]) => {
+                            updateCustomLightnessValue(index, newValue / 100);
+                          }}
+                        />
                       </div>
                     );
                   })}
                   
                   {/* Quick presets */}
                   <div className="pt-4 border-t">
-                    <Label className="mb-2 block">Quick Presets</Label>
+                    <Label className="mb-2 block">Distribution Presets</Label>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
                           const newValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
-                            // Linear distribution
                             const percent = i / (paletteConfig.numSteps - 1);
                             return paletteConfig.lightnessRange[0] + percent * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
                           });
@@ -589,7 +561,6 @@ export function ColorPropertiesPanel() {
                             lightnessPreset: 'custom',
                             customLightnessValues: newValues
                           });
-                          setTimeout(() => updateAllPalettes(), 10);
                         }}
                       >
                         Linear
@@ -599,9 +570,8 @@ export function ColorPropertiesPanel() {
                         size="sm"
                         onClick={() => {
                           const newValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
-                            // Ease in (slow start, fast end)
                             const t = i / (paletteConfig.numSteps - 1);
-                            const easedT = t * t * t; // Cubic easing
+                            const easedT = 1 - Math.pow(1 - t, 3);
                             return paletteConfig.lightnessRange[0] + easedT * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
                           });
                           setCustomLightnessValues(newValues);
@@ -609,27 +579,6 @@ export function ColorPropertiesPanel() {
                             lightnessPreset: 'custom',
                             customLightnessValues: newValues
                           });
-                          setTimeout(() => updateAllPalettes(), 10);
-                        }}
-                      >
-                        Ease In
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
-                            // Ease out (fast start, slow end)
-                            const t = i / (paletteConfig.numSteps - 1);
-                            const easedT = 1 - Math.pow(1 - t, 3); // Cubic easing
-                            return paletteConfig.lightnessRange[0] + easedT * (paletteConfig.lightnessRange[1] - paletteConfig.lightnessRange[0]);
-                          });
-                          setCustomLightnessValues(newValues);
-                          updatePaletteConfig({
-                            lightnessPreset: 'custom',
-                            customLightnessValues: newValues
-                          });
-                          setTimeout(() => updateAllPalettes(), 10);
                         }}
                       >
                         Ease Out
@@ -639,7 +588,6 @@ export function ColorPropertiesPanel() {
                         size="sm"
                         onClick={() => {
                           const newValues = Array(paletteConfig.numSteps).fill(0).map((_, i) => {
-                            // S-curve (ease in-out)
                             const t = i / (paletteConfig.numSteps - 1);
                             let easedT;
                             if (t < 0.5) {
@@ -654,86 +602,10 @@ export function ColorPropertiesPanel() {
                             lightnessPreset: 'custom',
                             customLightnessValues: newValues
                           });
-                          setTimeout(() => updateAllPalettes(), 10);
                         }}
                       >
                         S-Curve
                       </Button>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              {/* Chroma & Hue Tab */}
-              <TabsContent value="chromaSettings" className="space-y-4 pt-2">
-                <div className="space-y-4">
-                  {/* Chroma Range */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>Chroma Range</Label>
-                      <span className="text-xs text-muted-foreground">
-                        {(paletteConfig.chromaRange[0] * (colorModel === 'oklch' ? 100 : 100)).toFixed(0)}% - 
-                        {(paletteConfig.chromaRange[1] * (colorModel === 'oklch' ? 100 : 100)).toFixed(0)}%
-                      </span>
-                    </div>
-                    <Slider 
-                      value={[
-                        paletteConfig.chromaRange[0] * (colorModel === 'oklch' ? 100 : 100), 
-                        paletteConfig.chromaRange[1] * (colorModel === 'oklch' ? 100 : 100)
-                      ]} 
-                      min={0} 
-                      max={colorModel === 'oklch' ? 40 : 100} 
-                      step={1} 
-                      onValueChange={([min, max]) => updatePaletteConfig({ 
-                        chromaRange: [
-                          min / (colorModel === 'oklch' ? 100 : 100), 
-                          max / (colorModel === 'oklch' ? 100 : 100)
-                        ] 
-                      })}
-                    />
-                  </div>
-                  
-                  {/* Chroma Distribution */}
-                  <div className="space-y-2">
-                    <Label>Chroma Distribution</Label>
-                    <Select 
-                      value={paletteConfig.chromaPreset} 
-                      onValueChange={(value: any) => updatePaletteConfig({ chromaPreset: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a preset" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="constant">Constant</SelectItem>
-                        <SelectItem value="decrease">Decrease with Lightness</SelectItem>
-                        <SelectItem value="increase">Increase with Lightness</SelectItem>
-                        <SelectItem value="custom">Custom</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {/* Hue Shift */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>Hue Shift</Label>
-                      <span className="text-xs text-muted-foreground">
-                        {paletteConfig.hueShift}°
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs whitespace-nowrap">-180°</span>
-                      <Slider 
-                        value={[paletteConfig.hueShift + 180]} 
-                        min={0} 
-                        max={360} 
-                        step={1} 
-                        onValueChange={([value]) => updatePaletteConfig({ hueShift: value - 180 })}
-                        className="flex-1"
-                      />
-                      <span className="text-xs whitespace-nowrap">+180°</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Adjusts the hue angle around the color wheel. Negative values rotate counterclockwise, positive values rotate clockwise.
                     </div>
                   </div>
                 </div>
