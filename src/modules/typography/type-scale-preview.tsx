@@ -316,14 +316,23 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">
-                {style.scaleStep}px
+                {/* Find the actual font size from the scale values based on the style's scale step */}
+                {(() => {
+                  const scaleValue = scaleValues.find(s => s.label === style.scaleStep);
+                  const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
+                  return `${fontSize}${typographyUnit}`;
+                })()}
               </div>
             </div>
             <div 
               className="font-preview-container break-words"
               style={{ 
                 fontFamily: `${fontFamilyValue} !important`,
-                fontSize: `${style.scaleStep}px`,
+                fontSize: (() => {
+                  const scaleValue = scaleValues.find(s => s.label === style.scaleStep);
+                  const fontSize = style.fontSize || (scaleValue ? scaleValue.size : 16);
+                  return `${fontSize}${typographyUnit}`;
+                })(),
                 fontWeight: style.fontWeight,
                 lineHeight: style.lineHeight,
                 letterSpacing: style.letterSpacing,

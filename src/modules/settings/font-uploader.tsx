@@ -39,6 +39,8 @@ import { SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/compo
 import { Card } from "@/components/ui/card"
 import { useAuth } from '@/providers/auth-provider'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { toast as sonnerToast } from "sonner"
 
 interface FontMetadata extends Partial<Font> {
   file: File
@@ -46,6 +48,8 @@ interface FontMetadata extends Partial<Font> {
   size?: number
   variableMode?: 'variable' | 'fixed'
   selectedWeight?: number
+  fileUrl?: string
+  isVariable?: boolean
 }
 
 const fontCategories = [
@@ -219,29 +223,18 @@ export function FontUploader() {
     field: keyof FontMetadata,
     value: any
   ) => {
-    setFiles((prev) => {
+    setFiles(prev => {
       const newFiles = [...prev]
       const font = { ...newFiles[index] }
       
-      if (field === 'variableMode') {
-        // When switching between variable and fixed modes
-        font[field] = value
-        if (value === 'fixed' && !font.selectedWeight) {
-          // Set a default weight for fixed mode
-          font.selectedWeight = 400
-          font.weight = 400
-        } else if (value === 'variable') {
-          // Reset to full variable mode
-          font.selectedWeight = undefined
-          font.weight = 400 // Default variable weight
-        }
-      } else if (field === 'selectedWeight' && font.variableMode === 'fixed') {
+      // Handle special cases
+      if (field === 'weight') {
         // Update weight when in fixed mode
         font.selectedWeight = value
         font.weight = value
       } else {
-        // Handle other metadata changes
-        font[field] = value
+        // Handle other metadata changes with proper typing
+        (font as any)[field] = value
       }
       
       newFiles[index] = font
@@ -250,9 +243,15 @@ export function FontUploader() {
   }
 
   const handleUpload = async () => {
-    if (!files.length) return
+    if (files.length === 0) {
+      sonnerToast.error('Please add at least one font file')
+      return
+    }
     
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
+      sonnerToast.error('You must be signed in to upload fonts')
       router.push('/auth/signin')
       return
     }
@@ -273,63 +272,103 @@ export function FontUploader() {
         try {
           const familyId = uuidv4()
           
-          // Create family
-          const family = await createFamily({
+          // Create family with proper typing
+          const familyData = {
             id: familyId,
             name: familyName,
             category: familyFonts[0].category as FontCategory,
             tags: familyFonts[0].tags || []
-          })
-
-          if (!family) {
-            toast.error(`Failed to create font family: ${familyName}`)
-            continue
-          }
-
-          // Upload fonts
-          for (const font of familyFonts) {
-            try {
-              const fontId = uuidv4()
-              await uploadFont(font.file, {
-                id: fontId,
-                name: font.name || '',
-                family: familyName,
-                family_id: family.id,
-                weight: font.weight || 400,
-                style: font.style || 'normal',
-                format: font.format || '',
-                is_variable: font.isVariable,
-                variable_mode: font.variableMode,
-                category: font.category as FontCategory,
-                tags: font.tags || []
-              })
-              
-              uploaded++
-              setProgress((uploaded / totalFiles) * 100)
-            } catch (error: any) {
-              console.error('Font upload error:', error)
-              toast.error(`Failed to upload font: ${font.name}`)
+          };
+          
+          try {
+            const family = await createFamily(familyData);
+             
+            // Upload fonts
+            for (const font of familyFonts) {
+              try {
+                const fontId = uuidv4()
+                
+                // Ensure we have the correct file format
+                const fileExt = font.file.name.split('.').pop()?.toLowerCase() || '';
+                const validFormats = ['ttf', 'otf', 'woff', 'woff2'];
+                
+                if (!validFormats.includes(fileExt)) {
+                  sonnerToast.error(`Unsupported font format: ${fileExt}. Please use TTF, OTF, WOFF, or WOFF2.`);
+                  continue;
+                }
+                
+                // Log file details for debugging
+                console.log(`Preparing to upload font: ${font.name}`, {
+                  type: font.file.type,
+                  size: font.file.size,
+                  extension: fileExt
+                });
+                
+                // Create a new File object with the correct MIME type if needed
+                let fileToUpload = font.file;
+                if (!font.file.type || font.file.type === 'application/json') {
+                  const mimeTypes: Record<string, string> = {
+                    'ttf': 'font/ttf',
+                    'otf': 'font/otf',
+                    'woff': 'font/woff',
+                    'woff2': 'font/woff2'
+                  };
+                  const correctType = mimeTypes[fileExt] || 'application/octet-stream';
+                  
+                  // Create a new File with the correct MIME type
+                  const arrayBuffer = await font.file.arrayBuffer();
+                  fileToUpload = new File([arrayBuffer], font.file.name, { 
+                    type: correctType 
+                  });
+                  
+                  console.log(`Created new file with corrected MIME type: ${correctType}`);
+                }
+                
+                await uploadFont(fileToUpload, {
+                  id: fontId,
+                  name: font.name || '',
+                  family: familyName,
+                  family_id: familyId, // Use the ID we generated
+                  weight: font.weight || 400,
+                  style: font.style || 'normal',
+                  format: fileExt,
+                  is_variable: font.isVariable,
+                  variable_mode: font.variableMode,
+                  category: font.category as FontCategory,
+                  tags: font.tags || []
+                })
+                
+                uploaded++
+                setProgress((uploaded / totalFiles) * 100)
+              } catch (error: any) {
+                console.error('Font upload error:', error)
+                sonnerToast.error(`Failed to upload font: ${font.name}`)
+              }
             }
+          } catch (error: any) {
+            console.error('Family creation error:', error)
+            sonnerToast.error(`Failed to create font family: ${familyName}`)
           }
         } catch (error: any) {
           if (error.message === 'Authentication required') {
+            sonnerToast.error('You must be signed in to upload fonts')
             router.push('/auth/signin')
             return
           }
           console.error('Family creation error:', error)
-          toast.error(`Failed to create family: ${familyName}`)
+          sonnerToast.error(`Failed to create family: ${familyName}`)
         }
       }
 
       if (uploaded > 0) {
-        toast.success(`Successfully uploaded ${uploaded} font${uploaded > 1 ? 's' : ''}`)
+        sonnerToast.success(`Successfully uploaded ${uploaded} font${uploaded > 1 ? 's' : ''}`)
         setFiles([])
         setProgress(0)
         await loadFonts()
       }
     } catch (error: any) {
       console.error('Upload error:', error)
-      toast.error('Failed to upload fonts. Please try again.')
+      sonnerToast.error('Failed to upload fonts. Please try again.')
     } finally {
       setUploading(false)
     }

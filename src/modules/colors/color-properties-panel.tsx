@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { convertToAllFormats } from '@/lib/color-utils'
+import { toast } from '@/components/ui/use-toast'
 
 export function ColorPropertiesPanel() {
   const { 
@@ -114,50 +115,38 @@ export function ColorPropertiesPanel() {
   };
 
   const handleCreatePalette = async (isCore: boolean) => {
-    if (!currentBrand || !newPaletteName) return
-    
+    if (!currentBrand) return
+
     try {
       // Use the selected base color
       const baseColorObj = convertToAllFormats(baseColor);
       
-      // Create palette generation options based on user selections
-      const paletteOptions = {
-        lightnessPreset: paletteConfig.lightnessPreset,
-        chromaPreset: paletteConfig.chromaPreset,
-        lightnessRange: paletteConfig.lightnessRange,
-        chromaRange: paletteConfig.chromaRange,
-        hueShift: paletteConfig.hueShift
-      };
-      
-      // Generate steps for the palette using the selected parameters and options
+      // Generate steps for the palette using the parameters from the palette config
       const generatedSteps = generatePalette(baseColorObj, paletteConfig.numSteps);
       
       // Create the palette in the store (which syncs to Supabase)
-      const newPalette = await createPalette(currentBrand.id, {
-        name: newPaletteName,
-        description: `${newPaletteName} color palette`,
+      const paletteData = {
+        name: newPaletteName || `${isCore ? 'Core' : 'Accent'} Palette ${Date.now()}`,
+        description: '',
         baseColor: baseColorObj,
+        tags: [],
         steps: generatedSteps,
         isCore,
-        brandId: currentBrand.id // Add brandId explicitly to match the required type
-      })
+        brandId: currentBrand.id
+      };
+      
+      await createPalette(currentBrand.id, paletteData);
       
       setNewPaletteName('');
       
-      if (newPalette) {
-        // Safe access to the id property
-        const newPaletteId = newPalette?.id;
-        if (newPaletteId) {
-          setCurrentPalette(newPaletteId);
-          // Force an update of the preview
-          setTimeout(() => {
-            const event = new Event('paletteCreated');
-            window.dispatchEvent(event);
-          }, 100);
-        }
-      }
+      // Fetch all palettes to update the UI
+      await updatePalettes();
+      
+      // Set the current palette to the most recently created one
+      // This will be handled by the updatePalettes function
     } catch (error) {
       console.error('Error creating palette:', error);
+      toast.error('Failed to create palette');
     }
   }
 

@@ -57,6 +57,7 @@ interface PaletteConfig {
   lockBaseColor: boolean;
   customLightnessValues: number[];
   customChromaValues: number[];
+  colorGamutSetting: 'srgb' | 'display-p3' | 'unlimited';
 }
 
 // Interface for the color store
@@ -106,6 +107,7 @@ export const useColorStore = create<ColorStore>((set, get) => ({
     lockBaseColor: true,
     customLightnessValues: [],
     customChromaValues: [],
+    colorGamutSetting: 'srgb',
   },
 
   fetchPalettesByBrand: async (brandId: string) => {

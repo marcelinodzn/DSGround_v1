@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import { Font, FontFamily, uploadFont, createFontFamily, getFontFamilies, getFontsByFamily, getFonts, deleteFont } from '@/lib/fonts'
+import { Font, FontFamily, FontCategory, uploadFont, createFontFamily, getFontFamilies, getFontsByFamily, getFonts, deleteFont } from '@/lib/fonts'
 import { useAuth } from '@/providers/auth-provider'
-import { supabase } from '@/lib/supabase'
+import { supabase, getCurrentUserId } from '@/lib/supabase'
 import { useTypographyStore } from '@/store/typography'
 import { usePlatformStore } from '@/store/platform-store'
 
@@ -43,16 +43,20 @@ interface FontState {
   families: FontFamily[]
   isLoading: boolean
   error: string | null
-  uploadFont: (file: File, metadata: Partial<Font>) => Promise<void>
-  createFamily: (family: Partial<FontFamily>) => Promise<void>
-  fetchFamilies: () => Promise<void>
-  fetchFontsByFamily: (familyName: string) => Promise<void>
-  loadFonts: () => Promise<void>
-  deleteFont: (fontId: string) => Promise<void>
   brandTypography: Record<string, BrandTypography>
-  setBrandTypography: (type: 'primary' | 'secondary' | 'tertiary', fontId: string) => void
-  saveBrandTypography: (brandId: string, typography: Partial<BrandTypography>) => Promise<void>
+  
+  // Font operations
+  loadFonts: () => Promise<void>
+  uploadFont: (file: File, metadata: Partial<Font>) => Promise<Font>
+  createFamily: (family: Partial<FontFamily>) => Promise<FontFamily>
+  deleteFont: (fontId: string) => Promise<void>
+  deleteFamily: (familyId: string) => Promise<void>
+  
+  // Typography settings
   loadBrandTypography: (brandId: string) => Promise<void>
+  updateBrandTypography: (brandId: string, settings: Partial<BrandTypography>) => Promise<void>
+  addFontToBrand: (brandId: string, fontId: string, role: string) => Promise<void>
+  removeFontFromBrand: (brandId: string, fontId: string) => Promise<void>
 }
 
 export const useFontStore = create<FontState>((set, get) => ({
@@ -76,18 +80,19 @@ export const useFontStore = create<FontState>((set, get) => ({
       const result = await uploadFont(file, fontData)
 
       await get().loadFonts()
-      return result
+      return result as Font
     } catch (error: any) {
       console.error('Error uploading font:', error?.message || error)
-      set({ error: error?.message || 'Failed to upload font' })
+      set({ error: error?.message || String(error), isLoading: false })
       throw error
-    } finally {
-      set({ isLoading: false })
     }
   },
 
   createFamily: async (family: Partial<FontFamily>) => {
     try {
+      // Get current user ID or throw if not authenticated
+      const userId = await getCurrentUserId();
+      
       // Create basic family first with required fields only
       const { data, error } = await supabase
         .from('font_families')
@@ -96,6 +101,7 @@ export const useFontStore = create<FontState>((set, get) => ({
           name: family.name,
           category: family.category,
           tags: family.tags || [],
+          user_id: userId, // Add user_id from the session
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -108,33 +114,35 @@ export const useFontStore = create<FontState>((set, get) => ({
           const { data: existingFamily } = await supabase
             .from('font_families')
             .select()
-            .eq('name', family.name)
+            .eq('name', family.name || '')
             .single()
           
-          if (existingFamily) return existingFamily
+          if (existingFamily) return existingFamily as FontFamily
         }
         throw error
       }
 
-      // Try to update with additional properties
+      // Try to update with additional properties if available
       try {
-        const { error: updateError } = await supabase
-          .from('font_families')
-          .update({
-            is_variable: family.is_variable || false,
-            variable_mode: family.variable_mode
-          })
-          .eq('id', family.id)
+        if (family.is_variable !== undefined || family.variable_mode !== undefined) {
+          const { error: updateError } = await supabase
+            .from('font_families')
+            .update({
+              is_variable: family.is_variable,
+              variable_mode: family.variable_mode
+            })
+            .eq('id', family.id || '')
 
-        if (updateError) {
-          console.warn('Could not update additional properties:', updateError)
+          if (updateError) {
+            console.warn('Could not update additional properties:', updateError)
+          }
         }
       } catch (updateError) {
         console.warn('Additional properties not supported:', updateError)
       }
 
-      await get().fetchFamilies()
-      return data
+      await get().loadFonts()
+      return data as FontFamily
     } catch (error: any) {
       console.error('Error in createFontFamily:', error?.message || error)
       throw error
@@ -145,7 +153,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const families = await getFontFamilies()
-      set({ families })
+      set({ families: families as FontFamily[] })
     } catch (error) {
       set({ error: (error as Error).message })
       throw error
@@ -170,39 +178,12 @@ export const useFontStore = create<FontState>((set, get) => ({
   loadFonts: async () => {
     set({ isLoading: true, error: null })
     try {
-      console.log('Fetching fonts from database...');
-      const fonts = await getFonts();
-      
-      if (!fonts || fonts.length === 0) {
-        console.warn('No fonts returned from database, retrying with direct query...');
-        
-        // Make a direct query as a fallback
-        const { data, error } = await supabase
-          .from('fonts')
-          .select('*')
-          .order('family', { ascending: true });
-          
-        if (error) {
-          throw new Error(`Direct font query failed: ${error.message}`);
-        }
-        
-        if (data && data.length > 0) {
-          console.log(`Retrieved ${data.length} fonts with direct query`);
-          set({ fonts: data });
-        } else {
-          console.warn('Still no fonts found with direct query');
-          set({ fonts: [] });
-        }
-      } else {
-        console.log(`Successfully loaded ${fonts.length} fonts`);
-        set({ fonts });
-      }
+      const fonts = await getFonts()
+      set({ fonts: fonts as Font[], isLoading: false })
     } catch (error) {
-      console.error('Error loading fonts:', error);
-      set({ error: (error as Error).message });
-      throw error;
-    } finally {
-      set({ isLoading: false });
+      console.error('Error loading fonts:', error)
+      set({ error: (error as Error).message, isLoading: false })
+      throw error
     }
   },
 

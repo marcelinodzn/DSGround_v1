@@ -74,6 +74,11 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
     });
   };
 
+  // Get the font size from the scale values based on the current scale step
+  const scaleValues = props.getScaleValues();
+  const selectedScale = scaleValues.find(scale => scale.label === typeStyle.scaleStep);
+  const fontSize = selectedScale?.size || typeStyle.fontSize;
+
   return (
     <div ref={setNodeRef} style={styleProps} {...attributes}>
       <div key={typeStyle.id} className="border rounded-md overflow-hidden">
@@ -81,12 +86,17 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
           <div {...listeners} className="cursor-grab">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 flex items-center">
             <Input
               value={typeStyle.name}
               onChange={(e) => props.handleTypeStyleChange(typeStyle.id, { name: e.target.value })}
               className="text-xs h-8"
             />
+            {fontSize && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {formatWithUnit(fontSize, typographyUnit)}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <Button 
@@ -527,9 +537,10 @@ export function PropertiesPanel() {
           const scaleValue = scaleValues.find((s: { label: string }) => s.label === updates.scaleStep);
           
           if (scaleValue) {
+            console.log(`Updating fontSize for scale step ${updates.scaleStep} to ${scaleValue.size}px`);
             return {
               ...style,
-              scaleStep: updates.scaleStep,
+              ...updates,
               fontSize: scaleValue.size
             };
           }

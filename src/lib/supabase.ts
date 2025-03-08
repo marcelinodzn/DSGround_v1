@@ -30,12 +30,8 @@ export const getSupabaseClient = () => {
           headers: {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "apikey": supabaseAnonKey,
-            "Authorization": `Bearer ${supabaseAnonKey}`
           }
-        },
-        // Enable debug mode in development
-        debug: process.env.NODE_ENV === 'development',
+        }
       }
     )
     
@@ -46,24 +42,27 @@ export const getSupabaseClient = () => {
         
         // Update headers with the session token when auth state changes
         if (session) {
-          supabaseClient.realtime.setAuth(session.access_token)
-          // Update global headers with the user's session token
-          supabaseClient.supabaseUrl = supabaseUrl
-          supabaseClient.supabaseKey = session.access_token
-          
-          // Log the updated auth state
-          console.log('Supabase client updated with user session token')
+          try {
+            console.log('Setting auth token from auth change event')
+            supabaseClient.realtime.setAuth(session.access_token)
+          } catch (e) {
+            console.error('Failed to set realtime auth:', e)
+          }
         }
       })
       
       // Check for existing session and update headers
       supabaseClient.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          console.log('Found existing session, updating headers')
-          supabaseClient.realtime.setAuth(session.access_token)
-          // Update global headers with the user's session token
-          supabaseClient.supabaseUrl = supabaseUrl
-          supabaseClient.supabaseKey = session.access_token
+          console.log('Found existing session, updating auth state')
+          try {
+            supabaseClient.realtime.setAuth(session.access_token)
+            console.log('Session token applied to Supabase client')
+          } catch (e) {
+            console.error('Failed to set realtime auth from existing session:', e)
+          }
+        } else {
+          console.log('No existing session found')
         }
       })
     }
@@ -79,6 +78,18 @@ export const hasAuthSession = async () => {
   const client = getSupabaseClient()
   const { data } = await client.auth.getSession()
   return !!data.session
+}
+
+/**
+ * Get the current authenticated user's ID
+ * Throws an error if not authenticated
+ */
+export const getCurrentUserId = async (): Promise<string> => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    throw new Error('Authentication required')
+  }
+  return session.user.id
 }
 
 // Export the Supabase client

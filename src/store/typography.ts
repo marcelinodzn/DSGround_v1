@@ -70,6 +70,7 @@ export interface TypeStyle {
   lineHeight: number
   letterSpacing: number
   opticalSize: number
+  fontSize?: number
 }
 
 export interface AIPrompt {
