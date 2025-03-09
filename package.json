@@ -6,6 +6,7 @@
     "lint": "next lint"
   },
   "devDependencies": {
+    "@figma/plugin-typings": "^1.108.0",
     "@shadcn/ui": "^0.0.4",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.4",

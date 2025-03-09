@@ -1,0 +1,23 @@
+{
+  "name": "dsground-typography-plugin",
+  "version": "1.0.0",
+  "description": "A Figma plugin to import DSGround typography styles",
+  "main": "code.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && webpack --mode=production",
+    "dev": "webpack --mode=development --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "DSGround",
+  "license": "MIT",
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.108.0",
+    "html-loader": "^5.1.0",
+    "html-webpack-inline-source-plugin": "^1.0.0-beta.2",
+    "html-webpack-plugin": "^5.5.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.4",
+    "webpack": "^5.82.1",
+    "webpack-cli": "^5.1.1"
+  }
+}

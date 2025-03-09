@@ -1,0 +1,47 @@
+[
+  {
+    "id": "web",
+    "name": "Web",
+    "scale": {
+      "baseSize": 16,
+      "ratio": 1.25,
+      "stepsUp": 5,
+      "stepsDown": 2
+    },
+    "typeStyles": [
+      {
+        "id": "heading-1",
+        "name": "Heading 1",
+        "scaleStep": "f5",
+        "fontFamily": "Inter",
+        "fontWeight": 700,
+        "lineHeight": 1.2,
+        "lineHeightUnit": "multiplier",
+        "letterSpacing": -0.02,
+        "opticalSize": 0
+      },
+      {
+        "id": "heading-2",
+        "name": "Heading 2",
+        "scaleStep": "f4",
+        "fontFamily": "Inter",
+        "fontWeight": 700,
+        "lineHeight": 1.2,
+        "lineHeightUnit": "multiplier",
+        "letterSpacing": -0.01,
+        "opticalSize": 0
+      },
+      {
+        "id": "body",
+        "name": "Body",
+        "scaleStep": "f0",
+        "fontFamily": "Inter",
+        "fontWeight": 400,
+        "lineHeight": 1.5,
+        "lineHeightUnit": "multiplier",
+        "letterSpacing": 0,
+        "opticalSize": 0
+      }
+    ]
+  }
+] 

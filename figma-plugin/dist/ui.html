@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSGround Typography</title>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      background-color: #f9f9f9;
+    }
+    
+    h1 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    
+    p {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      color: #666;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    
+    .content {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    .footer {
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    button {
+      background-color: #18A0FB;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    button:hover {
+      background-color: #0D8DE3;
+    }
+    
+    button.secondary {
+      background-color: #F0F0F0;
+      color: #333;
+    }
+    
+    button.secondary:hover {
+      background-color: #E0E0E0;
+    }
+    
+    .file-input {
+      display: none;
+    }
+    
+    .file-label {
+      display: inline-block;
+      background-color: #F0F0F0;
+      color: #333;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .file-label:hover {
+      background-color: #E0E0E0;
+    }
+    
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    
+    .status.success {
+      background-color: #E3F9E5;
+      color: #1B8E24;
+    }
+    
+    .status.error {
+      background-color: #FFEFEF;
+      color: #D82C0D;
+    }
+    
+    .preview {
+      margin-top: 16px;
+      padding: 16px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .preview-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .preview-content {
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      padding: 8px;
+      background-color: #F5F5F5;
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="content">
+      <h1>Import Typography Styles</h1>
+      <p>Import your DSGround typography styles into Figma. This will create text styles for each platform and type style in your system.</p>
+      
+      <div>
+        <input type="file" id="file-input" class="file-input" accept=".json">
+        <label for="file-input" class="file-label">Choose JSON File</label>
+        <span id="file-name" style="margin-left: 8px; font-size: 14px;"></span>
+      </div>
+      
+      <div id="status-container" style="display: none;" class="status">
+        <div id="status-message"></div>
+      </div>
+      
+      <div id="preview-container" style="display: none;" class="preview">
+        <div class="preview-title">Preview</div>
+        <div id="preview-content" class="preview-content"></div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <button id="cancel-button" class="secondary">Cancel</button>
+      <button id="import-button" disabled>Import Styles</button>
+    </div>
+  </div>
+  
+  <script>
+    // Get DOM elements
+    const fileInput = document.getElementById('file-input');
+    const fileName = document.getElementById('file-name');
+    const importButton = document.getElementById('import-button');
+    const cancelButton = document.getElementById('cancel-button');
+    const statusContainer = document.getElementById('status-container');
+    const statusMessage = document.getElementById('status-message');
+    const previewContainer = document.getElementById('preview-container');
+    const previewContent = document.getElementById('preview-content');
+    
+    let typographyData = null;
+    
+    // Handle file selection
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      fileName.textContent = file.name;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          // Parse the JSON file
+          const data = JSON.parse(e.target.result);
+          typographyData = data;
+          
+          // Enable the import button
+          importButton.disabled = false;
+          
+          // Show a preview of the data
+          previewContainer.style.display = 'block';
+          previewContent.textContent = JSON.stringify(data, null, 2);
+          
+          // Clear any previous status
+          statusContainer.style.display = 'none';
+        } catch (error) {
+          // Show error if JSON is invalid
+          statusContainer.style.display = 'block';
+          statusContainer.className = 'status error';
+          statusMessage.textContent = 'Invalid JSON file. Please check the format and try again.';
+          
+          // Disable the import button
+          importButton.disabled = true;
+          
+          // Hide the preview
+          previewContainer.style.display = 'none';
+        }
+      };
+      
+      reader.readAsText(file);
+    });
+    
+    // Handle import button click
+    importButton.addEventListener('click', () => {
+      if (!typographyData) return;
+      
+      // Send the data to the plugin code
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'import-typography', 
+          typographyData 
+        } 
+      }, '*');
+      
+      // Show loading status
+      statusContainer.style.display = 'block';
+      statusContainer.className = 'status';
+      statusMessage.textContent = 'Importing typography styles...';
+      
+      // Disable the import button
+      importButton.disabled = true;
+    });
+    
+    // Handle cancel button click
+    cancelButton.addEventListener('click', () => {
+      parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+    });
+    
+    // Listen for messages from the plugin code
+    window.onmessage = (event) => {
+      const message = event.data.pluginMessage;
+      
+      if (!message) return;
+      
+      if (message.type === 'import-success') {
+        // Show success message
+        statusContainer.style.display = 'block';
+        statusContainer.className = 'status success';
+        statusMessage.textContent = 'Typography styles imported successfully!';
+        
+        // Re-enable the import button
+        importButton.disabled = false;
+      } else if (message.type === 'import-error') {
+        // Show error message
+        statusContainer.style.display = 'block';
+        statusContainer.className = 'status error';
+        statusMessage.textContent = `Error: ${message.message}`;
+        
+        // Re-enable the import button
+        importButton.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html> 

@@ -449,6 +449,10 @@ export function DocumentationModal({
                       .table-cell { font-size: 14px; }
                       .table-cell-small { font-size: 12px; fill: #6b7280; }
                       .table-border { stroke: #e5e7eb; stroke-width: 1; }
+                      @font-face {
+                        font-family: 'system-ui';
+                        src: local('system-ui');
+                      }
                     </style>
                     <rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />
                     <text x="${initialPadding}" y="${initialPadding}" class="heading">Typography Documentation</text>`;
@@ -461,8 +465,8 @@ export function DocumentationModal({
                     y: number, 
                     width: number, 
                     headers: string[], 
-                    rows: Array<Array<string | { main: string; sub?: string }>>,
-                    rowHeight = 60
+                    rows: Array<Array<string | { main: string; sub?: string; style?: any }>>,
+                    rowHeight = 80
                   ): number => {
                     const colWidths: number[] = [];
                     const headerHeight = 40;
@@ -471,9 +475,9 @@ export function DocumentationModal({
                     let totalWidth = 0;
                     headers.forEach((header, i) => {
                       let colWidth: number;
-                      if (i === 0) colWidth = width * 0.3; // Style name column
-                      else if (i === 1) colWidth = width * 0.5; // Preview column
-                      else colWidth = width * 0.2; // Size column
+                      if (i === 0) colWidth = width * 0.25; // Style name column - reduced from 0.3
+                      else if (i === 1) colWidth = width * 0.6; // Preview column - increased from 0.5
+                      else colWidth = width * 0.15; // Size column - reduced from 0.2
                       colWidths.push(colWidth);
                       totalWidth += colWidth;
                     });
@@ -489,7 +493,12 @@ export function DocumentationModal({
                       
                       // Draw vertical line after each column except the last
                       if (i < headers.length - 1) {
-                        svg += `<line x1="${xPos + colWidths[i]}" y1="${y}" x2="${xPos + colWidths[i]}" y2="${y + headerHeight + rows.length * rowHeight}" class="table-border" />`;
+                        // If this is the first column (style), reduce the gap
+                        if (i === 0) {
+                          svg += `<line x1="${xPos + colWidths[i]}" y1="${y}" x2="${xPos + colWidths[i]}" y2="${y + headerHeight + rows.length * rowHeight}" class="table-border" />`;
+                        } else {
+                          svg += `<line x1="${xPos + colWidths[i]}" y1="${y}" x2="${xPos + colWidths[i]}" y2="${y + headerHeight + rows.length * rowHeight}" class="table-border" />`;
+                        }
                       }
                       
                       xPos += colWidths[i];
@@ -510,10 +519,39 @@ export function DocumentationModal({
                         const textAnchor = cellIndex === row.length - 1 ? 'end' : 'start';
                         
                         if (typeof cell === 'object') {
-                          // Complex cell with main text and subtext
-                          svg += `<text x="${textX}" y="${rowY + 25}" class="table-cell" text-anchor="${textAnchor}">${cell.main}</text>`;
-                          if (cell.sub) {
-                            svg += `<text x="${textX}" y="${rowY + 45}" class="table-cell-small" text-anchor="${textAnchor}">${cell.sub}</text>`;
+                          if (cellIndex === 1 && cell.style) {
+                            // This is a preview cell with style information
+                            const style = cell.style;
+                            const fontSize = style.fontSize || 16;
+                            const fontWeight = style.fontWeight || 400;
+                            const lineHeight = style.lineHeight || 1.2;
+                            const textTransform = style.textTransform || 'none';
+                            const fontFamily = style.fontFamily || 'system-ui';
+                            
+                            // Apply text transformation
+                            let previewText = 'The quick brown fox jumps over the lazy dog';
+                            if (textTransform === 'uppercase') previewText = previewText.toUpperCase();
+                            else if (textTransform === 'lowercase') previewText = previewText.toLowerCase();
+                            else if (textTransform === 'capitalize') previewText = previewText.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                            
+                            // Calculate position based on line height
+                            const textY = rowY + (rowHeight / 2) + (fontSize / 4);
+                            
+                            svg += `<text 
+                              x="${textX}" 
+                              y="${textY}" 
+                              font-family="${fontFamily}, system-ui, sans-serif" 
+                              font-size="${fontSize}px" 
+                              font-weight="${fontWeight}"
+                              text-anchor="${textAnchor}"
+                              style="text-transform: ${textTransform};"
+                            >${previewText}</text>`;
+                          } else {
+                            // Complex cell with main text and subtext
+                            svg += `<text x="${textX}" y="${rowY + 25}" class="table-cell" text-anchor="${textAnchor}">${cell.main}</text>`;
+                            if (cell.sub) {
+                              svg += `<text x="${textX}" y="${rowY + 45}" class="table-cell-small" text-anchor="${textAnchor}">${cell.sub}</text>`;
+                            }
                           }
                         } else {
                           // Simple cell with just text
@@ -563,7 +601,10 @@ export function DocumentationModal({
                       
                       return [
                         { main: style.name, sub: style.fontFamily || 'System Font' },
-                        'The quick brown fox jumps over the lazy dog',
+                        { main: 'The quick brown fox jumps over the lazy dog', style: {
+                          ...style,
+                          fontSize: fontSize
+                        }},
                         { main: `${fontSize}${platform.units?.typography || 'px'}`, sub: `Line Height: ${lineHeight}${textTransform}` }
                       ];
                     });
@@ -609,7 +650,24 @@ export function DocumentationModal({
                       name: platform.name,
                       scaleMethod: typographyData.scaleMethod,
                       scale: typographyData.scale,
-                      typeStyles: typographyData.typeStyles
+                      typeStyles: typographyData.typeStyles?.map(style => {
+                        // Include all necessary properties for the Figma plugin
+                        return {
+                          ...style,
+                          // Ensure all required properties are present
+                          id: style.id || `style-${Math.random().toString(36).substr(2, 9)}`,
+                          name: style.name,
+                          scaleStep: style.scaleStep,
+                          fontFamily: style.fontFamily || 'Inter',
+                          fontWeight: style.fontWeight,
+                          lineHeight: style.lineHeight,
+                          lineHeightUnit: style.lineHeightUnit || 'multiplier',
+                          letterSpacing: style.letterSpacing,
+                          opticalSize: style.opticalSize,
+                          fontSize: style.fontSize,
+                          textTransform: style.textTransform || 'none'
+                        };
+                      })
                     };
                   });
                   
@@ -627,6 +685,51 @@ export function DocumentationModal({
                 }}>
                   <FileJson className="h-4 w-4 mr-2" />
                   Export as JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  // Generate JSON data specifically for the Figma plugin
+                  const exportData = platforms.map(platform => {
+                    const typographyData = getTypographyData(platform.id) || {};
+                    return {
+                      id: platform.id,
+                      name: platform.name,
+                      scaleMethod: typographyData.scaleMethod,
+                      scale: typographyData.scale,
+                      typeStyles: typographyData.typeStyles?.map(style => {
+                        // Include all necessary properties for the Figma plugin
+                        return {
+                          ...style,
+                          // Ensure all required properties are present
+                          id: style.id || `style-${Math.random().toString(36).substr(2, 9)}`,
+                          name: style.name,
+                          scaleStep: style.scaleStep,
+                          fontFamily: style.fontFamily || 'Inter',
+                          fontWeight: style.fontWeight,
+                          lineHeight: style.lineHeight,
+                          lineHeightUnit: style.lineHeightUnit || 'multiplier',
+                          letterSpacing: style.letterSpacing,
+                          opticalSize: style.opticalSize,
+                          fontSize: style.fontSize,
+                          textTransform: style.textTransform || 'none'
+                        };
+                      })
+                    };
+                  });
+                  
+                  // Download JSON
+                  const json = JSON.stringify(exportData, null, 2);
+                  const blob = new Blob([json], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'figma-typography-styles.json';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export for Figma Plugin
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
