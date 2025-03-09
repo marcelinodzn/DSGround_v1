@@ -34,7 +34,7 @@ interface Platform {
 
 interface ImportMessage {
   type: 'import-typography';
-  typographyData: Platform[];
+  typographyData: Platform[] | any;
 }
 
 interface CloseMessage {
@@ -53,6 +53,65 @@ interface ImportErrorMessage {
 type Message = ImportMessage | CloseMessage;
 type ResponseMessage = ImportSuccessMessage | ImportErrorMessage;
 
+/**
+ * Convert any JSON format to the expected format for the plugin
+ */
+function normalizeTypographyData(data: any): Platform[] {
+  console.log('Normalizing data:', data);
+  
+  // If data is not an array, try to convert it
+  if (!Array.isArray(data)) {
+    console.warn('Data is not an array, attempting to convert');
+    // If it's an object with platforms property, use that
+    if (data && data.platforms && Array.isArray(data.platforms)) {
+      data = data.platforms;
+    } else {
+      // Otherwise, wrap it in an array
+      data = [data];
+    }
+  }
+  
+  // Map each platform to ensure it has the correct structure
+  return data.map((platform: any) => {
+    if (!platform) return null;
+    
+    // Ensure platform has required properties
+    const normalizedPlatform: Platform = {
+      id: platform.id || `platform-${Math.random().toString(36).substr(2, 9)}`,
+      name: platform.name || 'Unnamed Platform',
+      scale: {
+        baseSize: platform.scale?.baseSize || 16,
+        ratio: platform.scale?.ratio || 1.25,
+        stepsUp: platform.scale?.stepsUp || 5,
+        stepsDown: platform.scale?.stepsDown || 2
+      },
+      typeStyles: []
+    };
+    
+    // Get type styles from the platform
+    const typeStyles = platform.typeStyles || [];
+    
+    // Normalize each type style
+    normalizedPlatform.typeStyles = typeStyles.map((style: any) => {
+      return {
+        id: style.id || `style-${Math.random().toString(36).substr(2, 9)}`,
+        name: style.name || 'Unnamed Style',
+        scaleStep: style.scaleStep || 'f0',
+        fontFamily: style.fontFamily || 'Inter',
+        fontWeight: style.fontWeight || 400,
+        lineHeight: style.lineHeight || 1.5,
+        lineHeightUnit: style.lineHeightUnit || 'multiplier',
+        letterSpacing: style.letterSpacing || 0,
+        opticalSize: style.opticalSize || 0,
+        fontSize: style.fontSize,
+        textTransform: style.textTransform || 'none'
+      };
+    });
+    
+    return normalizedPlatform;
+  }).filter(Boolean) as Platform[]; // Remove any null values
+}
+
 // Show the UI when the plugin is run
 figma.showUI(__html__, { width: 450, height: 550 });
 
@@ -60,18 +119,12 @@ figma.showUI(__html__, { width: 450, height: 550 });
 figma.ui.onmessage = async (msg: Message) => {
   if (msg.type === 'import-typography') {
     try {
-      const { typographyData } = msg;
-      
-      // Debug: Log the received data
-      console.log('Received typography data:', typographyData);
-      
-      // Check if typographyData is an array
-      if (!Array.isArray(typographyData)) {
-        throw new Error('Typography data is not an array. Please check the JSON format.');
-      }
+      // Normalize the typography data to ensure it has the correct structure
+      const normalizedData = normalizeTypographyData(msg.typographyData);
+      console.log('Normalized data:', normalizedData);
       
       // Process each platform's typography styles
-      for (const platform of typographyData) {
+      for (const platform of normalizedData) {
         // Debug: Log each platform
         console.log('Processing platform:', platform);
         
