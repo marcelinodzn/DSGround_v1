@@ -14,6 +14,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 
+interface Platform {
+  id: string;
+  name: string;
+  brand_id: string;
+  [key: string]: unknown;
+}
+
 interface BrandTokensPageProps {
   params: {
     brandId: string;
@@ -22,7 +29,7 @@ interface BrandTokensPageProps {
 
 export default function BrandTokensPage({ params }: BrandTokensPageProps) {
   const { brandId } = params;
-  const [platforms, setPlatforms] = useState([]);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   
   // Load platforms directly from the database
@@ -41,10 +48,10 @@ export default function BrandTokensPage({ params }: BrandTokensPageProps) {
         }
         
         console.log("Platforms loaded:", data);
-        setPlatforms(data || []);
+        setPlatforms(data as Platform[] || []);
         
         if (data && data.length > 0 && !selectedPlatform) {
-          setSelectedPlatform(data[0].id);
+          setSelectedPlatform(data[0].id as string);
         }
       } catch (err) {
         console.error("Exception loading platforms:", err);
