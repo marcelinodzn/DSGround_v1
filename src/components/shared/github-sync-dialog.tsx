@@ -215,6 +215,7 @@ export function GitHubSyncDialog({ onSync }: GitHubSyncDialogProps) {
           <AnimatedTabs 
             tabs={platformTabs}
             defaultTab="web"
+            layoutId="github-sync-tabs"
             onChange={(platform) => {
               // Platform change logic
             }}
