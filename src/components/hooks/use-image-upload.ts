@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 
 export interface UseImageUploadProps {
   onUpload?: (url: string) => void
-  initialUrl?: string
+  initialUrl?: string | null
   bucket?: string
   folder?: string
 }
