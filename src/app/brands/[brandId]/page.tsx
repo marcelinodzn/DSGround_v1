@@ -168,14 +168,21 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
         }
 
         if (brandData) {
-          // Explicitly cast brandData to BrandData type to fix TypeScript error
-          // This ensures that brandData.name is properly typed as a string
+          // Fix TypeScript error by explicitly typing brandData and checking for name property
           const typedBrandData = brandData as BrandData;
-          setBrand(typedBrandData)
-          setBrandName(typedBrandData.name)
+          setBrand(typedBrandData);
+          
+          // Ensure name property exists before setting it
+          if (typeof typedBrandData.name === 'string') {
+            setBrandName(typedBrandData.name);
+          } else {
+            console.warn('Brand name is not a string or is undefined');
+            setBrandName(''); // Set a default empty string
+          }
         }
       } catch (error) {
         console.error('Error in fetchBrand:', error)
+        toast.error('Failed to load brand details')
       }
     }
 
