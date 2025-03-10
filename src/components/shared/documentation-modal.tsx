@@ -97,22 +97,22 @@ const generateSVG = (platforms: Platform[]) => {
     yOffset += 40;
     
     // Add type styles
-    typeStyles.forEach((style, styleIndex) => {
-      if (styleIndex > 0 && styleIndex % 10 === 0) {
-        // Start a new column after 10 styles
-        yOffset = initialPadding + 40;
-        xPadding += 300;
-      }
+    if (typeStyles.length > 0) {
+      yOffset += 20;
+      svg += `<text x="${xPadding}" y="${yOffset}">Type Styles:</text>`;
+      yOffset += 20;
       
-      svg += `<text x="${xPadding}" y="${yOffset}" class="style-name">${style.name}</text>`;
-      yOffset += 20;
-      svg += `<text x="${xPadding + 20}" y="${yOffset}">Size: ${style.size}px</text>`;
-      yOffset += 20;
-      svg += `<text x="${xPadding + 20}" y="${yOffset}">Weight: ${style.fontWeight}</text>`;
-      yOffset += 20;
-      svg += `<text x="${xPadding + 20}" y="${yOffset}">Line Height: ${style.lineHeight}</text>`;
-      yOffset += 30;
-    });
+      typeStyles.forEach((style: any, styleIndex) => {
+        svg += `<text x="${xPadding}" y="${yOffset}" class="style-name">${style.name}</text>`;
+        yOffset += 20;
+        svg += `<text x="${xPadding + 20}" y="${yOffset}">Size: ${style.fontSize || style.size || 0}px</text>`;
+        yOffset += 20;
+        svg += `<text x="${xPadding + 20}" y="${yOffset}">Weight: ${style.fontWeight}</text>`;
+        yOffset += 20;
+        svg += `<text x="${xPadding + 20}" y="${yOffset}">Line Height: ${style.lineHeight}</text>`;
+        yOffset += 30;
+      });
+    }
     
     yOffset += 40;
     if (yOffset > svgHeight - 100) {
@@ -143,9 +143,9 @@ const downloadSVG = (platforms: Platform[]) => {
 };
 
 /**
- * Export as JSON
+ * Download typography data as JSON
  */
-const downloadJSON = () => {
+const downloadJSON = (platforms: Platform[], getTypographyData: (id: string) => any) => {
   const exportData = platforms.map(platform => {
     const typographyData = getTypographyData(platform.id) || {};
     return {
@@ -156,36 +156,35 @@ const downloadJSON = () => {
       typeStyles: typographyData.typeStyles
     };
   });
-  
-  const json = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+
+  const dataStr = JSON.stringify(exportData, null, 2);
+  const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
   
   const link = document.createElement('a');
-  link.href = url;
-  link.download = 'typography-documentation.json';
+  link.setAttribute('href', dataUri);
+  link.setAttribute('download', 'typography-data.json');
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 };
 
 /**
- * Export as JSON for Figma Plugin
+ * Download typography data as JSON formatted for Figma plugin
  */
-const downloadJSONForFigma = () => {
+const downloadJSONForFigma = (platforms: Platform[], getTypographyData: (id: string) => any) => {
   const exportData = platforms.map(platform => {
     const typographyData = getTypographyData(platform.id) || {};
     return {
       id: platform.id,
       name: platform.name,
+      scaleMethod: typographyData.scaleMethod,
       scale: {
         baseSize: typographyData.scale?.baseSize || 16,
-        ratio: typographyData.scale?.ratio || 1.25,
+        ratio: typographyData.scale?.ratio || 1.2,
         stepsUp: typographyData.scale?.stepsUp || 5,
         stepsDown: typographyData.scale?.stepsDown || 2
       },
-      typeStyles: (typographyData.typeStyles || []).map(style => ({
+      typeStyles: (typographyData.typeStyles || []).map((style: any) => ({
         id: style.id || `style-${Math.random().toString(36).substr(2, 9)}`,
         name: style.name || 'Unnamed Style',
         scaleStep: style.scaleStep || 'f0',
@@ -194,24 +193,20 @@ const downloadJSONForFigma = () => {
         lineHeight: style.lineHeight || 1.5,
         lineHeightUnit: style.lineHeightUnit || 'multiplier',
         letterSpacing: style.letterSpacing || 0,
-        opticalSize: style.opticalSize || 0,
-        fontSize: style.fontSize,
-        textTransform: style.textTransform || 'none'
+        fontSize: style.fontSize || style.size || 16
       }))
     };
   });
-  
-  const json = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+
+  const dataStr = JSON.stringify(exportData, null, 2);
+  const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
   
   const link = document.createElement('a');
-  link.href = url;
-  link.download = 'figma-typography-styles.json';
+  link.setAttribute('href', dataUri);
+  link.setAttribute('download', 'figma-typography-data.json');
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 };
 
 export function DocumentationModal({
@@ -528,10 +523,11 @@ export function DocumentationModal({
               tabs={[
                 { id: 'overview', label: 'Overview' },
                 { id: 'styles', label: 'Type Styles' },
-                { id: 'preview', label: 'Preview' },
+                { id: 'preview', label: 'Preview' }
               ]}
               defaultTab="overview"
               onChange={setActiveTab}
+              layoutId="documentation-tabs"
             />
           </div>
 
@@ -597,11 +593,11 @@ export function DocumentationModal({
                   <File className="h-4 w-4 mr-2" />
                   Export as PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={downloadJSON}>
+                <DropdownMenuItem onClick={() => downloadJSON(platforms, getTypographyData)}>
                   <FileJson className="h-4 w-4 mr-2" />
                   Export as JSON
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={downloadJSONForFigma}>
+                <DropdownMenuItem onClick={() => downloadJSONForFigma(platforms, getTypographyData)}>
                   <FileJson className="h-4 w-4 mr-2" />
                   Export for Figma Plugin
                 </DropdownMenuItem>
