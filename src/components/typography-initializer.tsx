@@ -38,7 +38,7 @@ export function TypographyInitializer() {
         console.warn('[Typography] Missing tables:', diagnosticsResult.tables.missingTables)
         
         // For each missing table that's critical, try to verify it exists directly
-        const missingTables = diagnosticsResult.tables.missingTables || []
+        const missingTables: string[] = diagnosticsResult.tables.missingTables || []
         
         if (missingTables.includes('typography_settings')) {
           const typographyTableExists = await ensureTableExists('typography_settings')
