@@ -12,7 +12,7 @@ export interface UseImageUploadProps {
 export interface UseImageUploadReturn {
   previewUrl: string | null
   fileName: string | null
-  fileInputRef: React.RefObject<HTMLInputElement>
+  fileInputRef: React.RefObject<HTMLInputElement | null>
   isUploading: boolean
   error: Error | null
   handleThumbnailClick: () => void
