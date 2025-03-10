@@ -51,6 +51,12 @@ interface PlatformSettings {
   typeUnit: 'px' | 'rem' | 'pt'
 }
 
+interface BrandData {
+  id: string;
+  name: string;
+  [key: string]: any; // Include other fields but not strictly typed
+}
+
 interface BrandPageProps {
   params: {
     brandId: string
@@ -60,7 +66,7 @@ interface BrandPageProps {
 
 export default function BrandPage({ params, searchParams }: BrandPageProps) {
   const { isFullscreen, setIsFullscreen } = useLayout()
-  const [brand, setBrand] = useState<any>(null)
+  const [brand, setBrand] = useState<BrandData | null>(null)
   const [isEditingName, setIsEditingName] = useState(false)
   const [brandName, setBrandName] = useState('')
   const [tokens, setTokens] = useState<TokenCollection>({
@@ -162,8 +168,9 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
         }
 
         if (brandData) {
-          setBrand(brandData)
-          setBrandName(brandData.name)
+          const typedBrandData = brandData as BrandData;
+          setBrand(typedBrandData)
+          setBrandName(typedBrandData.name)
         }
       } catch (error) {
         console.error('Error in fetchBrand:', error)
@@ -187,7 +194,7 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
           throw error
         }
 
-        setBrand(prev => ({ ...prev, name: brandName }))
+        setBrand(prev => prev ? { ...prev, name: brandName } : null)
         setIsEditingName(false)
         toast.success('Brand name updated successfully')
       } catch (error) {
