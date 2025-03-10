@@ -42,6 +42,15 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Download, File, FileJson } from "lucide-react"
 
+// Helper function to get typography data for a platform
+interface TypographyPlatformData {
+  id: string;
+  scaleMethod?: string;
+  scale?: any;
+  typeStyles?: any[];
+  [key: string]: any;
+}
+
 export function DocumentationModal({
   isOpen,
   onClose
@@ -65,7 +74,7 @@ export function DocumentationModal({
   }
 
   // Helper function to get typography data for a platform
-  const getTypographyData = (platformId: string) => {
+  const getTypographyData = (platformId: string): TypographyPlatformData | undefined => {
     return typographyPlatforms.find(p => p.id === platformId)
   }
 
@@ -309,7 +318,7 @@ export function DocumentationModal({
                   <TableCell>{style.name}</TableCell>
                   <TableCell>
                     {scaleValue 
-                      ? `${Math.round(scaleValue.size)}${typographyData.units.typography}` 
+                      ? `${Math.round(scaleValue.size)}${typographyData.units.typography || 'px'}` 
                       : '-'}
                   </TableCell>
                   <TableCell>
@@ -320,7 +329,7 @@ export function DocumentationModal({
                   <TableCell>{style.letterSpacing}em</TableCell>
                   <TableCell>{style.fontWeight}</TableCell>
                   <TableCell>{style.scaleStep}</TableCell>
-                  <TableCell>{style.opticalSize}{typographyData.units.typography}</TableCell>
+                  <TableCell>{style.opticalSize}{typographyData.units.typography || 'px'}</TableCell>
                 </TableRow>
               )
             })
@@ -644,13 +653,13 @@ export function DocumentationModal({
                 <DropdownMenuItem onClick={() => {
                   // Generate JSON data
                   const exportData = platforms.map(platform => {
-                    const typographyData = getTypographyData(platform.id) || {};
+                    const typographyData = getTypographyData(platform.id) || {} as TypographyPlatformData;
                     return {
                       id: platform.id,
                       name: platform.name,
                       scaleMethod: typographyData.scaleMethod,
                       scale: typographyData.scale,
-                      typeStyles: typographyData.typeStyles?.map(style => {
+                      typeStyles: typographyData.typeStyles?.map((style: any) => {
                         // Include all necessary properties for the Figma plugin
                         return {
                           ...style,
@@ -689,13 +698,13 @@ export function DocumentationModal({
                 <DropdownMenuItem onClick={() => {
                   // Generate JSON data specifically for the Figma plugin
                   const exportData = platforms.map(platform => {
-                    const typographyData = getTypographyData(platform.id) || {};
+                    const typographyData = getTypographyData(platform.id) || {} as TypographyPlatformData;
                     return {
                       id: platform.id,
                       name: platform.name,
                       scaleMethod: typographyData.scaleMethod,
                       scale: typographyData.scale,
-                      typeStyles: typographyData.typeStyles?.map(style => {
+                      typeStyles: typographyData.typeStyles?.map((style: any) => {
                         // Include all necessary properties for the Figma plugin
                         return {
                           ...style,
