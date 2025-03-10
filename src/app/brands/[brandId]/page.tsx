@@ -760,3 +760,5 @@ export const typography = {
     </div>
   )
 }
+
+// Brand page component for managing brand settings and typography
