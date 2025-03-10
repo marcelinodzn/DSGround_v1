@@ -168,6 +168,8 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
         }
 
         if (brandData) {
+          // Explicitly cast brandData to BrandData type to fix TypeScript error
+          // This ensures that brandData.name is properly typed as a string
           const typedBrandData = brandData as BrandData;
           setBrand(typedBrandData)
           setBrandName(typedBrandData.name)
