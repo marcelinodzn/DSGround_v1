@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf'
+import jsPDFModule from 'jspdf'
 import 'jspdf-autotable'
 import { Platform } from '@/store/platform-store'
 import { useTypographyStore } from '@/store/typography'
@@ -11,6 +11,18 @@ interface jsPDF {
   lastAutoTable: {
     finalY: number
   }
+  save: (filename: string) => void
+  setFillColor: (r: number, g: number, b: number) => void
+  setDrawColor: (r: number, g: number, b: number) => void
+  setTextColor: (r: number, g: number, b: number) => void
+  setLineWidth: (width: number) => void
+  setFontSize: (size: number) => void
+  setFont: (fontName: string, fontStyle: string) => void
+  text: (text: string, x: number, y: number, options?: any) => void
+  rect: (x: number, y: number, width: number, height: number, style: string) => void
+  line: (x1: number, y1: number, x2: number, y2: number) => void
+  addPage: () => void
+  getNumberOfPages: () => number
 }
 
 // Type for autoTable options
@@ -36,7 +48,7 @@ type ScaleValue = {
 
 export function generatePDF(platforms: Platform[]) {
   // Create a new document
-  const doc = new jsPDF() as unknown as jsPDF
+  const doc = new jsPDFModule() as unknown as jsPDF
   
   // Get typography data from the store
   const typographyPlatforms = useTypographyStore.getState().platforms || []
