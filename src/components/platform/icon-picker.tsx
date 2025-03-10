@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Icons } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Popular icon sets from Iconify
