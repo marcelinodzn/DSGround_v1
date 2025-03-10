@@ -58,30 +58,37 @@ const generateSVG = (platforms: Platform[]) => {
   const svgHeight = 800;
   const initialPadding = 40;
   
-  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      text { font-family: system-ui, sans-serif; }
-      .heading { font-weight: bold; font-size: 20px; }
-      .platform-name { font-weight: bold; font-size: 16px; }
-      .style-name { font-weight: 500; }
-    </style>
-    <rect width="${svgWidth}" height="${svgHeight}" fill="#ffffff" />
-    <text x="${initialPadding}" y="${initialPadding}" class="heading">Typography Documentation</text>`;
+  // Get typography data from the store
+  const typographyStore = useTypographyStore.getState();
+  const typographyData = typographyStore.platforms || [];
+  
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">`;
+  
+  // Add styles
+  svg += `<style>
+    text { font-family: system-ui, sans-serif; font-size: 14px; fill: #333; }
+    .platform-name { font-weight: bold; font-size: 18px; }
+    .type-style { font-size: 12px; }
+  </style>`;
+  
+  // Add title
+  svg += `<text x="${initialPadding}" y="${initialPadding}" font-size="24px" font-weight="bold">Typography Documentation</text>`;
   
   let yOffset = initialPadding + 40;
   let xPadding = initialPadding;
   
   platforms.forEach((platform, platformIndex) => {
-    // Get typography data from the store
-    const typeStyles = typographyPlatforms[platform.id]?.typeStyles || [];
+    // Get typography data for this platform
+    const platformData = typographyData.find(p => p.id === platform.id);
+    const typeStyles = platformData?.typeStyles || [];
     
     svg += `<text x="${xPadding}" y="${yOffset}" class="platform-name">${platform.name}</text>`;
     yOffset += 30;
     
-    const scaleMethod = typographyPlatforms[platform.id]?.scaleMethod || 'None';
+    const scaleMethod = platformData?.scaleMethod || 'None';
     svg += `<text x="${xPadding}" y="${yOffset}">Scale Method: ${scaleMethod}</text>`;
     
-    const scale = typographyPlatforms[platform.id]?.scale;
+    const scale = platformData?.scale;
     if (scale) {
       yOffset += 20;
       svg += `<text x="${xPadding}" y="${yOffset}">Base Size: ${scale.baseSize}px, Ratio: ${scale.ratio}</text>`;
