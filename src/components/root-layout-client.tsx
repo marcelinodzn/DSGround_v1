@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select"
 import { useBrandStore } from "@/store/brand-store"
 import * as SelectPrimitive from "@radix-ui/react-select"
+import { TypographyInitializer } from '@/components/typography-initializer'
 
 function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
   const segments = pathname.split('/').filter(Boolean)
@@ -65,11 +66,19 @@ const BrandDropdown = () => {
   useEffect(() => {
     const initializeBrands = async () => {
       try {
-        const fetchedBrands = await fetchBrands()
-        if (!fetchedBrands?.length) return
+        // Call fetchBrands but don't rely on its return value
+        await fetchBrands()
         
-        if (!currentBrand?.id && fetchedBrands[0]) {
-          await setCurrentBrand(fetchedBrands[0].id)
+        // Instead, use the brands from the store state which should be updated by fetchBrands
+        const currentBrands = useBrandStore.getState().brands || []
+        
+        if (currentBrands.length === 0) {
+          console.log('No brands available after fetching')
+          return
+        }
+        
+        if (!currentBrand?.id && currentBrands[0]) {
+          await setCurrentBrand(currentBrands[0].id)
         }
       } catch (error) {
         console.error('Error initializing brands:', error)
@@ -77,7 +86,7 @@ const BrandDropdown = () => {
     }
 
     initializeBrands()
-  }, [fetchBrands, setCurrentBrand])
+  }, [fetchBrands, setCurrentBrand, currentBrand])
 
   const handleBrandChange = async (brandId: string) => {
     if (brandId === 'new') {
@@ -142,11 +151,17 @@ export function RootLayoutClient({
   }
 
   if (isFullscreen) {
-    return children
+    return (
+      <>
+        <TypographyInitializer />
+        {children}
+      </>
+    )
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <TypographyInitializer />
       {/* Left Sidebar */}
       <aside className={cn(
         "w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto transition-transform",

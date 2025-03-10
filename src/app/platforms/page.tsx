@@ -20,6 +20,7 @@ interface Platform {
   units: {
     typography: string
     spacing: string
+    dimensions: string
     borderWidth: string
     borderRadius: string
   }
@@ -76,6 +77,7 @@ export default function PlatformsPage() {
         units: {
           typography: 'rem',
           spacing: 'rem',
+          dimensions: 'px',
           borderWidth: 'px',
           borderRadius: 'px'
         },
@@ -117,6 +119,7 @@ export default function PlatformsPage() {
         units: {
           typography: platform.units.typography,
           spacing: platform.units.spacing,
+          dimensions: platform.units.dimensions || 'px',
           borderWidth: platform.units.borderWidth,
           borderRadius: platform.units.borderRadius
         },

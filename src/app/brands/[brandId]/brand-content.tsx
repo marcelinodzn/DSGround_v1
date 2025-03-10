@@ -5,7 +5,7 @@ import { Brand } from "@/store/brand-store"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AnimatedTabs } from "@/components/ui/animated-tabs"
-import { useLayout } from "@/store/layout-store"
+import { useLayout } from "@/contexts/layout-context"
 import { useTypographyStore } from "@/store/typography-store"
 import { Platform } from "@/store/typography"
 import { usePlatformStore } from "@/store/platform-store"
@@ -36,7 +36,11 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
           .single()
 
         if (error) throw error
-        setBrand(data as Brand)
+        if (data && typeof data === 'object' && 'id' in data && 'name' in data) {
+          setBrand(data as unknown as Brand)
+        } else {
+          console.error('Invalid brand data format:', data)
+        }
       } catch (error) {
         console.error('Error fetching brand:', error)
       }
@@ -98,13 +102,14 @@ export function BrandContent({ params, searchParams }: BrandContentProps) {
 
       <div className="mt-6">
         <AnimatedTabs
-          value="overview"
-          onValueChange={() => {}}
+          defaultTab="overview"
+          onChange={() => {}}
+          layoutId="brand-tabs"
           tabs={[
-            { value: 'overview', label: 'Overview' },
-            { value: 'tokens', label: 'Design Tokens' },
-            { value: 'components', label: 'Components' },
-            { value: 'settings', label: 'Settings' },
+            { id: 'overview', label: 'Overview' },
+            { id: 'tokens', label: 'Design Tokens' },
+            { id: 'components', label: 'Components' },
+            { id: 'settings', label: 'Settings' },
           ]}
         />
       </div>

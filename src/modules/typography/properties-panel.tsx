@@ -265,22 +265,17 @@ const getFontNameById = (fontId: string | null | undefined, fonts: any[]): strin
 export function PropertiesPanel() {
   const platforms = usePlatformStore((state) => state.platforms)
   const {
-    currentPlatform,
-    setCurrentPlatform,
-    updatePlatform,
-    copyTypeStylesToAllPlatforms,
+    currentPlatform: activePlatform,
     platforms: typographyPlatforms,
-    initializePlatform
-  } = useTypographyStore((state): TypographyState => state as unknown as TypographyState)
-  const { platforms: platformSettings } = usePlatformStore()
-  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
+    setCurrentPlatform,
+    initializePlatform,
+    fetchTypographySettings,
+    fetchTypeStyles,
+    saveTypographySettings
+  } = useTypographyStore() as any
+  const { platforms: platformSettings, updatePlatform } = usePlatformStore()
+  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore() as any
   const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
-
-  // Compute active platform - either current platform or first available
-  const activePlatform = useMemo(() => {
-    if (currentPlatform) return currentPlatform;
-    return platforms.length > 0 ? platforms[0].id : '';
-  }, [currentPlatform, platforms]);
 
   // DnD hooks
   const sensors = useSensors(
@@ -344,22 +339,39 @@ export function PropertiesPanel() {
     // TODO: Implement duplicate platform functionality
   };
 
-  // Effect hooks
+  // Track if we've already initialized platforms to prevent infinite loops
+  const [initializedPlatforms, setInitializedPlatforms] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (platforms.length > 0) {
-      // Initialize typography settings for each platform if needed
-      platforms.forEach(platform => {
-        if (!typographyPlatforms.find(p => p.id === platform.id)) {
-          initializePlatform(platform.id)
-        }
-      })
+      console.log('Initializing typography for platforms:', platforms);
+      
+      // Create a list of platforms that need initialization
+      const platformsToInitialize = platforms.filter((platform: any) => 
+        !initializedPlatforms.has(platform.id) && 
+        !typographyPlatforms.find((p: any) => p.id === platform.id)
+      );
+      
+      if (platformsToInitialize.length > 0) {
+        // Initialize typography settings for each platform if needed
+        platformsToInitialize.forEach(platform => {
+          console.log(`Initializing typography for platform: ${platform.id}`);
+          initializePlatform(platform.id);
+        });
+        
+        // Update our tracking set
+        const newInitialized = new Set(initializedPlatforms);
+        platformsToInitialize.forEach(p => newInitialized.add(p.id));
+        setInitializedPlatforms(newInitialized);
+      }
       
       // Set current platform if none selected
       if (!activePlatform && platforms[0]) {
-        setCurrentPlatform(platforms[0].id)
+        console.log(`Setting current platform to: ${platforms[0].id}`);
+        setCurrentPlatform(platforms[0].id);
       }
     }
-  }, [platforms, typographyPlatforms, activePlatform, initializePlatform, setCurrentPlatform])
+  }, [platforms, typographyPlatforms, activePlatform, initializePlatform, setCurrentPlatform, fetchTypographySettings, fetchTypeStyles, initializedPlatforms]);
 
   useEffect(() => {
     // Add a flag to prevent multiple loads
@@ -395,7 +407,7 @@ export function PropertiesPanel() {
     name: 'Default',
     scaleMethod: 'modular' as ScaleMethod,
     scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
-    units: { typography: 'px', spacing: 'px', dimensions: 'px' },
+    units: { typography: 'px', spacing: 'px', dimensions: 'px', borderWidth: 'px', borderRadius: 'px' },
     typeStyles: []
   }
   
@@ -451,17 +463,23 @@ export function PropertiesPanel() {
         console.log("Initializing missing AI settings");
         const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
         
-        updatePlatform(activePlatform, {
-          aiScale: {
-            recommendedBaseSize: currentScale.baseSize,
-            originalSizeInPx: currentScale.baseSize,
-            recommendations: currentSettings.aiScale?.recommendations || '',
-            summaryTable: currentSettings.aiScale?.summaryTable || ''
-          }
+        // Use the typography store's function instead of platform store
+        // This avoids mixing different Platform types
+        fetchTypographySettings(activePlatform).then(() => {
+          saveTypographySettings(activePlatform, {
+            aiScale: {
+              recommendedBaseSize: currentScale.baseSize,
+              originalSizeInPx: currentScale.baseSize,
+              recommendations: currentSettings.aiScale?.recommendations || '',
+              summaryTable: currentSettings.aiScale?.summaryTable || ''
+            }
+          });
+        }).catch(error => {
+          console.error("Error updating AI settings:", error);
         });
       }
     }
-  }, [activePlatform, currentSettings, updatePlatform]);
+  }, [activePlatform, currentSettings, fetchTypographySettings, saveTypographySettings]);
 
   // Helper function to ensure AI scale settings are properly updated
   const updateAIScaleSettings = useCallback((method: ScaleMethod) => {
@@ -474,7 +492,8 @@ export function PropertiesPanel() {
       // Initialize AI settings if they don't exist or are incomplete
       const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
       
-      updatePlatform(activePlatform, {
+      // Use saveTypographySettings instead of updatePlatform to avoid type mismatches
+      saveTypographySettings(activePlatform, {
         scaleMethod: method,
         aiScale: currentSettings.aiScale || {
           recommendedBaseSize: currentScale.baseSize,
@@ -488,13 +507,11 @@ export function PropertiesPanel() {
       });
     } else {
       // For other methods, just update the scale method
-      updatePlatform(activePlatform, { 
+      saveTypographySettings(activePlatform, { 
         scaleMethod: method 
       });
     }
-    
-    // The updatePlatform function now automatically saves to Supabase
-  }, [activePlatform, currentSettings, updatePlatform]);
+  }, [activePlatform, currentSettings, saveTypographySettings]);
 
   // Use this function when changing scale method
   const handleScaleMethodChange = useCallback((method: ScaleMethod) => {
@@ -510,7 +527,8 @@ export function PropertiesPanel() {
     
     // Use setTimeout to ensure this update happens in a separate tick
     setTimeout(() => {
-      updatePlatform(activePlatform, {
+      // Use saveTypographySettings instead of updatePlatform for scale changes
+      saveTypographySettings(activePlatform, {
         scale: {
           ...(currentSettings.scale || {}),
           ratio,
@@ -519,7 +537,7 @@ export function PropertiesPanel() {
           stepsUp: currentSettings.scale.stepsUp || 3,
           stepsDown: currentSettings.scale.stepsDown || 2
         }
-      })
+      });
     }, 0);
   };
 
@@ -941,54 +959,53 @@ ${result.reasoning || ''}
         console.log('Selected font ID:', fontId);
       }
       
-      // Always update the role, even if the font ID is null
-      updatePlatform(activePlatform, {
-        currentFontRole: role,
-        fontId: fontId
+      // Instead of using updatePlatform, directly update the local state
+      // These properties don't exist in the database schema
+      setCurrentFontRole(role);
+      
+      // Find the platform in the local state and update it
+      const updatedPlatforms = typographyPlatforms.map((p: any) => {
+        if (p.id === activePlatform) {
+          return {
+            ...p,
+            currentFontRole: role,
+            fontId: fontId
+          };
+        }
+        return p;
       });
       
-      // Update local state to ensure UI updates immediately
-      setCurrentFontRole(role);
+      // Update the platforms in the store
+      const typographyStore = useTypographyStore.getState();
+      if (activePlatform) {
+        typographyStore.updatePlatform(activePlatform, { currentFontRole: role, fontId });
+      }
       
       // Force a font load if we have a font ID
       if (fontId) {
-        const font = fonts.find(f => f.id === fontId);
+        const font = fonts.find((f: any) => f.id === fontId);
         if (font?.file_url) {
           try {
             console.log(`Loading font for role ${role}:`, font.family);
-            const fontFace = new FontFace(
-              font.family,
-              `url(${font.file_url})`,
-              {
-                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
-                style: font.style || 'normal',
-              }
-            );
+            // Font loading logic
+            const customFontName = font.family;
             
-            const loadedFont = await fontFace.load();
-            document.fonts.add(loadedFont);
-            console.log(`Font loaded for role ${role}:`, font.family);
-            
-            // Force a CSS update by creating a style tag
-            const styleTag = document.createElement('style');
-            styleTag.textContent = `
-              .font-preview {
-                font-family: "${font.family}", ${font.category || 'sans-serif'} !important;
-              }
-              .font-preview-container {
-                font-family: "${font.family}", ${font.category || 'sans-serif'} !important;
-              }
-            `;
-            document.head.appendChild(styleTag);
-          } catch (err) {
-            console.error(`Error loading font for role ${role}:`, err);
+            // If the font file URL is an object URL, it's already loaded
+            if (typeof font.file_url === 'string' && !font.file_url.startsWith('blob:')) {
+              const fontFace = new FontFace(customFontName, `url(${font.file_url})`);
+              await fontFace.load();
+              document.fonts.add(fontFace);
+              console.log(`Font ${customFontName} loaded successfully`);
+            }
+          } catch (error) {
+            console.error(`Error loading font:`, error);
           }
         }
       }
     } catch (error) {
-      console.error('Error updating font role:', error)
+      console.error(`Error changing font role:`, error);
     }
-  }
+  };
 
   const getFontInfo = (role: 'primary' | 'secondary' | 'tertiary') => {
     const fontId = currentTypography?.[`${role}_font_id`]
@@ -1138,16 +1155,18 @@ ${currentSettings.aiScale.reasoning || ''}
   const handleViewTabChange = useCallback((tab: string) => {
     setActiveViewTab(tab);
     if (activePlatform) {
-      updatePlatform(activePlatform, { viewTab: tab });
+      // Use saveTypographySettings instead of updatePlatform for tab changes
+      saveTypographySettings(activePlatform, { viewTab: tab });
     }
-  }, [activePlatform, updatePlatform]);
+  }, [activePlatform, saveTypographySettings]);
 
   const handleAnalysisTabChange = useCallback((tab: string) => {
     setActiveAnalysisTab(tab);
     if (activePlatform) {
-      updatePlatform(activePlatform, { analysisTab: tab });
+      // Use saveTypographySettings instead of updatePlatform for tab changes
+      saveTypographySettings(activePlatform, { analysisTab: tab });
     }
-  }, [activePlatform, updatePlatform]);
+  }, [activePlatform, saveTypographySettings]);
 
   if (!currentSettings) {
     return <div className="flex items-center justify-center h-full">Loading platform settings...</div>
@@ -1271,7 +1290,8 @@ ${currentSettings.aiScale.reasoning || ''}
                   // Initialize AI settings if they don't exist or are incomplete
                   const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
                   
-                  updatePlatform(activePlatform, {
+                  // Use saveTypographySettings instead of updatePlatform for scale method changes
+                  saveTypographySettings(activePlatform, {
                     scaleMethod: method,
                     aiScale: currentSettings.aiScale || {
                       recommendedBaseSize: currentScale.baseSize,
@@ -1286,7 +1306,8 @@ ${currentSettings.aiScale.reasoning || ''}
                   });
                 } else {
                   // For other methods, just update the scale method
-                  updatePlatform(activePlatform, { 
+                  // Use saveTypographySettings instead of updatePlatform for scale method changes
+                  saveTypographySettings(activePlatform, { 
                     scaleMethod: method 
                   });
                 }
@@ -1367,7 +1388,8 @@ ${currentSettings.aiScale.reasoning || ''}
                       
                       // Use setTimeout to ensure this update happens in a separate tick
                       setTimeout(() => {
-                        updatePlatform(activePlatform, {
+                        // Use saveTypographySettings instead of updatePlatform for scale changes
+                        saveTypographySettings(activePlatform, {
                           scale: {
                             ...(currentSettings.scale || {}),
                             baseSize: newBaseSize
@@ -1392,12 +1414,13 @@ ${currentSettings.aiScale.reasoning || ''}
                         console.log("Setting Steps Up to:", newValue);
                         // Use setTimeout to ensure this update happens in a separate tick
                         setTimeout(() => {
-                          updatePlatform(activePlatform, {
+                          // Use saveTypographySettings instead of updatePlatform for scale changes
+                          saveTypographySettings(activePlatform, {
                             scale: {
                               ...(currentSettings.scale || {}),
                               stepsUp: newValue
                             }
-                          })
+                          });
                         }, 0);
                       }}
                       className="text-xs h-8"
@@ -1415,12 +1438,13 @@ ${currentSettings.aiScale.reasoning || ''}
                         console.log("Setting Steps Down to:", newValue);
                         // Use setTimeout to ensure this update happens in a separate tick
                         setTimeout(() => {
-                          updatePlatform(activePlatform, {
+                          // Use saveTypographySettings instead of updatePlatform for scale changes
+                          saveTypographySettings(activePlatform, {
                             scale: {
                               ...(currentSettings.scale || {}),
                               stepsDown: newValue
                             }
-                          })
+                          });
                         }, 0);
                       }}
                       className="text-xs h-8"
@@ -1437,12 +1461,13 @@ ${currentSettings.aiScale.reasoning || ''}
                   <Select
                     value={currentSettings.scale.ratio.toString()}
                     onValueChange={(value) => {
-                      updatePlatform(activePlatform, {
+                      // Use saveTypographySettings instead of updatePlatform for scale changes
+                      saveTypographySettings(activePlatform, {
                         scale: {
                           ...(currentSettings.scale || {}),
                           ratio: parseFloat(value)
                         }
-                      })
+                      });
                     }}
                   >
                     <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
@@ -1589,12 +1614,13 @@ ${currentSettings.aiScale.reasoning || ''}
                         console.log("Setting Steps Up to:", newValue);
                         // Use setTimeout to ensure this update happens in a separate tick
                         setTimeout(() => {
-                          updatePlatform(activePlatform, {
+                          // Use saveTypographySettings instead of updatePlatform for scale changes
+                          saveTypographySettings(activePlatform, {
                             scale: {
                               ...(currentSettings.scale || {}),
                               stepsUp: newValue
                             }
-                          })
+                          });
                         }, 0);
                       }}
                       className="text-xs h-8"
@@ -1612,12 +1638,13 @@ ${currentSettings.aiScale.reasoning || ''}
                         console.log("Setting Steps Down to:", newValue);
                         // Use setTimeout to ensure this update happens in a separate tick
                         setTimeout(() => {
-                          updatePlatform(activePlatform, {
+                          // Use saveTypographySettings instead of updatePlatform for scale changes
+                          saveTypographySettings(activePlatform, {
                             scale: {
                               ...(currentSettings.scale || {}),
                               stepsDown: newValue
                             }
-                          })
+                          });
                         }, 0);
                       }}
                       className="text-xs h-8"
@@ -1786,7 +1813,8 @@ ${currentSettings.aiScale.reasoning || ''}
                                 <Select
                                   value={currentSettings.scale.ratio.toString()}
                                   onValueChange={(value) => {
-                                    updatePlatform(activePlatform, {
+                                    // Use saveTypographySettings instead of updatePlatform for scale changes
+                                    saveTypographySettings(activePlatform, {
                                       scale: {
                                         ...(currentSettings.scale || {}),
                                         ratio: parseFloat(value)
@@ -1823,12 +1851,13 @@ ${currentSettings.aiScale.reasoning || ''}
                                       console.log("Setting Steps Up to:", newValue);
                                       // Use setTimeout to ensure this update happens in a separate tick
                                       setTimeout(() => {
-                                        updatePlatform(activePlatform, {
+                                        // Use saveTypographySettings instead of updatePlatform for scale changes
+                                        saveTypographySettings(activePlatform, {
                                           scale: {
                                             ...(currentSettings.scale || {}),
                                             stepsUp: newValue
                                           }
-                                        })
+                                        });
                                       }, 0);
                                     }}
                                     className="text-xs h-8"
@@ -1846,12 +1875,13 @@ ${currentSettings.aiScale.reasoning || ''}
                                       console.log("Setting Steps Down to:", newValue);
                                       // Use setTimeout to ensure this update happens in a separate tick
                                       setTimeout(() => {
-                                        updatePlatform(activePlatform, {
+                                        // Use saveTypographySettings instead of updatePlatform for scale changes
+                                        saveTypographySettings(activePlatform, {
                                           scale: {
                                             ...(currentSettings.scale || {}),
                                             stepsDown: newValue
                                           }
-                                        })
+                                        });
                                       }, 0);
                                     }}
                                     className="text-xs h-8"
@@ -1970,12 +2000,13 @@ ${currentSettings.aiScale.reasoning || ''}
                                 <Select
                                   value={currentSettings.scale.ratio.toString()}
                                   onValueChange={(value) => {
-                                    updatePlatform(activePlatform, {
+                                    // Use saveTypographySettings instead of updatePlatform for scale changes
+                                    saveTypographySettings(activePlatform, {
                                       scale: {
                                         ...(currentSettings.scale || {}),
                                         ratio: parseFloat(value)
                                       }
-                                    })
+                                    });
                                   }}
                                 >
                                   <SelectTrigger className="text-xs h-8">
@@ -2007,12 +2038,13 @@ ${currentSettings.aiScale.reasoning || ''}
                                       console.log("Setting Steps Up to:", newValue);
                                       // Use setTimeout to ensure this update happens in a separate tick
                                       setTimeout(() => {
-                                        updatePlatform(activePlatform, {
+                                        // Use saveTypographySettings instead of updatePlatform for scale changes
+                                        saveTypographySettings(activePlatform, {
                                           scale: {
                                             ...(currentSettings.scale || {}),
                                             stepsUp: newValue
                                           }
-                                        })
+                                        });
                                       }, 0);
                                     }}
                                     className="text-xs h-8"
@@ -2030,12 +2062,13 @@ ${currentSettings.aiScale.reasoning || ''}
                                       console.log("Setting Steps Down to:", newValue);
                                       // Use setTimeout to ensure this update happens in a separate tick
                                       setTimeout(() => {
-                                        updatePlatform(activePlatform, {
+                                        // Use saveTypographySettings instead of updatePlatform for scale changes
+                                        saveTypographySettings(activePlatform, {
                                           scale: {
                                             ...(currentSettings.scale || {}),
                                             stepsDown: newValue
                                           }
-                                        })
+                                        });
                                       }, 0);
                                     }}
                                     className="text-xs h-8"
@@ -2347,7 +2380,7 @@ function DistanceBasedTab({
       <div>
         <RadioGroup
           value={platform.scaleMethod} 
-          onValueChange={(value) => updatePlatform(platform.id, { scaleMethod: value as ScaleMethod })}
+          onValueChange={(value) => saveTypographySettings(platform.id, { scaleMethod: value as ScaleMethod })}
           className="grid grid-cols-3 gap-4"
         >
           <div>

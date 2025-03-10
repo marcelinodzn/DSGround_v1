@@ -4,6 +4,7 @@ import { usePlatformStore } from "@/store/platform-store"
 import { supabase } from '@/lib/supabase'
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { v4 as uuidv4 } from 'uuid'
+import { notifySyncStarted, notifySyncCompleted, notifySyncError } from '@/components/supabase-sync-manager'
 
 // Function to upload an image to Supabase storage
 export const uploadImageToStorage = async (base64Image: string, brandId: string, platformId: string): Promise<string | null> => {
@@ -107,10 +108,13 @@ export interface Platform {
   name: string
   scaleMethod: ScaleMethod
   scale: ScaleConfig
+  baseSize?: number
   units: {
     typography: string
     spacing: string
     dimensions: string
+    borderWidth: string
+    borderRadius: string
   }
   distanceScale: {
     viewingDistance: number
@@ -146,6 +150,7 @@ interface TypographyState {
   saveTypographySettings: (platformId: string, settings: Partial<Platform>) => Promise<void>
   fetchTypeStyles: (platformId: string) => Promise<void>
   fetchTypographySettings: (platformId: string) => Promise<void>
+  setPlatforms: (updatedPlatforms: Platform[]) => void
 }
 
 const defaultAccessibility = {
@@ -202,7 +207,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'rem',
       spacing: 'rem',
-      dimensions: 'rem'
+      dimensions: 'rem',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 50,
@@ -223,7 +230,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'sp',
       spacing: 'dp',
-      dimensions: 'dp'
+      dimensions: 'dp',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 30,
@@ -244,7 +253,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'px',
       spacing: 'px',
-      dimensions: 'px'
+      dimensions: 'px',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 300,
@@ -264,8 +275,10 @@ const initialPlatforms: Platform[] = [
     scale: { ...defaultScale },
     units: {
       typography: 'pt',
-      spacing: 'mm',
-      dimensions: 'mm'
+      spacing: 'pt',
+      dimensions: 'pt',
+      borderWidth: 'pt',
+      borderRadius: 'pt'
     },
     distanceScale: {
       viewingDistance: 40,
@@ -286,7 +299,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'px',
       spacing: 'px',
-      dimensions: 'px'
+      dimensions: 'px',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 100,
@@ -307,7 +322,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'px',
       spacing: 'px',
-      dimensions: 'px'
+      dimensions: 'px',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 20,
@@ -328,7 +345,9 @@ const initialPlatforms: Platform[] = [
     units: {
       typography: 'px',
       spacing: 'px',
-      dimensions: 'px'
+      dimensions: 'px',
+      borderWidth: 'px',
+      borderRadius: 'px'
     },
     distanceScale: {
       viewingDistance: 250,
@@ -343,7 +362,7 @@ const initialPlatforms: Platform[] = [
   },
 ]
 
-export const useTypographyStore = create(
+export const useTypographyStore = create<TypographyState>(
   persist(
     (set, get) => ({
       currentPlatform: '',
@@ -354,15 +373,22 @@ export const useTypographyStore = create(
       setCurrentPlatform: (platformId: string) => {
         set({ currentPlatform: platformId })
       },
+      
+      setPlatforms: (updatedPlatforms: Platform[]) => {
+        set({ platforms: updatedPlatforms })
+      },
 
       initializePlatform: async (platformId: string) => {
+        console.log(`[Typography] Initializing platform ${platformId}`)
         const platformStore = usePlatformStore.getState()
         const platformData = platformStore.platforms.find(p => p.id === platformId)
         
         if (!platformData) {
-          console.error('Platform not found:', platformId)
+          console.error(`[Typography] Platform ${platformId} not found in platform store, cannot initialize`)
           return
         }
+
+        console.log(`[Typography] Found platform data for ${platformId}:`, platformData)
 
         const defaultSettings: Platform = {
           id: platformId,
@@ -374,10 +400,12 @@ export const useTypographyStore = create(
             stepsUp: 3,
             stepsDown: 2
           },
-          units: {
+          units: platformData.units || {
             typography: 'px',
             spacing: 'px',
-            dimensions: 'px'
+            dimensions: 'px',
+            borderWidth: 'px',
+            borderRadius: 'px'
           },
           distanceScale: {
             viewingDistance: 400,
@@ -391,21 +419,97 @@ export const useTypographyStore = create(
             minContrastBody: 4.5,
             minContrastLarge: 3
           },
-          typeStyles: []
+          typeStyles: [...defaultTypeStyles]
         }
 
-        set((state: TypographyState) => ({
-          ...state,
-          platforms: [...state.platforms, { ...defaultSettings }]
-        }))
+        console.log(`[Typography] Setting up default settings for platform ${platformId}:`, defaultSettings)
 
-        // Save the default settings to the database
-        await get().saveTypographySettings(platformId, defaultSettings)
+        set((state: TypographyState) => {
+          // Check if platform already exists
+          const platformExists = state.platforms.some(p => p.id === platformId);
+          
+          if (platformExists) {
+            console.log(`[Typography] Platform ${platformId} already exists in state, updating it`)
+            return {
+              ...state,
+              platforms: state.platforms.map(p => 
+                p.id === platformId ? { ...p, ...defaultSettings } : p
+              )
+            }
+          } else {
+            console.log(`[Typography] Platform ${platformId} doesn't exist in state, adding it`)
+            return {
+              ...state,
+              platforms: [...state.platforms, { ...defaultSettings }]
+            }
+          }
+        })
+
+        console.log(`[Typography] Saving default settings to database for platform ${platformId}`)
+        
+        try {
+          // Save the default settings to the database
+          await get().saveTypographySettings(platformId, defaultSettings)
+          console.log(`[Typography] Successfully saved default settings to database for platform ${platformId}`)
+          
+          // Save the default type styles to the database
+          await get().saveTypeStyles(platformId, defaultTypeStyles)
+          console.log(`[Typography] Successfully saved default type styles to database for platform ${platformId}`)
+        } catch (error) {
+          console.error(`[Typography] Error saving default settings for platform ${platformId}:`, error)
+        }
       },
 
       updatePlatform: (platformId: string, updates: Partial<Platform>) => {
         // First check if platform exists in state
-        const platformExists = get().platforms.some(p => p.id === platformId);
+        console.log(`[Typography] updatePlatform called for ${platformId}`, updates);
+
+        const state = get() as TypographyState;
+        const existingPlatform = state.platforms.find((p: Platform) => p.id === platformId);
+        const platformExists = !!existingPlatform;
+        
+        // Check if there are actual changes to avoid unnecessary updates
+        if (platformExists && existingPlatform && Object.keys(updates).length > 0) {
+          // Check if any values are actually different
+          let hasChanges = false;
+          
+          for (const key in updates) {
+            if (key === 'units' && updates.units) {
+              // Special handling for units object
+              const existingUnits = existingPlatform.units || {};
+              const updatedUnits = updates.units;
+              
+              for (const unitKey in updatedUnits) {
+                if (existingUnits[unitKey as keyof typeof existingUnits] !== 
+                    updatedUnits[unitKey as keyof typeof updatedUnits]) {
+                  hasChanges = true;
+                  break;
+                }
+              }
+            } else if (key === 'scale' && updates.scale) {
+              // Special handling for scale object
+              const existingScale = existingPlatform.scale || {};
+              const updatedScale = updates.scale;
+              
+              for (const scaleKey in updatedScale) {
+                if (existingScale[scaleKey as keyof typeof existingScale] !== 
+                    updatedScale[scaleKey as keyof typeof updatedScale]) {
+                  hasChanges = true;
+                  break;
+                }
+              }
+            } else if (JSON.stringify(existingPlatform[key as keyof Platform]) !== 
+                       JSON.stringify(updates[key as keyof Partial<Platform>])) {
+              hasChanges = true;
+              break;
+            }
+          }
+          
+          if (!hasChanges) {
+            console.log(`No actual changes detected for platform ${platformId}, skipping update`);
+            return;
+          }
+        }
         
         if (!platformExists) {
           console.log(`Platform ${platformId} not found, initializing it first`);
@@ -415,7 +519,13 @@ export const useTypographyStore = create(
             name: 'New Platform',
             scaleMethod: 'modular',
             scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
-            units: { typography: 'px', spacing: 'px', dimensions: 'px' },
+            units: { 
+              typography: 'px', 
+              spacing: 'px', 
+              dimensions: 'px', 
+              borderWidth: 'px', 
+              borderRadius: 'px' 
+            },
             distanceScale: {
               viewingDistance: 400,
               visualAcuity: 1,
@@ -440,43 +550,73 @@ export const useTypographyStore = create(
         }
         
         // If platform exists, update it
-        set((state: TypographyState) => ({
-          ...state,
-          platforms: state.platforms.map((platform: Platform) => 
-            platform.id === platformId 
-              ? { ...platform, ...updates }
-              : platform
-          )
-        }))
+        set((state: TypographyState) => {
+          // Ensure units property has all required fields
+          let updatedUnits = updates.units as Platform['units'] | undefined;
+          if (updatedUnits) {
+            const platform = state.platforms.find((p: Platform) => p.id === platformId);
+            if (platform) {
+              updatedUnits = {
+                typography: updatedUnits.typography || platform.units.typography || 'px',
+                spacing: updatedUnits.spacing || platform.units.spacing || 'px',
+                dimensions: updatedUnits.dimensions || platform.units.dimensions || 'px',
+                borderWidth: updatedUnits.borderWidth || platform.units.borderWidth || 'px',
+                borderRadius: updatedUnits.borderRadius || platform.units.borderRadius || 'px'
+              };
+            }
+          }
+          
+          return {
+            ...state,
+            platforms: state.platforms.map((platform: Platform) => 
+              platform.id === platformId 
+                ? { ...platform, ...updates, ...(updatedUnits ? { units: updatedUnits } : {}) }
+                : platform
+            )
+          };
+        });
         
-        // Then persist the changes to Supabase
+        // Then persist the changes to Supabase with a delay
         // We need to use setTimeout to ensure this runs after the state update
-        setTimeout(() => {
+        (window as any).__typographySaveTimeout = setTimeout(() => {
           const store = get() as TypographyState
           const updatedPlatform = store.platforms.find(p => p.id === platformId)
           
           if (updatedPlatform) {
-            // Only save the specific updates that were provided
-            // This prevents overwriting other settings that weren't changed
+            // Check which properties were updated and include only those
             const settingsToSave: Partial<Platform> = {}
             
-            // Check which properties were updated and include only those
             if (updates.scaleMethod !== undefined) settingsToSave.scaleMethod = updates.scaleMethod
             if (updates.scale !== undefined) settingsToSave.scale = updates.scale
             if (updates.distanceScale !== undefined) settingsToSave.distanceScale = updates.distanceScale
             if (updates.aiScale !== undefined) settingsToSave.aiScale = updates.aiScale
+            if (updates.viewTab !== undefined) settingsToSave.viewTab = updates.viewTab
+            if (updates.analysisTab !== undefined) settingsToSave.analysisTab = updates.analysisTab
+            
+            // If we're updating baseSize directly, make sure to include it in the scale
+            if (updates.baseSize !== undefined) {
+              const currentScale = updatedPlatform.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
+              settingsToSave.scale = { ...currentScale, baseSize: updates.baseSize };
+              console.log(`[Typography] Updating baseSize to ${updates.baseSize} in scale settings for platform ${platformId}`);
+            }
             
             // Only call saveTypographySettings if we have settings to save
             if (Object.keys(settingsToSave).length > 0) {
+              console.log('[Typography] Preparing to save typography settings to Supabase in 500ms (debounced):', settingsToSave);
               store.saveTypographySettings(platformId, settingsToSave)
-                .catch(error => {
-                  console.error('Error saving typography settings:', error)
-                  // Update the error state
-                  set({ error: (error as Error).message })
+                .then(() => {
+                  console.log(`[Typography] Debounced save completed for platform ${platformId}`);
                 })
+                .catch(error => {
+                  console.error('[Typography] Error in debounced save to Supabase:', error);
+                  // Update the error state
+                  set({ error: (error as Error).message });
+                });
+            } else {
+              console.log('[Typography] No typography settings to save to Supabase after debounce');
             }
           }
-        }, 0)
+        }, 500) // Increase the debounce time to 500ms
       },
 
       getScaleValues: (platformId: string) => {
@@ -627,215 +767,396 @@ export const useTypographyStore = create(
       saveTypeStyles: async (platformId: string, styles: TypeStyle[]) => {
         set({ isLoading: true, error: null })
         try {
+          console.log(`Saving type styles for platform ${platformId}:`, styles)
+          
           // First, delete existing type styles for this platform
           const { error: deleteError } = await supabase
-            .from('typography_styles')
+            .from('type_styles')
             .delete()
             .eq('platform_id', platformId)
         
-          if (deleteError) throw deleteError
+          if (deleteError) {
+            console.error('Error deleting existing type styles:', deleteError)
+            throw deleteError
+          }
         
           // Now insert the new styles
-          const { error } = await supabase
-            .from('typography_styles')
+          const { data, error } = await supabase
+            .from('type_styles')
             .insert(styles.map(style => ({
               platform_id: platformId,
               name: style.name,
               scale_step: style.scaleStep,
-              font_family: style.fontFamily,
               font_weight: style.fontWeight,
               line_height: style.lineHeight,
               letter_spacing: style.letterSpacing,
               optical_size: style.opticalSize
             })))
+            .select()
         
-          if (error) throw error
-        } catch (error) {
-          set({ 
-            isLoading: false,
-            error: (error as Error).message 
-          })
-        }
-      },
-
-      saveTypographySettings: async (platformId: string, settings: Partial<Platform>) => {
-        set({ isLoading: true, error: null })
-        
-        try {
-          // Ensure AI settings are properly formatted
-          const aiSettings = settings.aiScale ? {
-            recommendedBaseSize: settings.aiScale.recommendedBaseSize || 0,
-            originalSizeInPx: settings.aiScale.originalSizeInPx || 0,
-            recommendations: settings.aiScale.recommendations || '',
-            summaryTable: settings.aiScale.summaryTable || '',
-            reasoning: settings.aiScale.reasoning || '',
-            prompts: settings.aiScale.prompts || []
-          } : null;
-          
-          // Check if settings already exist for this platform
-          const { data: existingData, error: checkError } = await supabase
-            .from('typography_settings')
-            .select('platform_id')
-            .eq('platform_id', platformId)
-            
-          if (checkError) throw checkError
-          
-          // If there are multiple rows, delete all but one
-          if (existingData && existingData.length > 1) {
-            console.log(`Found ${existingData.length} rows for platform ${platformId}, cleaning up...`);
-            
-            // Keep the first row and delete the rest
-            const keepId = existingData[0].platform_id;
-            const { error: deleteError } = await supabase
-              .from('typography_settings')
-              .delete()
-              .eq('platform_id', platformId)
-              .neq('platform_id', keepId);
-              
-            if (deleteError) throw deleteError;
+          if (error) {
+            console.error('Error inserting type styles:', error)
+            return false
           }
           
-          if (existingData && existingData.length > 0) {
-            // Update existing record
-            const { error } = await supabase
-              .from('typography_settings')
-              .update({
-                scale_method: settings.scaleMethod,
-                scale_config: settings.scale,
-                distance_scale: {
-                  viewing_distance: settings.distanceScale?.viewingDistance,
-                  visual_acuity: settings.distanceScale?.visualAcuity,
-                  mean_length_ratio: settings.distanceScale?.meanLengthRatio,
-                  text_type: settings.distanceScale?.textType,
-                  lighting: settings.distanceScale?.lighting,
-                  ppi: settings.distanceScale?.ppi,
-                },
-                ai_settings: aiSettings,
-                view_tab: settings.viewTab,
-                analysis_tab: settings.analysisTab
-              })
-              .eq('platform_id', platformId)
-            if (error) throw error
-          } else {
-            // Insert new record
-            const { error } = await supabase
-              .from('typography_settings')
-              .insert({
-                platform_id: platformId,
-                scale_method: settings.scaleMethod,
-                scale_config: settings.scale,
-                distance_scale: {
-                  viewing_distance: settings.distanceScale?.viewingDistance,
-                  visual_acuity: settings.distanceScale?.visualAcuity,
-                  mean_length_ratio: settings.distanceScale?.meanLengthRatio,
-                  text_type: settings.distanceScale?.textType,
-                  lighting: settings.distanceScale?.lighting,
-                  ppi: settings.distanceScale?.ppi
-                },
-                ai_settings: aiSettings,
-                view_tab: settings.viewTab,
-                analysis_tab: settings.analysisTab
-              })
-            if (error) throw error
-          }
+          console.log('Successfully saved type styles:', data)
           
           // Update local state
-          set((state: TypographyState): TypographyState => ({
+          set((state: TypographyState) => ({
             ...state,
-            platforms: state.platforms.map((p: Platform) => 
-              p.id === platformId ? { ...p, ...settings } as Platform : p
-            ),
             isLoading: false,
             error: null
           }))
         } catch (error) {
-          console.error('Error saving typography settings:', error)
+          console.error('Error in saveTypeStyles:', error)
           set({ 
             isLoading: false,
             error: (error as Error).message 
           })
+          throw error
+        }
+      },
+
+      saveTypographySettings: async (platformId: string, settings: Partial<Platform>) => {
+        console.log(`[Typography] Saving typography settings for platform ${platformId}:`, settings);
+        
+        // Notify sync started
+        notifySyncStarted();
+        
+        try {
+          // First, check if there are existing settings for this platform
+          const { data: existingSettings, error: checkError } = await supabase
+            .from('typography_settings')
+            .select('id')
+            .eq('platform_id', platformId);
+          
+          if (checkError) {
+            console.error(`[Typography] Error checking existing settings for platform ${platformId}:`, checkError);
+            notifySyncError(`Error checking existing settings: ${checkError.message}`);
+            return;
+          }
+          
+          // Clean up multiple records for the same platform if they exist (data integrity)
+          if (existingSettings && existingSettings.length > 1) {
+            console.log(`Found ${existingSettings.length} rows for platform ${platformId}, cleaning up...`);
+            
+            try {
+              // Keep only the most recent record, delete the others
+              const idsToKeep = [existingSettings[0].id];
+              const idsToDelete = existingSettings
+                .slice(1)
+                .map(s => s.id);
+              
+              if (idsToDelete.length > 0) {
+                const { error: deleteError } = await supabase
+                  .from('typography_settings')
+                  .delete()
+                  .in('id', idsToDelete);
+                
+                if (deleteError) {
+                  console.error(`[Typography] Error cleaning up duplicate settings:`, deleteError);
+                  // Continue anyway, we can still update the first record
+                }
+              }
+            } catch (error) {
+              console.error(`[Typography] Error during cleanup:`, error);
+              // Continue anyway, we can still try to update
+            }
+          }
+          
+          // Prepare the base update data with only fields that are always in the schema
+          const baseUpdateData = {
+            platform_id: platformId,
+            scale_method: settings.scaleMethod,
+            scale_config: settings.scale || {},
+            distance_scale: settings.distanceScale || {},
+            ai_settings: settings.aiScale ? {
+              recommendedBaseSize: settings.aiScale.recommendedBaseSize || 0,
+              originalSizeInPx: settings.aiScale.originalSizeInPx || 0,
+              recommendations: settings.aiScale.recommendations || '',
+              summaryTable: settings.aiScale.summaryTable || '',
+              reasoning: settings.aiScale.reasoning || '',
+              prompts: settings.aiScale.prompts || []
+            } : null
+          };
+          
+          // Optional fields (that might not be in the schema yet)
+          const optionalFields: Record<string, any> = {};
+          
+          // Only add these fields if they're defined in the settings
+          if (settings.viewTab !== undefined) {
+            optionalFields.view_tab = settings.viewTab;
+          }
+          
+          if (settings.analysisTab !== undefined) {
+            optionalFields.analysis_tab = settings.analysisTab;
+          }
+          
+          if (existingSettings && existingSettings.length > 0) {
+            console.log(`[Typography] Updating existing typography settings for platform ${platformId}`);
+            
+            // Update existing record
+            const updateData = {
+              ...baseUpdateData,
+              ...optionalFields
+            };
+            
+            console.log(`[Typography] Update data:`, updateData);
+            
+            // First try with all fields
+            let data;
+            let error;
+            
+            try {
+              const result = await supabase
+                .from('typography_settings')
+                .update(updateData)
+                .eq('id', existingSettings[0].id)
+                .select();
+              
+              data = result.data;
+              error = result.error;
+              
+              // If there's an error about a column not existing, remove problematic fields and try again
+              if (error && error.code === 'PGRST204' && error.message && error.message.includes('column')) {
+                console.warn(`[Typography] Column error detected: ${error.message}. Retrying with base fields only.`);
+                
+                // Try again with just the base fields that we know exist
+                const baseResult = await supabase
+                  .from('typography_settings')
+                  .update(baseUpdateData)
+                  .eq('id', existingSettings[0].id)
+                  .select();
+                
+                data = baseResult.data;
+                error = baseResult.error;
+              }
+            } catch (e) {
+              console.error(`[Typography] Exception during typography settings update:`, e);
+              error = { message: e.message };
+            }
+            
+            if (error) {
+              console.error(`[Typography] Error updating typography settings:`, error);
+              notifySyncError(`Error updating settings: ${error.message}`);
+              return;
+            }
+            
+            console.log(`[Typography] Successfully updated typography settings:`, data);
+            notifySyncCompleted();
+          } else {
+            console.log(`[Typography] Inserting new typography settings for platform ${platformId}`);
+            
+            // Insert new record
+            const insertData = {
+              ...baseUpdateData,
+              ...optionalFields
+            };
+            
+            console.log(`[Typography] Insert data:`, insertData);
+            
+            // First try with all fields
+            let data;
+            let error;
+            
+            try {
+              const result = await supabase
+                .from('typography_settings')
+                .insert(insertData)
+                .select();
+              
+              data = result.data;
+              error = result.error;
+              
+              // If there's an error about a column not existing, remove problematic fields and try again
+              if (error && error.code === 'PGRST204' && error.message && error.message.includes('column')) {
+                console.warn(`[Typography] Column error detected: ${error.message}. Retrying with base fields only.`);
+                
+                // Try again with just the base fields that we know exist
+                const baseResult = await supabase
+                  .from('typography_settings')
+                  .insert(baseUpdateData)
+                  .select();
+                
+                data = baseResult.data;
+                error = baseResult.error;
+              }
+            } catch (e) {
+              console.error(`[Typography] Exception during typography settings insert:`, e);
+              error = { message: e.message };
+            }
+            
+            if (error) {
+              console.error(`[Typography] Error inserting typography settings:`, error);
+              notifySyncError(`Error inserting settings: ${error.message}`);
+              return;
+            }
+            
+            console.log(`[Typography] Successfully inserted typography settings:`, data);
+            notifySyncCompleted();
+          }
+          
+          // Update local state
+          const platforms = get().platforms;
+          const updatedPlatforms = platforms.map(p => {
+            if (p.id === platformId) {
+              return { ...p, ...settings };
+            }
+            return p;
+          });
+          
+          // Update platforms in the store
+          set({ platforms: updatedPlatforms });
+          
+        } catch (error) {
+          console.error(`[Typography] Exception in saveTypographySettings:`, error);
+          notifySyncError(`Error saving settings: ${error.message || 'Unknown error'}`);
         }
       },
 
       fetchTypographySettings: async (platformId: string) => {
         set({ isLoading: true, error: null })
+        console.log(`[Typography] Fetching typography settings for platform ${platformId}`)
         
         try {
-          const { data, error } = await supabase
+          // Modify query to get the most recent settings if multiple exist
+          const { data: settingsData, error } = await supabase
             .from('typography_settings')
             .select('*')
             .eq('platform_id', platformId)
+            .order('created_at', { ascending: false })
+            .limit(1)
           
-          if (error) throw error
+          if (error) {
+            console.error(`[Typography] Error fetching typography settings for platform ${platformId}:`, error)
+            throw error
+          }
           
-          // Handle case where multiple rows are returned
-          if (data && data.length > 0) {
-            // Use the first row if multiple are found
-            const settingsData = data[0];
-            console.log('Typography settings response:', settingsData);
-            
-            // Map database format to our state format
-            const settings = {
-              scaleMethod: settingsData.scale_method as ScaleMethod,
-              scale: settingsData.scale_config || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
+          if (!settingsData || settingsData.length === 0) {
+            console.log(`[Typography] No settings found for platform ${platformId}, will use defaults`)
+            // No data found, initialize with defaults
+            return get().initializePlatform(platformId)
+          }
+          
+          // Use the first (most recent) result
+          const settings = settingsData[0];
+          
+          console.log(`[Typography] Received settings for platform ${platformId}:`, settings)
+          
+          if (settings) {
+            // Transform the data from database format to app format
+            const transformedSettings = {
+              scaleMethod: settings.scale_method as ScaleMethod,
+              scale: settings.scale_config || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
               distanceScale: {
-                viewingDistance: settingsData.distance_scale?.viewing_distance ?? 400,
-                visualAcuity: settingsData.distance_scale?.visual_acuity ?? 1,
-                meanLengthRatio: settingsData.distance_scale?.mean_length_ratio ?? 5,
-                textType: (settingsData.distance_scale?.text_type as TextType) ?? 'continuous',
-                lighting: (settingsData.distance_scale?.lighting as LightingCondition) ?? 'good',
-                ppi: settingsData.distance_scale?.ppi ?? 96
+                viewingDistance: settings.distance_scale?.viewing_distance ?? 400,
+                visualAcuity: settings.distance_scale?.visual_acuity ?? 1,
+                meanLengthRatio: settings.distance_scale?.mean_length_ratio ?? 5,
+                textType: (settings.distance_scale?.text_type as TextType) ?? 'continuous',
+                lighting: (settings.distance_scale?.lighting as LightingCondition) ?? 'good',
+                ppi: settings.distance_scale?.ppi ?? 96
               },
               // Properly handle AI settings
-              aiScale: settingsData.ai_settings ? {
-                recommendedBaseSize: settingsData.ai_settings.recommendedBaseSize || 0,
-                originalSizeInPx: settingsData.ai_settings.originalSizeInPx || 0,
-                recommendations: settingsData.ai_settings.recommendations || '',
-                summaryTable: settingsData.ai_settings.summaryTable || '',
-                reasoning: settingsData.ai_settings.reasoning || '',
-                prompts: settingsData.ai_settings.prompts || []
-              } : settingsData.scale_method === 'ai' ? {
+              aiScale: settings.ai_settings ? {
+                recommendedBaseSize: settings.ai_settings.recommendedBaseSize || 0,
+                originalSizeInPx: settings.ai_settings.originalSizeInPx || 0,
+                recommendations: settings.ai_settings.recommendations || '',
+                summaryTable: settings.ai_settings.summaryTable || '',
+                reasoning: settings.ai_settings.reasoning || '',
+                prompts: settings.ai_settings.prompts || []
+              } : settings.scale_method === 'ai' ? {
                 // If scale method is 'ai' but no ai_settings exist, create default ones
-                recommendedBaseSize: settingsData.scale_config?.baseSize || 16,
-                originalSizeInPx: settingsData.scale_config?.baseSize || 16,
+                recommendedBaseSize: settings.scale_config?.baseSize || 16,
+                originalSizeInPx: settings.scale_config?.baseSize || 16,
                 recommendations: '',
                 summaryTable: '',
                 reasoning: '',
                 prompts: []
               } : undefined,
               // Include tab selections
-              viewTab: settingsData.view_tab || 'scale',
-              analysisTab: settingsData.analysis_tab || 'platform'
+              viewTab: settings.view_tab || 'scale',
+              analysisTab: settings.analysis_tab || 'platform'
             }
             
-            set((state: TypographyState): TypographyState => ({
-              ...state,
-              platforms: state.platforms.map((p: Platform) => 
-                p.id === platformId ? { ...p, ...settings } as Platform : p
-              ),
-              isLoading: false,
-              error: null
-            }))
+            console.log(`[Typography] Transformed settings for platform ${platformId}:`, transformedSettings)
             
-            // If there are multiple rows, clean up by deleting extras
-            if (data.length > 1) {
-              console.log(`Found ${data.length} rows for platform ${platformId}, cleaning up...`);
+            set((state: TypographyState): TypographyState => {
+              // Find if platform already exists in state
+              const platformExists = state.platforms.some(p => p.id === platformId);
+              let updatedPlatforms;
               
-              // Keep the first row and delete the rest
-              const keepId = settingsData.platform_id;
-              const { error: deleteError } = await supabase
-                .from('typography_settings')
-                .delete()
-                .eq('platform_id', platformId)
-                .neq('platform_id', keepId);
+              if (platformExists) {
+                // Update existing platform
+                updatedPlatforms = state.platforms.map(p => 
+                  p.id === platformId ? { ...p, ...transformedSettings } as Platform : p
+                );
+                console.log(`[Typography] Updated existing platform ${platformId} in state`)
+              } else {
+                // Create new platform with all required fields
+                const platformStore = usePlatformStore.getState();
+                const platformData = platformStore.platforms.find(p => p.id === platformId);
                 
-              if (deleteError) {
-                console.error('Error cleaning up duplicate settings:', deleteError);
+                if (!platformData) {
+                  console.error(`[Typography] Platform ${platformId} not found in platform store`);
+                  // Still proceed with a default name
+                  const newPlatform: Platform = {
+                    id: platformId,
+                    name: 'Unknown Platform',
+                    ...transformedSettings,
+                    units: {
+                      typography: 'px',
+                      spacing: 'px',
+                      dimensions: 'px',
+                      borderWidth: 'px',
+                      borderRadius: 'px'
+                    },
+                    accessibility: {
+                      minContrastBody: 4.5,
+                      minContrastLarge: 3
+                    },
+                    typeStyles: []
+                  };
+                  updatedPlatforms = [...state.platforms, newPlatform];
+                  console.log(`[Typography] Added new platform ${platformId} to state with default values`)
+                } else {
+                  // We found the platform in the platform store
+                  const newPlatform: Platform = {
+                    id: platformId,
+                    name: platformData.name,
+                    ...transformedSettings,
+                    units: platformData.units || {
+                      typography: 'px',
+                      spacing: 'px',
+                      dimensions: 'px',
+                      borderWidth: 'px',
+                      borderRadius: 'px'
+                    },
+                    accessibility: {
+                      minContrastBody: 4.5,
+                      minContrastLarge: 3
+                    },
+                    typeStyles: []
+                  };
+                  updatedPlatforms = [...state.platforms, newPlatform];
+                  console.log(`[Typography] Added new platform ${platformId} to state with data from platform store`)
+                }
               }
-            }
+              
+              return {
+                ...state,
+                platforms: updatedPlatforms,
+                isLoading: false,
+                error: null
+              };
+            });
+            
+            // Also fetch the type styles for this platform
+            get().fetchTypeStyles(platformId).catch(error => {
+              console.error(`[Typography] Error fetching type styles for platform ${platformId}:`, error)
+            });
           }
         } catch (error) {
-          console.error('Error fetching typography settings:', error)
+          console.error(`[Typography] Error in fetchTypographySettings for platform ${platformId}:`, error)
           set({ 
             isLoading: false,
             error: (error as Error).message 
@@ -846,33 +1167,49 @@ export const useTypographyStore = create(
       fetchTypeStyles: async (platformId: string) => {
         set({ isLoading: true, error: null })
         try {
+          console.log(`Fetching type styles for platform ${platformId}`)
+          
           const { data, error } = await supabase
-            .from('typography_styles')
+            .from('type_styles')
             .select('*')
             .eq('platform_id', platformId)
 
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching type styles:', error)
+            throw error
+          }
+
+          console.log(`Received ${data.length} type styles for platform ${platformId}:`, data)
 
           const styles: TypeStyle[] = data.map((style: any) => ({
             id: style.id as string,
             name: style.name as string,
             scaleStep: style.scale_step as string,
-            fontFamily: style.font_family as string,
+            fontFamily: '',  // Default value since column doesn't exist in DB
             fontWeight: style.font_weight as number,
             lineHeight: style.line_height as number,
             letterSpacing: style.letter_spacing as number,
-            opticalSize: style.optical_size as number
+            opticalSize: style.optical_size as number || 14
           }))
 
-          set((state: TypographyState): TypographyState => ({
-            ...state,
-            platforms: state.platforms.map((p: Platform) => 
+          console.log('Transformed styles:', styles)
+
+          set((state: TypographyState): TypographyState => {
+            const updatedPlatforms = state.platforms.map((p: Platform) => 
               p.id === platformId ? { ...p, typeStyles: styles } : p
-            ),
-            isLoading: false,
-            error: null
-          }))
+            );
+            
+            console.log('Updated platforms in state:', updatedPlatforms);
+            
+            return {
+              ...state,
+              platforms: updatedPlatforms,
+              isLoading: false,
+              error: null
+            };
+          })
         } catch (error) {
+          console.error('Error in fetchTypeStyles:', error)
           set({ 
             isLoading: false,
             error: (error as Error).message 

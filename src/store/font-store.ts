@@ -55,6 +55,7 @@ interface FontState {
   // Typography settings
   loadBrandTypography: (brandId: string) => Promise<void>
   updateBrandTypography: (brandId: string, settings: Partial<BrandTypography>) => Promise<void>
+  saveBrandTypography: (brandId: string, typography: Partial<BrandTypography>) => Promise<void>
   addFontToBrand: (brandId: string, fontId: string, role: string) => Promise<void>
   removeFontFromBrand: (brandId: string, fontId: string) => Promise<void>
 }

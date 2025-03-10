@@ -76,7 +76,9 @@ export default function BrandPage({ params, searchParams }: BrandPageProps) {
     themes: {}
   })
   const [selectedVersion, setSelectedVersion] = useState('main')
-  const { platforms, currentPlatform } = useTypographyStore()
+  const typographyStore = useTypographyStore.getState() as any
+  const platforms = typographyStore.platforms || []
+  const currentPlatform = typographyStore.currentPlatform
   const { copy, copied } = useClipboard()
   const [githubConfig, setGithubConfig] = useState({
     owner: '',

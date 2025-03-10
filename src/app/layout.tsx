@@ -5,6 +5,7 @@ import { LayoutProvider } from "@/contexts/layout-context"
 import { TypeScaleProvider } from "@/contexts/type-scale-context"
 import { StoreProvider } from "@/providers/store-provider"
 import { RootLayoutClient } from "@/components/root-layout-client"
+import { SupabaseSyncManager } from "@/components/supabase-sync-manager"
 import { cn } from "@/lib/utils"
 import { Providers } from '@/components/providers'
 
@@ -37,6 +38,7 @@ export default function RootLayout({
                 <RootLayoutClient>
                   {children}
                 </RootLayoutClient>
+                <SupabaseSyncManager />
               </LayoutProvider>
             </StoreProvider>
           </TypeScaleProvider>

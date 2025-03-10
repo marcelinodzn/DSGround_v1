@@ -252,6 +252,33 @@ export default function PlatformPage({ params }: { params: { platformId: string 
                       </Select>
                     </TableCell>
                   </TableRow>
+                  <TableRow>
+                    <TableCell className="pl-0">Dimensions</TableCell>
+                    <TableCell className="w-full">
+                      <Select
+                        value={platform.units.dimensions || 'px'}
+                        onValueChange={(value) => {
+                          updatePlatform(platform.id, {
+                            units: { ...platform.units, dimensions: value }
+                          })
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.dimensions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="pl-0">Border Width</TableCell>
+                  </TableRow>
                 </TableBody>
               </Table>
             </div>

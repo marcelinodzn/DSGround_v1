@@ -92,5 +92,57 @@ export const getCurrentUserId = async (): Promise<string> => {
   return session.user.id
 }
 
+// Function to check if required tables exist
+export async function verifyDatabaseSchema() {
+  try {
+    console.log('Verifying database schema...');
+    
+    // List of tables that should exist in the database
+    const requiredTables = [
+      'platforms',
+      'typography_settings',
+      'brands',
+      'fonts'
+    ];
+    
+    // Instead of querying pg_catalog.pg_tables, check each table directly
+    const missingTables = [];
+    
+    // Import ensureTableExists dynamically to avoid circular dependencies
+    const { ensureTableExists } = await import('./supabase-diagnostics');
+    
+    // Check each table individually
+    for (const tableName of requiredTables) {
+      const exists = await ensureTableExists(tableName);
+      if (!exists) {
+        missingTables.push(tableName);
+      }
+    }
+      
+    if (missingTables.length > 0) {
+      console.error('[Typography] Missing tables:', missingTables);
+      return {
+        success: false,
+        error: `Missing required tables: ${missingTables.join(', ')}`,
+        missingTables
+      };
+    }
+    
+    console.log('All required tables exist');
+    return {
+      success: true,
+      error: null,
+      missingTables: []
+    };
+  } catch (e) {
+    console.error('[Typography] Database schema check failed:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Unknown error verifying database schema',
+      missingTables: []
+    };
+  }
+}
+
 // Export the Supabase client
 export const supabase = getSupabaseClient()

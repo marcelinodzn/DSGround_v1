@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { useRouter } from 'next/navigation'
 import { supabase } from "@/lib/supabase"
+import { TypographyDebugMode } from "./debug-mode"
 
 // Make sure this is the correct route being accessed
 console.log('Rendering typography page at: /brands/[brandId]/foundations/typography')
@@ -31,7 +32,7 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
   const router = useRouter()
   const { isFullscreen, setIsFullscreen } = useLayout()
   const { currentBrand, fetchBrand } = useBrandStore()
-  const { fonts, loadFonts, brandTypography, saveBrandTypography, loadBrandTypography } = useFontStore()
+  const { fonts, loadFonts, brandTypography, loadBrandTypography, saveBrandTypography } = useFontStore()
 
   console.log('Current route:', window.location.pathname)
   console.log('Brand ID from params:', brandId)
@@ -147,11 +148,11 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
       
       // Also update the typography store directly to ensure preview updates
       // This makes the preview update immediately without waiting for the server
-      const typographyStore = useTypographyStore.getState();
+      const typographyStore = useTypographyStore.getState() as any;
       const platformStore = usePlatformStore.getState();
       
       if (platformStore.currentPlatform) {
-        typographyStore.updatePlatform(platformStore.currentPlatform, {
+        typographyStore.updatePlatform?.(platformStore.currentPlatform, {
           currentFontRole: type,
           fontId: effectiveFontId
         });
@@ -456,6 +457,9 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
           </div>
         </div>
       </div>
+      
+      {/* Add the debug mode component */}
+      <TypographyDebugMode />
     </div>
   )
 }

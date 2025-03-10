@@ -36,6 +36,7 @@ export default function NewPlatformPage() {
         units: {
           typography: 'rem',
           spacing: 'rem',
+          dimensions: 'px',
           borderWidth: 'px',
           borderRadius: 'px'
         }

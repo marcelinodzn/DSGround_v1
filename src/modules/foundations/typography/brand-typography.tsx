@@ -20,8 +20,8 @@ import { Badge } from "@/components/ui/badge"
 import { VariableTag } from "@/components/ui/variable-tag"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertTriangle } from "lucide-react"
-import { useBrandStore } from "@/stores/brand"
-import { useFontStore } from "@/stores/font"
+import { useBrandStore } from "@/store/brand-store"
+import { useFontStore } from "@/store/font-store"
 
 interface BrandTypographyProps {
   fonts: any[]
