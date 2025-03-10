@@ -13,9 +13,10 @@ import { toast } from 'sonner'
 interface Brand {
   id: string
   name: string
-  description: string
+  description: string | null
   type: 'master' | 'sub'
-  createdAt: string
+  created_at: string
+  updated_at: string
 }
 
 export default function BrandsPage() {
@@ -36,8 +37,7 @@ export default function BrandsPage() {
     router.push(`/brands/${brandId}`)
   }
 
-  const handleDeleteBrand = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDeleteBrand = async (id: string) => {
     try {
       await deleteBrand(id)
       toast.success('Brand deleted successfully')
@@ -46,8 +46,7 @@ export default function BrandsPage() {
     }
   }
 
-  const handleDuplicateBrand = async (brand: Brand, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDuplicateBrand = async (brand: Brand) => {
     try {
       const newBrand = {
         name: `${brand.name} (Copy)`,
@@ -61,8 +60,7 @@ export default function BrandsPage() {
     }
   }
 
-  const handleEditBrand = async (id: string, newName: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleEditBrand = async (id: string, newName: string) => {
     try {
       await updateBrand(id, { name: newName })
       toast.success('Brand updated successfully')
@@ -202,12 +200,12 @@ export default function BrandsPage() {
                   )}
                 </Button>
                 <CardMenu
-                  onEdit={(e) => {
+                  onEdit={() => {
                     const newName = prompt('Enter new name:', brand.name)
-                    if (newName) handleEditBrand(brand.id, newName, e)
+                    if (newName) handleEditBrand(brand.id, newName)
                   }}
-                  onDelete={(e) => handleDeleteBrand(brand.id, e)}
-                  onDuplicate={(e) => handleDuplicateBrand(brand, e)}
+                  onDelete={() => handleDeleteBrand(brand.id)}
+                  onDuplicate={() => handleDuplicateBrand(brand)}
                   onShare={() => {/* Implement sharing functionality */}}
                 />
               </div>
