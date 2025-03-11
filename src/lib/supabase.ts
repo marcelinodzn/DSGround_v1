@@ -17,7 +17,14 @@ const createMockClient = () => {
     }),
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: null, error: null }),
+      onAuthStateChange: () => ({ 
+        data: { 
+          subscription: { 
+            unsubscribe: () => console.log('[Mock] Unsubscribing from auth listener') 
+          } 
+        }, 
+        error: null 
+      }),
     },
     realtime: {
       setAuth: () => {},
