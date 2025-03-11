@@ -22,6 +22,38 @@ const createMockClient = () => {
     realtime: {
       setAuth: () => {},
     },
+    // Add channel method for realtime subscriptions
+    channel: (name: string) => {
+      console.log(`[Mock] Creating channel: ${name}`);
+      return {
+        on: (event: string, config: any, callback: Function) => {
+          console.log(`[Mock] Subscribing to ${event} on channel ${name}`);
+          return {
+            on: () => ({}),
+            subscribe: (statusCallback: Function) => {
+              console.log(`[Mock] Mock subscription to ${name}`);
+              // Call the status callback with SUBSCRIBED status
+              if (statusCallback && typeof statusCallback === 'function') {
+                setTimeout(() => statusCallback('SUBSCRIBED'), 0);
+              }
+              return {
+                unsubscribe: () => console.log(`[Mock] Unsubscribing from ${name}`)
+              };
+            }
+          };
+        },
+        subscribe: (callback: Function) => {
+          console.log(`[Mock] Mock subscription to ${name}`);
+          // Call the callback with SUBSCRIBED status
+          if (callback && typeof callback === 'function') {
+            setTimeout(() => callback('SUBSCRIBED'), 0);
+          }
+          return {
+            unsubscribe: () => console.log(`[Mock] Unsubscribing from ${name}`)
+          };
+        }
+      };
+    }
   } as any
 }
 
