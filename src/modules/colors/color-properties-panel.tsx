@@ -150,46 +150,46 @@ export function ColorPropertiesPanel() {
     }
   }
 
+  const updatePalettes = async () => {
+    if (!currentBrand) return;
+    
+    try {
+      // Get all palettes for the current brand
+      const brandPalettes = palettes.filter(p => p.brandId === currentBrand.id);
+      
+      if (brandPalettes.length === 0) return;
+      
+      // Update each palette
+      for (const palette of brandPalettes) {
+        // For the current palette, check if base color is locked
+        // Only use the stored base color when it's the current palette AND the base color is locked
+        // Otherwise, use the base color from the palette
+        const baseColorToUse = palette.baseColor;
+        
+        // Do not regenerate the current palette if the base color is locked
+        if (palette.id === currentPaletteId && lockBaseColor) {
+          console.log('Base color is locked for current palette - preserving colors');
+          continue; // Skip regeneration for this palette
+        }
+          
+        // Generate steps for the palette
+        const generatedSteps = generatePalette(
+          baseColorToUse, 
+          paletteConfig.numSteps
+        );
+        
+        // Update the palette in the store
+        await updatePalette(palette.id, {
+          steps: generatedSteps
+        });
+      }
+    } catch (error) {
+      console.error('Error updating palettes:', error);
+    }
+  };
+
   // Update palettes when config changes
   useEffect(() => {
-    const updatePalettes = async () => {
-      if (!currentBrand) return;
-      
-      try {
-        // Get all palettes for the current brand
-        const brandPalettes = palettes.filter(p => p.brandId === currentBrand.id);
-        
-        if (brandPalettes.length === 0) return;
-        
-        // Update each palette
-        for (const palette of brandPalettes) {
-          // For the current palette, check if base color is locked
-          // Only use the stored base color when it's the current palette AND the base color is locked
-          // Otherwise, use the base color from the palette
-          const baseColorToUse = palette.baseColor;
-          
-          // Do not regenerate the current palette if the base color is locked
-          if (palette.id === currentPaletteId && lockBaseColor) {
-            console.log('Base color is locked for current palette - preserving colors');
-            continue; // Skip regeneration for this palette
-          }
-            
-          // Generate steps for the palette
-          const generatedSteps = generatePalette(
-            baseColorToUse, 
-            paletteConfig.numSteps
-          );
-          
-          // Update the palette in the store
-          await updatePalette(palette.id, {
-            steps: generatedSteps
-          });
-        }
-      } catch (error) {
-        console.error('Error updating palettes:', error);
-      }
-    };
-
     // Debounce the update to prevent too many rapid changes
     const timeoutId = setTimeout(() => {
       updatePalettes();

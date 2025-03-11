@@ -1,5 +1,17 @@
 import { create } from 'zustand'
-import { supabase, type TypographySettings, type TypeStyle } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
+import { type TypeStyle, type Platform } from '@/types/typography'
+
+// Define TypographySettings interface here since it's not exported from elsewhere
+interface TypographySettings {
+  scale: {
+    baseSize: number;
+    ratio: number;
+    stepsUp: number;
+    stepsDown: number;
+  };
+  // Add other properties as needed
+}
 
 interface TypographyState {
   platforms: {
@@ -14,6 +26,10 @@ interface TypographyState {
     }
   }
   currentPlatform: Platform
+  settings: TypographySettings | null
+  styles: TypeStyle[]
+  isLoading: boolean
+  error: string | null
   setCurrentPlatform: (platform: Platform) => void
   updatePlatformStyles: (platform: Platform, styles: TypeStyle[]) => void
   updatePlatformSettings: (
@@ -25,6 +41,8 @@ interface TypographyState {
       scaleMethod: 'modular' | 'linear' | 'custom'
     }
   ) => void
+  fetchTypographySettings: (platformId: string) => Promise<void>
+  fetchTypeStyles: (platformId: string) => Promise<void>
 }
 
 export const useTypographyStore = create<TypographyState>((set, get) => ({
@@ -94,7 +112,7 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         .single()
 
       if (error && error.code !== 'PGRST116') throw error
-      set({ settings: data || null })
+      set({ settings: data as TypographySettings | null })
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {
@@ -112,7 +130,7 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
         .order('created_at', { ascending: true })
 
       if (error) throw error
-      set({ styles: data })
+      set({ styles: data as TypeStyle[] })
     } catch (error) {
       set({ error: (error as Error).message })
     } finally {

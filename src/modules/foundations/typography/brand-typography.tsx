@@ -221,7 +221,7 @@ export function BrandTypography({ fonts }: BrandTypographyProps) {
       </Table>
 
       {currentTypography?.tertiary_font_id && (
-        <Alert variant="warning" className="mt-4">
+        <Alert variant="destructive" className="mt-4">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             Using a tertiary typeface is not recommended. Consider using only primary and secondary typefaces for better brand consistency.

@@ -70,7 +70,7 @@ const commonWeights = [
 const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
 export function FontManagement() {
-  const { fonts, loadFonts, deleteFont, updateFont } = useFontStore()
+  const { fonts, loadFonts, deleteFont } = useFontStore()
   const { toast } = useToast()
   const [previewText, setPreviewText] = useState(presetTexts[0].text)
   const [selectedPreset, setSelectedPreset] = useState(presetTexts[0].label)
@@ -110,10 +110,7 @@ export function FontManagement() {
             const isVariable = fontData?.tables?.fvar !== undefined
             
             if (isVariable !== font.is_variable) {
-              updateFont?.(font.id, { 
-                is_variable: isVariable,
-                variable_mode: isVariable ? 'variable' : undefined
-              })
+              // TODO: Implement updateFont function
             }
           }
         } catch (error) {
@@ -128,7 +125,7 @@ export function FontManagement() {
         })
       }
     })
-  }, [loadFonts, fonts, updateFont, toast])
+  }, [loadFonts, fonts, toast])
 
   const handlePresetChange = useCallback((preset: typeof presetTexts[0]) => {
     setPreviewText(preset.text)
@@ -138,9 +135,15 @@ export function FontManagement() {
   const handleDeleteFont = useCallback(async (fontId: string) => {
     try {
       await deleteFont(fontId)
-      toast("Font deleted successfully")
+      toast({
+        title: "Success",
+        description: "Font deleted successfully"
+      })
     } catch (error) {
-      toast("Failed to delete font", {
+      console.error('Error deleting font:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete font",
         variant: "destructive"
       })
     }
@@ -152,8 +155,8 @@ export function FontManagement() {
   }, [])
 
   const handleWeightChange = useCallback((fontId: string, weight: number) => {
-    updateFont?.(fontId, { weight })
-  }, [updateFont])
+    // TODO: Implement updateFont function
+  }, [])
 
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setPreviewText(e.target.value)
@@ -283,7 +286,6 @@ export function FontManagement() {
                           <div className="mt-4 space-y-4">
                             <div className="flex-1">
                               <Slider
-                                showValue
                                 min={1}
                                 max={1000}
                                 step={1}

@@ -81,7 +81,7 @@ export const useFontStore = create<FontState>((set, get) => ({
       const result = await uploadFont(file, fontData)
 
       await get().loadFonts()
-      return result as Font
+      return result as unknown as Font
     } catch (error: any) {
       console.error('Error uploading font:', error?.message || error)
       set({ error: error?.message || String(error), isLoading: false })
@@ -112,13 +112,18 @@ export const useFontStore = create<FontState>((set, get) => ({
       if (error) {
         if (error.code === '23505') {
           // Handle duplicate family name
-          const { data: existingFamily } = await supabase
-            .from('font_families')
-            .select()
-            .eq('name', family.name || '')
-            .single()
-          
-          if (existingFamily) return existingFamily as FontFamily
+          try {
+            const existingFamily = await supabase
+              .from('font_families')
+              .select('*')
+              .eq('name', family.name || '')
+              .single()
+            
+            if (existingFamily) return existingFamily as unknown as FontFamily
+          } catch (error) {
+            console.error('Error checking existing family:', error)
+            throw error
+          }
         }
         throw error
       }
@@ -142,8 +147,11 @@ export const useFontStore = create<FontState>((set, get) => ({
         console.warn('Additional properties not supported:', updateError)
       }
 
+      console.log('Created font family:', data)
+      
+      // Reload families to ensure we have the latest data
       await get().loadFonts()
-      return data as FontFamily
+      return data as unknown as FontFamily
     } catch (error: any) {
       console.error('Error in createFontFamily:', error?.message || error)
       throw error
@@ -154,7 +162,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const families = await getFontFamilies()
-      set({ families: families as FontFamily[] })
+      set({ families: families as unknown as FontFamily[] })
     } catch (error) {
       set({ error: (error as Error).message })
       throw error
@@ -167,7 +175,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const fonts = await getFontsByFamily(familyName)
-      set({ fonts })
+      set({ fonts: fonts as unknown as Font[] })
     } catch (error) {
       set({ error: (error as Error).message })
       throw error
@@ -180,7 +188,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const fonts = await getFonts()
-      set({ fonts: fonts as Font[], isLoading: false })
+      set({ fonts: fonts as unknown as Font[], isLoading: false })
     } catch (error) {
       console.error('Error loading fonts:', error)
       set({ error: (error as Error).message, isLoading: false })
@@ -201,7 +209,7 @@ export const useFontStore = create<FontState>((set, get) => ({
     }
   },
 
-  setBrandTypography: (type, fontId) => 
+  setBrandTypography: (type: any, fontId: any) => 
     set((state) => ({
       brandTypography: {
         ...state.brandTypography,
@@ -259,7 +267,7 @@ export const useFontStore = create<FontState>((set, get) => ({
         set(state => ({
           brandTypography: {
             ...state.brandTypography,
-            [brandId]: data
+            [brandId]: data as unknown as BrandTypography
           }
         }))
 
@@ -267,22 +275,22 @@ export const useFontStore = create<FontState>((set, get) => ({
         const typographyStore = useTypographyStore.getState()
         const platformStore = usePlatformStore.getState()
         
-        if (platformStore.currentPlatform && typographyStore.updatePlatform) {
+        if (platformStore.currentPlatform) {
           // Determine which font role was updated
           if (typography.primary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform, {
+            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
               currentFontRole: 'primary',
-              fontId: typography.primary_font_id
+              fontId: typography.primary_font_id || undefined
             })
           } else if (typography.secondary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform, {
+            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
               currentFontRole: 'secondary',
-              fontId: typography.secondary_font_id
+              fontId: typography.secondary_font_id || undefined
             })
           } else if (typography.tertiary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform, {
+            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
               currentFontRole: 'tertiary',
-              fontId: typography.tertiary_font_id
+              fontId: typography.tertiary_font_id || undefined
             })
           }
           
@@ -324,107 +332,145 @@ export const useFontStore = create<FontState>((set, get) => ({
     }
   },
 
-  loadBrandTypography: async (brandId: string) => {
+  loadBrandTypography: async (brandId: string): Promise<void> => {
     console.log('Loading brand typography for brand:', brandId)
     try {
-      // First ensure fonts are loaded
-      await get().loadFonts();
-      
+      set({ isLoading: true });
       const { data, error } = await supabase
         .from('brand_typography')
         .select('*')
         .eq('brand_id', brandId)
-        .single()
-
-      console.log('Supabase typography response:', { data, error })
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No record exists, create a new one
-          const { data: newData, error: insertError } = await supabase
-            .from('brand_typography')
-            .insert({
-              brand_id: brandId,
-              primary_font_id: null,
-              secondary_font_id: null,
-              tertiary_font_id: null,
-              primary_font_scale: null,
-              secondary_font_scale: null,
-              tertiary_font_scale: null,
-              primary_font_styles: null,
-              secondary_font_styles: null,
-              tertiary_font_styles: null
-            })
-            .select('*')
-            .single()
-
-          if (insertError) throw insertError
-
-          set(state => ({
-            brandTypography: {
-              ...state.brandTypography,
-              [brandId]: newData as BrandTypography
-            }
-          }))
-          return
-        }
-        throw error
-      }
-
-      // Now let's preload the font files for immediate use
-      const fontIds = [data.primary_font_id, data.secondary_font_id, data.tertiary_font_id].filter(Boolean);
-      const { fonts } = get();
+        .single();
       
-      // Load web fonts for any fonts that are set
-      for (const fontId of fontIds) {
-        const font = fonts.find(f => f.id === fontId);
-        if (font?.file_url) {
-          try {
-            // Create and load a web font
-            const fontFace = new FontFace(
-              font.family,
-              `url(${font.file_url})`,
-              {
-                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
-                style: font.style || 'normal',
-              }
-            );
-            
-            // Load the font and add it to the document
-            const loadedFont = await fontFace.load();
-            document.fonts.add(loadedFont);
-            console.log(`Font loaded successfully: ${font.family}`);
-          } catch (error) {
-            console.error(`Error loading font ${font.family}:`, error);
-          }
-        }
+      if (error && error.code !== 'PGRST116') {
+        throw error;
       }
-
-      set(state => ({
-        brandTypography: {
-          ...state.brandTypography,
-          [brandId]: data as BrandTypography
-        }
-      }))
+      
+      // If we found data, update the state
+      if (data) {
+        set(state => ({
+          brandTypography: {
+            ...state.brandTypography,
+            [brandId]: data as unknown as BrandTypography
+          }
+        }));
+      }
     } catch (error) {
-      console.error('Error loading brand typography:', error)
+      console.error('Error loading brand typography:', error);
+      set({ error: (error as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteFamily: async (familyId: string) => {
+    console.log('Deleting font family:', familyId)
+    try {
+      set({ isLoading: true });
+      
+      // First, delete all fonts in this family
+      const fontsInFamily = get().fonts.filter(font => font.family_id === familyId);
+      for (const font of fontsInFamily) {
+        await get().deleteFont(font.id);
+      }
+      
+      // Then delete the family itself
+      const { error } = await supabase
+        .from('font_families')
+        .delete()
+        .eq('id', familyId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      set(state => ({
+        families: state.families.filter(family => family.id !== familyId)
+      }));
+    } catch (error) {
+      console.error('Error deleting font family:', error);
+      set({ error: (error as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
+  updateBrandTypography: async (brandId: string, settings: Partial<BrandTypography>) => {
+    console.log('Updating brand typography:', { brandId, settings })
+    try {
+      set({ isLoading: true });
+      
+      const { error } = await supabase
+        .from('brand_typography')
+        .update(settings)
+        .eq('brand_id', brandId);
+      
+      if (error) throw error;
+      
+      // Update local state
       set(state => ({
         brandTypography: {
           ...state.brandTypography,
           [brandId]: {
-            brand_id: brandId,
-            primary_font_id: null,
-            secondary_font_id: null,
-            tertiary_font_id: null,
-            primary_font_scale: null,
-            secondary_font_scale: null,
-            tertiary_font_scale: null,
-            primary_font_styles: null,
-            secondary_font_styles: null,
-            tertiary_font_styles: null
+            ...state.brandTypography[brandId],
+            ...settings
           }
         }
-      }))
+      }));
+    } catch (error) {
+      console.error('Error updating brand typography:', error);
+      set({ error: (error as Error).message });
+    } finally {
+      set({ isLoading: false });
     }
   },
+  
+  addFontToBrand: async (brandId: string, fontId: string, role: string) => {
+    console.log('Adding font to brand:', { brandId, fontId, role })
+    try {
+      set({ isLoading: true });
+      
+      // Update the brand typography with the new font
+      const update = {
+        [`${role}_font_id`]: fontId
+      };
+      
+      await get().updateBrandTypography(brandId, update as any);
+    } catch (error) {
+      console.error('Error adding font to brand:', error);
+      set({ error: (error as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
+  removeFontFromBrand: async (brandId: string, fontId: string) => {
+    console.log('Removing font from brand:', { brandId, fontId })
+    try {
+      set({ isLoading: true });
+      
+      // Get current typography
+      const typography = get().brandTypography[brandId];
+      if (!typography) return;
+      
+      // Find which role this font is assigned to
+      const updates: any = {};
+      if (typography.primary_font_id === fontId) {
+        updates.primary_font_id = null;
+      }
+      if (typography.secondary_font_id === fontId) {
+        updates.secondary_font_id = null;
+      }
+      if (typography.tertiary_font_id === fontId) {
+        updates.tertiary_font_id = null;
+      }
+      
+      // Update the brand typography
+      await get().updateBrandTypography(brandId, updates);
+    } catch (error) {
+      console.error('Error removing font from brand:', error);
+      set({ error: (error as Error).message });
+    } finally {
+      set({ isLoading: false });
+    }
+  }
 }))

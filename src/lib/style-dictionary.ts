@@ -2,19 +2,23 @@ import StyleDictionary from 'style-dictionary'
 import type { TypographyToken } from '@/types/tokens'
 
 // Custom format for Tailwind CSS
-StyleDictionary.registerFormat({
+(StyleDictionary as any).registerFormat({
   name: 'tailwind/theme',
-  formatter: ({ dictionary }) => {
+  formatter: ({ dictionary }: any) => {
     return `module.exports = {
   theme: {
     extend: {
-      typography: {
-        ${dictionary.allTokens.map(token => `'${token.name}': {
-          fontSize: '${token.value.fontSize}',
-          lineHeight: '${token.value.lineHeight}',
-          fontWeight: ${token.value.fontWeight},
-          letterSpacing: '${token.value.letterSpacing}',
-        }`).join(',\n        ')}
+      fontSize: {
+        ${dictionary.allTokens
+          .filter((token: any) => token.type === 'typography' && token.category === 'fontSize')
+          .map((token: any) => `'${token.name}': '${token.value}',`)
+          .join('\n        ')}
+      },
+      fontFamily: {
+        ${dictionary.allTokens
+          .filter((token: any) => token.type === 'typography' && token.category === 'fontFamily')
+          .map((token: any) => `'${token.name}': '${token.value}',`)
+          .join('\n        ')}
       }
     }
   }
@@ -22,111 +26,115 @@ StyleDictionary.registerFormat({
   }
 })
 
-// Custom format for iOS
-StyleDictionary.registerFormat({
+// Custom format for iOS Swift
+(StyleDictionary as any).registerFormat({
   name: 'ios/swift',
-  formatter: ({ dictionary }) => {
+  formatter: ({ dictionary }: any) => {
     return `import UIKit
 
-public enum Typography {
-    ${dictionary.allTokens.map(token => `static let ${token.name} = UIFont.systemFont(
-        size: ${parseFloat(token.value.fontSize)},
-        weight: .${getIOSWeight(token.value.fontWeight)}
-    )`).join('\n    ')}
+struct DesignTokens {
+  struct Typography {
+    ${dictionary.allTokens
+      .filter((token: any) => token.type === 'typography')
+      .map((token: any) => {
+        if (token.category === 'fontSize') {
+          return `static let ${token.name}Size: CGFloat = ${token.value.replace('px', '')}`
+        } else if (token.category === 'fontFamily') {
+          return `static let ${token.name}Family: String = "${token.value}"`
+        }
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n    ')}
+  }
 }`
   }
 })
 
-// Custom format for Android
-StyleDictionary.registerFormat({
+// Custom format for Android XML
+(StyleDictionary as any).registerFormat({
   name: 'android/xml',
-  formatter: ({ dictionary }) => {
+  formatter: ({ dictionary }: any) => {
     return `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    ${dictionary.allTokens.map(token => `<dimen name="typography_${token.name}_size">${token.value.fontSize}</dimen>
-    <item name="typography_${token.name}_line_height" format="float">${token.value.lineHeight}</item>
-    <item name="typography_${token.name}_letter_spacing" format="float">${token.value.letterSpacing}</item>`).join('\n    ')}
+  ${dictionary.allTokens
+    .filter((token: any) => token.type === 'typography')
+    .map((token: any) => {
+      if (token.category === 'fontSize') {
+        // Convert px to sp for Android
+        const value = token.value.replace('px', '').trim()
+        return `<dimen name="${token.name}_size">${value}sp</dimen>`
+      } else if (token.category === 'fontFamily') {
+        return `<string name="${token.name}_family">${token.value}</string>`
+      }
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n  ')}
 </resources>`
   }
 })
 
 function getIOSWeight(weight: number): string {
-  const weights: Record<number, string> = {
-    100: 'ultraLight',
-    200: 'thin',
-    300: 'light',
-    400: 'regular',
-    500: 'medium',
-    600: 'semibold',
-    700: 'bold',
-    800: 'heavy',
-    900: 'black'
+  switch (weight) {
+    case 100: return 'UIFont.Weight.ultraLight'
+    case 200: return 'UIFont.Weight.thin'
+    case 300: return 'UIFont.Weight.light'
+    case 400: return 'UIFont.Weight.regular'
+    case 500: return 'UIFont.Weight.medium'
+    case 600: return 'UIFont.Weight.semibold'
+    case 700: return 'UIFont.Weight.bold'
+    case 800: return 'UIFont.Weight.heavy'
+    case 900: return 'UIFont.Weight.black'
+    default: return 'UIFont.Weight.regular'
   }
-  return weights[weight] || 'regular'
 }
 
 export function generateTokens(tokens: TypographyToken[]) {
-  const styleDictionary = StyleDictionary.extend({
-    tokens: {
-      typography: tokens.reduce((acc, token) => ({
-        ...acc,
-        [token.name]: {
-          value: token.value,
-          type: 'typography'
-        }
-      }), {})
-    },
+  // Use type assertion for StyleDictionary.extend
+  const styleDictionary: any = StyleDictionary.extend({
+    tokens: tokens as any,
     platforms: {
-      css: {
-        transformGroup: 'css',
-        buildPath: 'build/css/',
-        files: [{
-          destination: 'typography.css',
-          format: 'css/variables'
-        }]
-      },
-      scss: {
-        transformGroup: 'scss',
-        buildPath: 'build/scss/',
-        files: [{
-          destination: '_typography.scss',
-          format: 'scss/variables'
-        }]
-      },
-      tailwind: {
-        transformGroup: 'js',
-        buildPath: 'build/tailwind/',
-        files: [{
-          destination: 'typography.js',
-          format: 'tailwind/theme'
-        }]
-      },
-      javascript: {
-        transformGroup: 'js',
-        buildPath: 'build/js/',
-        files: [{
-          destination: 'typography.js',
-          format: 'javascript/module'
-        }]
+      web: {
+        transformGroup: 'web',
+        buildPath: 'build/web/',
+        files: [
+          {
+            destination: 'tokens.css',
+            format: 'css/variables',
+            options: {
+              outputReferences: true
+            }
+          },
+          {
+            destination: 'tokens.js',
+            format: 'tailwind/theme'
+          }
+        ]
       },
       ios: {
         transformGroup: 'ios',
         buildPath: 'build/ios/',
-        files: [{
-          destination: 'Typography.swift',
-          format: 'ios/swift'
-        }]
+        files: [
+          {
+            destination: 'DesignTokens.swift',
+            format: 'ios/swift'
+          }
+        ]
       },
       android: {
         transformGroup: 'android',
         buildPath: 'build/android/',
-        files: [{
-          destination: 'typography.xml',
-          format: 'android/xml'
-        }]
+        files: [
+          {
+            destination: 'tokens.xml',
+            format: 'android/xml'
+          }
+        ]
       }
     }
-  })
+  } as any)
 
-  return styleDictionary.exportPlatform('all')
+  // Call buildAllPlatforms method
+  styleDictionary.buildAllPlatforms()
 } 

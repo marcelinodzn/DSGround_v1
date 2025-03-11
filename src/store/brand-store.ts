@@ -45,11 +45,11 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      set({ brands: data as Brand[], error: null })
+      set({ brands: data as unknown as Brand[], error: null })
 
       const state = get()
       if (!state.currentBrand && data.length > 0) {
-        await get().setCurrentBrand(data[0].id)
+        set({ currentBrand: data[0] as unknown as Brand })
       }
     } catch (error) {
       set({ error: (error as Error).message })
@@ -65,13 +65,12 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
         .from('brands')
         .insert([brand])
         .select()
-        .single()
 
       if (error) throw error
       
       set(state => ({
-        brands: [...state.brands, data as Brand],
-        currentBrand: data.id
+        brands: [...state.brands, data[0] as unknown as Brand],
+        currentBrand: data[0] as unknown as Brand
       }))
     } catch (error) {
       set({ error: (error as Error).message })
@@ -116,7 +115,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       
       set(state => ({
         brands: state.brands.filter(b => b.id !== id),
-        currentBrand: state.currentBrand === id ? null : state.currentBrand
+        currentBrand: state.currentBrand && state.currentBrand.id === id ? null : state.currentBrand
       }))
     } catch (error) {
       set({ error: (error as Error).message })
@@ -135,7 +134,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       const state = get()
       const brand = state.brands.find(b => b.id === id)
       if (brand) {
-        set({ currentBrand: brand })
+        set({ currentBrand: brand as unknown as Brand })
       } else {
         const { data, error } = await supabase
           .from('brands')
@@ -144,7 +143,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
           .single()
 
         if (error) throw error
-        set({ currentBrand: data as Brand })
+        set({ currentBrand: data as unknown as Brand })
       }
     } catch (error) {
       set({ error: (error as Error).message })
@@ -163,7 +162,7 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
       if (error) throw error
       
       set({ 
-        currentBrand: data as Brand,
+        currentBrand: data as unknown as Brand,
         error: null 
       })
     } catch (error) {

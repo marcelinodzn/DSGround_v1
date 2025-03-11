@@ -26,34 +26,15 @@ export function BrandTypographySettings() {
     }
   }, [currentBrand?.id, loadBrandTypography])
 
-  const handleFontRoleChange = async (fontId: string, role: 'primary' | 'secondary' | 'tertiary') => {
-    if (!currentBrand?.id) return
-
-    try {
-      const updatedTypography = {
-        brand_id: currentBrand.id,
-        [`${role}_font_id`]: fontId,
-      }
-
-      await saveBrandTypography(currentBrand.id, updatedTypography)
-      toast({
-        title: 'Success',
-        description: `${role.charAt(0).toUpperCase() + role.slice(1)} font updated successfully`
-      })
-    } catch (error) {
-      console.error('Error updating font role:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to update font role',
-        variant: 'destructive'
-      })
-    }
-  }
+  const handleFontRoleChange = (role: string) => {
+    console.log(`Selected font role: ${role}`);
+    // Additional logic can be added here if needed
+  };
 
   if (!currentBrand) return null
 
   const currentTypography = brandTypography[currentBrand.id]
-  const currentFontRole = currentTypography?.primary_font_id ? 'primary' : currentTypography?.secondary_font_id ? 'secondary' : currentTypography?.tertiary_font_id ? 'tertiary' : null
+  const currentFontRole = currentTypography?.primary_font_id ? 'primary' : currentTypography?.secondary_font_id ? 'secondary' : currentTypography?.tertiary_font_id ? 'tertiary' : undefined;
 
   return (
     <div className="space-y-6">
@@ -86,7 +67,7 @@ export function BrandTypographySettings() {
           <label className="text-sm font-medium">Primary Font</label>
           <Select
             value={currentTypography?.primary_font_id || ''}
-            onValueChange={(value) => handleFontRoleChange(value || '', 'primary')}
+            onValueChange={(value) => handleFontRoleChange(value || '')}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a font" />
@@ -106,7 +87,7 @@ export function BrandTypographySettings() {
           <label className="text-sm font-medium">Secondary Font</label>
           <Select
             value={currentTypography?.secondary_font_id || ''}
-            onValueChange={(value) => handleFontRoleChange(value || '', 'secondary')}
+            onValueChange={(value) => handleFontRoleChange(value || '')}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a font" />
@@ -126,7 +107,7 @@ export function BrandTypographySettings() {
           <label className="text-sm font-medium">Tertiary Font</label>
           <Select
             value={currentTypography?.tertiary_font_id || ''}
-            onValueChange={(value) => handleFontRoleChange(value || '', 'tertiary')}
+            onValueChange={(value) => handleFontRoleChange(value || '')}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a font" />

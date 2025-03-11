@@ -111,7 +111,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          set({ elements: data as DesignElement[], isLoading: false })
+          set({ elements: data as unknown as DesignElement[], isLoading: false })
         } catch (error) {
           console.error('Error fetching design elements:', error)
           set({ 
@@ -143,7 +143,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          const addedElement = data?.[0] as DesignElement
+          const addedElement = data?.[0] as unknown as DesignElement
           
           set(state => ({
             elements: [...state.elements, addedElement],
@@ -182,7 +182,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          const updated = data?.[0] as DesignElement
+          const updated = data?.[0] as unknown as DesignElement
           
           set(state => ({
             elements: state.elements.map(e => e.id === id ? updated : e),
@@ -244,7 +244,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          set({ layerStyles: data as LayerStyle[], isLoading: false })
+          set({ layerStyles: data as unknown as LayerStyle[], isLoading: false })
         } catch (error) {
           console.error('Error fetching layer styles:', error)
           set({ 
@@ -274,7 +274,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          const addedStyle = data?.[0] as LayerStyle
+          const addedStyle = data?.[0] as unknown as LayerStyle
           
           set(state => ({
             layerStyles: [...state.layerStyles, addedStyle],
@@ -312,7 +312,7 @@ export const useDesignStore = create<DesignStore>()(
             
           if (error) throw new Error(error.message)
           
-          const updated = data?.[0] as LayerStyle
+          const updated = data?.[0] as unknown as LayerStyle
           
           set(state => ({
             layerStyles: state.layerStyles.map(s => s.id === id ? updated : s),
@@ -368,7 +368,8 @@ export const useDesignStore = create<DesignStore>()(
         
         // If needed, we could also store the user's preference in Supabase
         try {
-          const userId = await get().getUserId()
+          const { data: { session } } = await supabase.auth.getSession();
+          const userId = session?.user?.id;
           if (!userId) return
           
           await supabase
@@ -383,12 +384,6 @@ export const useDesignStore = create<DesignStore>()(
           console.error('Error storing scale method preference:', error)
         }
       },
-      
-      // Helper method to get the current user ID
-      getUserId: async () => {
-        const { data } = await supabase.auth.getUser()
-        return data?.user?.id
-      }
     }),
     {
       name: 'design-store',

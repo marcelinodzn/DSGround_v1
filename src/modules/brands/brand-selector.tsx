@@ -24,12 +24,12 @@ export function BrandSelector() {
 
   return (
     <Select
-      value={currentBrand || ''}
+      value={typeof currentBrand === 'string' ? currentBrand : ''}
       onValueChange={setCurrentBrand}
     >
       <SelectTrigger className="w-[200px]">
         <SelectValue placeholder="Select brand">
-          {currentBrand ? brands.find(b => b.id === currentBrand)?.name : 'Select brand'}
+          {currentBrand ? brands.find(b => b.id === (typeof currentBrand === 'string' ? currentBrand : ''))?.name : 'Select brand'}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>

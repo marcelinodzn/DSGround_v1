@@ -1,6 +1,14 @@
 import { parse, formatHex, rgb, oklch } from 'culori';
 import { v4 as uuidv4 } from 'uuid';
 
+// Define RGB color type
+interface RGBColor {
+  r: number;
+  g: number;
+  b: number;
+  mode: string;
+}
+
 // Create a custom CMYK mode for culori
 const cmyk = (color: any) => {
   // Convert to RGB first
@@ -46,6 +54,16 @@ export interface ColorValues {
   hex: string;   // "#3264C8"
   cmyk?: string; // "cmyk(75%, 50%, 0%, 22%)"
   pantone?: string; // "Pantone 2728 C"
+}
+
+export interface ColorStep {
+  id: string;
+  name: string;
+  values: ColorValues;
+  accessibility?: any;
+  isBaseColor?: boolean;
+  color?: ColorValues;
+  index?: number;
 }
 
 /**
@@ -95,15 +113,19 @@ export function convertColor(color: string, fromFormat: ColorFormat, toFormat: C
     // Convert to the target format
     switch (toFormat) {
       case 'hex':
-        return formatHex(parsed);
+        const hexValue = formatHex(parsed);
+        return hexValue || '#000000'; // Fallback to black if undefined
       case 'rgb':
         const rgbColor = rgb(parsed);
+        if (!rgbColor) return 'rgb(0, 0, 0)'; // Fallback to black if undefined
         return `rgb(${Math.round(rgbColor.r * 255)}, ${Math.round(rgbColor.g * 255)}, ${Math.round(rgbColor.b * 255)})`;
       case 'oklch':
         const oklchColor = oklch(parsed);
+        if (!oklchColor) return 'oklch(0% 0 0)'; // Fallback to black if undefined
         return `oklch(${(oklchColor.l * 100).toFixed(0)}% ${oklchColor.c.toFixed(2)} ${oklchColor.h?.toFixed(0) || '0'})`;
       case 'cmyk':
         const cmykColor = cmyk(parsed);
+        if (!cmykColor) return 'cmyk(0%, 0%, 0%, 100%)'; // Fallback to black if undefined
         return `cmyk(${Math.round(cmykColor.c * 100)}%, ${Math.round(cmykColor.m * 100)}%, ${Math.round(cmykColor.y * 100)}%, ${Math.round(cmykColor.k * 100)}%)`;
       case 'pantone':
         // Pantone conversion would require a lookup table
@@ -122,74 +144,35 @@ export function convertColor(color: string, fromFormat: ColorFormat, toFormat: C
  * Convert a color to all supported formats
  */
 export function convertToAllFormats(color: string): ColorValues {
-  try {
-    // Handle empty or invalid color values
-    if (!color) {
-      return {
-        hex: '#000000',
-        rgb: 'rgb(0, 0, 0)',
-        oklch: 'oklch(0% 0 0)'
-      };
-    }
-    
-    // Normalize the color to hex first
-    let hex = color;
-    
-    if (!hex.startsWith('#')) {
-      if (hex.startsWith('rgb')) {
-        // Convert RGB to HEX
-        const rgbMatch = hex.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        if (rgbMatch) {
-          const r = parseInt(rgbMatch[1]);
-          const g = parseInt(rgbMatch[2]);
-          const b = parseInt(rgbMatch[3]);
-          hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        }
-      } else if (hex.startsWith('oklch')) {
-        // For now, we'll use a placeholder conversion
-        // In a real app, you'd use a proper color library to convert OKLCH to RGB to HEX
-        try {
-          const parsed = parse(hex);
-          if (parsed) {
-            hex = formatHex(parsed);
-          } else {
-            hex = '#3264C8'; // Default blue as a fallback
-          }
-        } catch (e) {
-          hex = '#3264C8'; // Default blue as a fallback
-        }
-      }
-    }
-    
-    // Now convert hex to other formats
-    try {
-      const parsed = parse(hex);
-      if (!parsed) throw new Error('Failed to parse hex color');
-      
-      const rgbColor = rgb(parsed);
-      const oklchColor = oklch(parsed);
-      
-      return {
-        hex: hex,
-        rgb: `rgb(${Math.round(rgbColor.r * 255)}, ${Math.round(rgbColor.g * 255)}, ${Math.round(rgbColor.b * 255)})`,
-        oklch: `oklch(${Math.round(oklchColor.l * 100)}% ${oklchColor.c.toFixed(2)} ${oklchColor.h?.toFixed(0) || '0'})`
-      };
-    } catch (e) {
-      console.error('Error converting color formats:', e);
-      return {
-        hex: hex,
-        rgb: 'rgb(50, 100, 200)',
-        oklch: 'oklch(60% 0.15 240)'
-      };
-    }
-  } catch (error) {
-    console.error('Error in convertToAllFormats:', error);
+  // Parse the color
+  const parsed = parse(color);
+  if (!parsed) {
     return {
-      hex: '#3264C8',
-      rgb: 'rgb(50, 100, 200)',
-      oklch: 'oklch(60% 0.15 240)'
+      hex: '#000000',
+      rgb: 'rgb(0, 0, 0)',
+      oklch: 'oklch(0% 0 0)'
     };
   }
+
+  // Convert to all formats
+  const hexValue = formatHex(parsed);
+  const hex = hexValue || '#000000';
+  
+  const rgbColor = rgb(parsed);
+  const rgbValue = rgbColor ? 
+    `rgb(${Math.round(rgbColor.r * 255)}, ${Math.round(rgbColor.g * 255)}, ${Math.round(rgbColor.b * 255)})` : 
+    'rgb(0, 0, 0)';
+  
+  const oklchColor = oklch(parsed);
+  const oklchValue = oklchColor ? 
+    `oklch(${(oklchColor.l * 100).toFixed(0)}% ${oklchColor.c.toFixed(2)} ${oklchColor.h?.toFixed(0) || '0'})` : 
+    'oklch(0% 0 0)';
+  
+  return {
+    hex,
+    rgb: rgbValue,
+    oklch: oklchValue
+  };
 }
 
 /**

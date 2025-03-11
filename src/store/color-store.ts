@@ -91,7 +91,7 @@ interface ColorStore {
 
 // Color conversion and accessibility functions are now imported from @/lib/color-utils
 
-export const useColorStore = create<ColorStore>((set, get) => ({
+export const useColorStore = create<ColorStore>()(persist((set, get) => ({
   palettes: [],
   currentPaletteId: null,
   isLoading: false,
@@ -110,148 +110,88 @@ export const useColorStore = create<ColorStore>((set, get) => ({
     colorGamutSetting: 'srgb',
   },
 
-  fetchPalettesByBrand: async (brandId: string) => {
+  fetchPalettesByBrand: async (brandId: string): Promise<void> => {
     set({ isLoading: true });
     try {
       // First, check if we have an authenticated session
       const { data: { session } } = await supabase.auth.getSession();
-      let palettes = [];
+      let palettes: any[] = [];
       
       if (session) {
         try {
+          // Fetch palettes from Supabase
           const { data, error } = await supabase
             .from('color_palettes')
             .select('*')
-            .eq('brand_id', brandId);
-
-          if (error) {
-            console.error('Error fetching palettes from Supabase:', error);
-            // Don't throw, we'll use local palettes or create default ones
-          } else {
-            // Transform data from database format to our store format
-            palettes = data.map(item => ({
-              id: item.id,
-              name: item.name,
-              description: item.description,
-              baseColor: item.base_color,
-              steps: item.steps || [],
-              tags: item.tags,
-              isCore: item.is_core
-            }));
-            console.log('Fetched palettes from Supabase:', palettes.length);
-          }
+            .eq('brandId', brandId);
+          
+          if (error) throw error;
+          palettes = data || [];
         } catch (dbError) {
-          console.error('Exception fetching palettes from Supabase:', dbError);
-          // Don't throw, we'll use local palettes or create default ones
+          console.error('Database error:', dbError);
+          // Fall back to local storage if database fails
+          palettes = [];
         }
-      } else {
-        console.log('No authenticated session, skipping Supabase fetch');
-        // We'll use local palettes or create default ones
       }
       
-      // Filter out any local palettes that might have the same brand ID
-      // to avoid duplicates when merging with Supabase data
-      const currentPalettes = get().palettes;
-      const localPalettes = currentPalettes.filter(p => p.id.startsWith('local-'));
+      // Set the palettes in the store
+      set({ palettes: palettes as ColorPalette[], error: null });
       
-      // Merge Supabase palettes with local-only palettes
-      const mergedPalettes = [...palettes, ...localPalettes];
-      
-      set({ 
-        palettes: mergedPalettes, 
-        currentPaletteId: mergedPalettes.length > 0 ? mergedPalettes[0].id : null,
-        error: null 
-      });
-      
-      return mergedPalettes;
+      // If we have palettes and no current palette is selected, select the first one
+      const state = get();
+      if (palettes.length > 0 && !state.currentPaletteId) {
+        set({ currentPaletteId: palettes[0].id });
+      }
     } catch (error) {
-      console.error('Error in fetchPalettesByBrand:', error);
       set({ error: (error as Error).message });
-      return [];
     } finally {
       set({ isLoading: false });
     }
   },
 
-  createPalette: async (brandId: string, palette) => {
+  createPalette: async (brandId: string, palette: Omit<ColorPalette, 'id'>): Promise<void> => {
     set({ isLoading: true });
     try {
       // Generate a new palette with a unique ID
       const newPalette = {
-        id: uuidv4(),
-        ...palette
+        ...palette,
+        brandId,
+        id: `palette-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
-
-      console.log('Creating new palette:', { brandId, palette: newPalette });
-
-      // Try to add the palette to Supabase, but don't fail if it doesn't work
-      try {
-        // First, check if we have an authenticated session
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-          const { error, data } = await supabase
-            .from('color_palettes')
-            .insert([{
-              id: newPalette.id,
-              brand_id: brandId,
-              name: newPalette.name,
-              description: newPalette.description,
-              base_color: newPalette.baseColor,
-              steps: newPalette.steps,
-              tags: newPalette.tags,
-              is_core: newPalette.isCore
-            }])
-            .select();
-
-          if (error) {
-            console.error('Error creating palette in Supabase:', error);
-            // Don't throw here, we'll continue with local state update
-          } else {
-            console.log('Palette created successfully in Supabase:', data);
-          }
-        } else {
-          console.log('No authenticated session, creating local-only palette');
-          // Mark this palette as local-only
-          newPalette.id = `local-${newPalette.id}`;
-          if (newPalette.description) {
-            newPalette.description += ' (local only)';
-          } else {
-            newPalette.description = 'Local palette';
-          }
-        }
-      } catch (dbError) {
-        console.error('Exception creating palette in Supabase:', dbError);
-        // Don't throw here, we'll continue with local state update
-      }
-
-      console.log('Palette created successfully in local state:', newPalette);
-
-      // Even if the Supabase operation fails, we'll add the palette to the local state
-      // This ensures the UI remains responsive
+      
+      // Add the palette to the store
       set(state => ({
-        palettes: [...state.palettes, newPalette],
+        palettes: [...state.palettes, newPalette as ColorPalette],
         currentPaletteId: newPalette.id,
         error: null
       }));
-
-      return newPalette;
+      
+      // Try to save to Supabase if we have a session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          const { error } = await supabase
+            .from('color_palettes')
+            .insert([{
+              id: newPalette.id,
+              brandId: newPalette.brandId,
+              name: newPalette.name,
+              description: newPalette.description,
+              baseColor: newPalette.baseColor,
+              steps: newPalette.steps,
+              tags: newPalette.tags,
+              isCore: newPalette.isCore
+            }]);
+          
+          if (error) {
+            console.error('Error saving palette to Supabase:', error);
+          }
+        } catch (dbError) {
+          console.error('Exception saving palette to Supabase:', dbError);
+        }
+      }
     } catch (error) {
-      console.error('Error in createPalette:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to create palette' });
-      
-      // Create a local-only palette as a fallback
-      const localPalette = {
-        id: uuidv4(),
-        ...palette
-      };
-      
-      set(state => ({
-        palettes: [...state.palettes, localPalette],
-        currentPaletteId: localPalette.id
-      }));
-      
-      return localPalette;
+      set({ error: (error as Error).message });
     } finally {
       set({ isLoading: false });
     }
@@ -331,50 +271,68 @@ export const useColorStore = create<ColorStore>((set, get) => ({
     set({ currentPaletteId: paletteId });
   },
 
-  addColorStep: async (paletteId, step) => {
+  addColorStep: async (paletteId: string, step: Omit<ColorStep, 'id'>): Promise<void> => {
     try {
       console.log('Adding color step to palette:', { paletteId, step });
       
-      // Create a new step with a unique ID
+      // Generate a new step with a unique ID
       const newStep = {
-        id: uuidv4(),
         ...step,
-        // Add default accessibility values if not provided
-        accessibility: step.accessibility || {
-          contrastWithWhite: 1,
-          contrastWithBlack: 1,
-          wcagAANormal: false,
-          wcagAALarge: false,
-          wcagAAA: false
-        }
+        id: `step-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       };
       
-      // Update local state first for immediate UI feedback
+      // Find the palette and add the step
       set(state => {
-        const updatedPalettes = state.palettes.map(p => {
-          if (p.id === paletteId) {
-            return {
-              ...p,
-              steps: [...p.steps, newStep]
-            };
-          }
-          return p;
-        });
-
-        return { palettes: updatedPalettes, error: null };
+        const palettes = [...state.palettes];
+        const paletteIndex = palettes.findIndex(p => p.id === paletteId);
+        
+        if (paletteIndex === -1) {
+          console.error('Palette not found:', paletteId);
+          return state;
+        }
+        
+        const palette = { ...palettes[paletteIndex] };
+        palette.steps = [...palette.steps, newStep];
+        palettes[paletteIndex] = palette;
+        
+        return { palettes, error: null };
       });
-
-      // Update in database
-      const palette = get().palettes.find(p => p.id === paletteId);
-      if (palette) {
-        await get().updatePalette(paletteId, { steps: [...palette.steps, newStep] });
-      }
       
-      return newStep;
+      // Try to save to Supabase if we have a session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        try {
+          // First get the current palette from Supabase
+          const { data: paletteData, error: fetchError } = await supabase
+            .from('color_palettes')
+            .select('steps')
+            .eq('id', paletteId)
+            .single();
+          
+          if (fetchError) {
+            console.error('Error fetching palette from Supabase:', fetchError);
+            return;
+          }
+          
+          // Update the steps array
+          const updatedSteps = Array.isArray(paletteData.steps) ? [...paletteData.steps, newStep] : [newStep];
+          
+          // Save back to Supabase
+          const { error: updateError } = await supabase
+            .from('color_palettes')
+            .update({ steps: updatedSteps })
+            .eq('id', paletteId);
+          
+          if (updateError) {
+            console.error('Error updating palette in Supabase:', updateError);
+          }
+        } catch (dbError) {
+          console.error('Exception updating palette in Supabase:', dbError);
+        }
+      }
     } catch (error) {
       console.error('Error in addColorStep:', error);
-      set({ error: error instanceof Error ? error.message : 'Failed to add color step' });
-      return null;
+      set({ error: (error as Error).message });
     }
   },
 
@@ -506,7 +464,7 @@ export const useColorStore = create<ColorStore>((set, get) => ({
   },
 }), {
   name: 'color-store'
-});
+}));
 
 // Add this function to the store implementation
 const regenerateCurrentPalette = async (state: ColorStore) => {
@@ -537,6 +495,6 @@ const regenerateCurrentPalette = async (state: ColorStore) => {
   
   // Update the palette in the store and database
   await state.updatePalette(currentPalette.id, {
-    steps: generatedSteps
+    steps: generatedSteps as any
   });
 };

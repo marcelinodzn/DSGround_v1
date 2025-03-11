@@ -114,7 +114,7 @@ const ScaleView = dynamic(() => Promise.resolve(({ baseSize, fontFamily, typogra
               // Force a repaint
               const currentDisplay = (element as HTMLElement).style.display;
               (element as HTMLElement).style.display = 'none';
-              void element.offsetHeight; // Trigger a reflow
+              void (element as HTMLElement).offsetHeight; // Trigger a reflow
               (element as HTMLElement).style.display = currentDisplay;
             });
             console.log(`Applied font to all preview containers: ${fontName}`);
@@ -631,6 +631,7 @@ export function TypeScalePreview() {
                 fontFamily={fontFamily}
                 typographyUnit={typographyUnit}
                 platformId={platform.id}
+                scaleValues={scaleValues}
               />
             ) : (
               <StylesView 

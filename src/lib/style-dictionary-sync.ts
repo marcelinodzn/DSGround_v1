@@ -72,25 +72,25 @@ export class StyleDictionarySync {
           files: [{
             destination: 'variables.css',
             format: 'css/variables',
-            filter: (token) => token.platform === platform
+            filter: (token: { platform: string }) => token.platform === platform
           }]
         },
         [`${platform}/scss`]: {
           transformGroup: 'scss',
           buildPath: `build/${platform}/scss/`,
           files: [{
-            destination: '_variables.scss',
+            destination: 'variables.scss',
             format: 'scss/variables',
-            filter: (token) => token.platform === platform
+            filter: (token: { platform: string }) => token.platform === platform
           }]
         },
         [`${platform}/js`]: {
           transformGroup: 'js',
           buildPath: `build/${platform}/js/`,
           files: [{
-            destination: 'tokens.js',
+            destination: 'variables.js',
             format: 'javascript/module',
-            filter: (token) => token.platform === platform
+            filter: (token: { platform: string }) => token.platform === platform
           }]
         }
       }), {})
@@ -232,18 +232,53 @@ export class StyleDictionarySync {
         const blobs = await Promise.all(blobPromises)
 
         // Create tree with platform-specific directories
-        const treeItems = platforms.map((platform, index) => ({
-          path: `tokens/${platform}/typography.json`,
-          mode: '100644',
-          type: 'blob',
-          sha: blobs[index].data.sha
+        const treeItems: Array<{
+          path: string;
+          mode: '100644';
+          type: 'blob';
+          sha: string;
+        }> = await Promise.all(platforms.map(async (platform) => {
+          // Create tree items for each file
+          const treeItems: Array<{
+            path: string;
+            mode: '100644';
+            type: 'blob';
+            sha: string;
+          }> = await Promise.all(tokenJson[platform].typography.map(async (token: any) => {
+            // Create blob for file content
+            const { data: blob } = await this.octokit.git.createBlob({
+              owner: this.owner,
+              repo: this.repo,
+              content: Buffer.from(JSON.stringify(token)).toString('base64'),
+              encoding: 'base64'
+            });
+
+            return {
+              path: `tokens/${platform}/typography.json`,
+              mode: '100644' as const,
+              type: 'blob' as const,
+              sha: blob.sha
+            };
+          }));
+
+          return {
+            path: `tokens/${platform}/typography.json`,
+            mode: '100644' as const,
+            type: 'blob' as const,
+            sha: (await this.octokit.git.createTree({
+              owner: this.owner,
+              repo: this.repo,
+              base_tree: ref.object.sha,
+              tree: treeItems
+            })).data.sha
+          };
         }))
 
         // Add config file to tree
         treeItems.push({
           path: 'style-dictionary.config.json',
-          mode: '100644',
-          type: 'blob',
+          mode: '100644' as const,
+          type: 'blob' as const,
           sha: configBlob.data.sha
         })
 
@@ -251,7 +286,7 @@ export class StyleDictionarySync {
           owner: this.owner,
           repo: this.repo,
           base_tree: ref.object.sha,
-          tree: treeItems
+          tree: treeItems as any
         })
         console.log('🌳 Created tree:', tree.sha)
 
@@ -281,15 +316,12 @@ export class StyleDictionarySync {
           commitSha: commit.sha,
           url: repoUrl
         }
-      } catch (error) {
-        console.error('❌ GitHub API error:', error)
-        if (error.status === 404) {
-          throw new Error(`Branch '${this.branch}' not found. Please make sure it exists.`)
-        }
-        throw error
+      } catch (error: unknown) {
+        console.error('❌ Sync failed:', error instanceof Error ? error.message : String(error));
+        throw error;
       }
-    } catch (error) {
-      console.error('❌ Sync failed:', error)
+    } catch (error: unknown) {
+      console.error('Error syncing to GitHub:', error instanceof Error ? error.message : String(error))
       throw error
     }
   }

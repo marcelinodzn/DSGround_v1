@@ -23,10 +23,9 @@ export function FontPreview({ file, name, weight, style, isVariable, variableMod
     // Create a FontFace object with variable font settings if applicable
     const fontUrl = URL.createObjectURL(file)
     const fontFace = new FontFace(name, `url(${fontUrl})`, {
-      weight: isVariable && variableMode === 'variable' ? '1 1000' : weight.toString(),
+      weight: weight.toString(),
       style,
-      display: 'swap',
-      variationSettings: isVariable && variableMode === 'variable' ? "'wght' 1" : undefined
+      display: 'swap'
     })
 
     // Load the font

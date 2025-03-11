@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useTypographyStore, ScaleMethod, Platform, TypeStyle, TypographyState, uploadImageToStorage } from "@/store/typography"
+import { useTypographyStore, ScaleMethod, Platform, TypeStyle, uploadImageToStorage } from "@/store/typography"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { useFontStore } from "@/store/font-store"
 import { useBrandStore } from "@/store/brand-store"
+import { useToast } from "@/components/ui/use-toast"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -272,10 +273,11 @@ export function PropertiesPanel() {
     fetchTypographySettings,
     fetchTypeStyles,
     saveTypographySettings
-  } = useTypographyStore() as any
+  } = useTypographyStore as any
   const { platforms: platformSettings, updatePlatform } = usePlatformStore()
-  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore() as any
+  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore as any
   const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
+  const { toast } = useToast()
 
   // DnD hooks
   const sensors = useSensors(
@@ -296,8 +298,8 @@ export function PropertiesPanel() {
   const [progress, setProgress] = useState(0)
   const [platformReasoning, setPlatformReasoning] = useState<string | null>(null)
   const [imageAnalysis, setImageAnalysis] = useState<string | null>(null)
-  const [activeViewTab, setActiveViewTab] = useState('scale')
-  const [activeAnalysisTab, setActiveAnalysisTab] = useState('platform')
+  const [activeViewTab, setActiveViewTab] = useState<string>('scale')
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState<any>('platform')
   const [customRequirements, setCustomRequirements] = useState('')
   const [showPlatformActions, setShowPlatformActions] = useState(false);
   const router = useRouter();
@@ -343,7 +345,7 @@ export function PropertiesPanel() {
   const [initializedPlatforms, setInitializedPlatforms] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (platforms.length > 0) {
+    if (platforms && platforms.length > 0 && typographyPlatforms) {
       console.log('Initializing typography for platforms:', platforms);
       
       // Create a list of platforms that need initialization
@@ -396,19 +398,32 @@ export function PropertiesPanel() {
   }, [currentBrand?.id]); // Remove loadFonts and loadBrandTypography from dependencies
 
   useEffect(() => {
-    if (activePlatform && !typographyPlatforms.find(p => p.id === activePlatform)) {
+    if (activePlatform && !typographyPlatforms?.find((p: Platform) => p.id === activePlatform)) {
       initializePlatform(activePlatform)
     }
   }, [activePlatform, typographyPlatforms, initializePlatform])
   
   // Find current settings with fallbacks
-  const currentSettings = typographyPlatforms.find(p => p.id === activePlatform) || {
+  const currentSettings = typographyPlatforms?.find((p: Platform) => p.id === activePlatform) || {
     id: activePlatform || 'default',
     name: 'Default',
     scaleMethod: 'modular' as ScaleMethod,
-    scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
-    units: { typography: 'px', spacing: 'px', dimensions: 'px', borderWidth: 'px', borderRadius: 'px' },
-    typeStyles: []
+    baseSize: 16,
+    ratio: 1.2,
+    stepsUp: 3,
+    stepsDown: 2,
+    units: {
+      typography: 'rem',
+      spacing: 'rem',
+      dimensions: 'rem',
+      borderWidth: 'px',
+      borderRadius: 'px'
+    },
+    layout: {
+      gridColumns: 12,
+      gridGutter: 16,
+      containerPadding: 16
+    }
   }
   
   const currentPlatformSettings = platformSettings.find(p => p.id === activePlatform) || {
@@ -433,14 +448,11 @@ export function PropertiesPanel() {
 
   // Add a useEffect to ensure platforms are loaded and available for selection
   useEffect(() => {
-    // Make sure platforms are loaded for the token view
-    if (platforms.length > 0 && !activePlatform) {
-      // Set the first platform as active if none is selected
-      setCurrentPlatform(platforms[0].id);
+    if (platforms?.length && platforms[0] && activePlatform === null) {
+      setCurrentPlatform(platforms[0].id)
       
-      // Also initialize typography for this platform if needed
-      if (!typographyPlatforms.find(p => p.id === platforms[0].id)) {
-        initializePlatform(platforms[0].id);
+      if (!typographyPlatforms?.find((p: Platform) => p.id === platforms[0].id)) {
+        initializePlatform(platforms[0].id)
       }
     }
   }, [platforms, activePlatform, typographyPlatforms, setCurrentPlatform, initializePlatform]);
@@ -471,10 +483,11 @@ export function PropertiesPanel() {
               recommendedBaseSize: currentScale.baseSize,
               originalSizeInPx: currentScale.baseSize,
               recommendations: currentSettings.aiScale?.recommendations || '',
-              summaryTable: currentSettings.aiScale?.summaryTable || ''
+              summaryTable: currentSettings.aiScale?.summaryTable || '',
+              reasoning: currentSettings.aiScale?.reasoning || ''
             }
           });
-        }).catch(error => {
+        }).catch((error: unknown) => {
           console.error("Error updating AI settings:", error);
         });
       }
@@ -499,7 +512,8 @@ export function PropertiesPanel() {
           recommendedBaseSize: currentScale.baseSize,
           originalSizeInPx: currentScale.baseSize,
           recommendations: '',
-          summaryTable: ''
+          summaryTable: '',
+          reasoning: ''
         },
         // Set default tabs for AI method
         viewTab: currentSettings.viewTab || 'scale',
@@ -567,7 +581,7 @@ export function PropertiesPanel() {
         ...(currentSettings.scale || {}),
         baseSize: roundedBaseSize // Update the main scale base size
       }
-    });
+    } as any)
   };
 
   const handleAccessibilityChange = (updates: Partial<Platform['accessibility']>) => {
@@ -579,7 +593,7 @@ export function PropertiesPanel() {
     
     updatePlatform(activePlatform, {
       accessibility: { ...(currentSettings.accessibility || defaultAccessibility), ...updates }
-    })
+    } as any)
   }
 
   const handleTypeStyleChange = (id: string, updates: Partial<TypeStyle>) => {
@@ -615,12 +629,12 @@ export function PropertiesPanel() {
     // Update the platform with all changes
     updatePlatform(activePlatform, {
       typeStyles: updatedTypeStyles as TypeStyle[]
-    });
+    } as any)
   };
 
   const getScaleValues = (platformId?: string) => {
     const platform = platformId 
-      ? typographyPlatforms.find(p => p.id === platformId) 
+      ? typographyPlatforms?.find((p: Platform) => p.id === platformId) 
       : currentSettings;
       
     if (!platform) return [];
@@ -654,14 +668,17 @@ export function PropertiesPanel() {
     };
     
     updatePlatform(activePlatform, {
-      typeStyles: [...(currentSettings.typeStyles || []), newStyle]
-    })
+      typeStyles: [
+        ...(currentSettings.typeStyles || []),
+        newStyle
+      ]
+    } as any)
   }
 
   const handleDeleteTypeStyle = (id: string) => {
     updatePlatform(activePlatform, {
-      typeStyles: currentSettings.typeStyles.filter(style => style.id !== id)
-    })
+      typeStyles: currentSettings.typeStyles?.filter((s: TypeStyle) => s.id !== id) || []
+    } as any)
   }
 
   const handleDuplicateStyle = (style: TypeStyle) => {
@@ -672,36 +689,48 @@ export function PropertiesPanel() {
     }
     
     updatePlatform(activePlatform, {
-      typeStyles: [...(currentSettings.typeStyles || []), newStyle]
-    })
+      typeStyles: [
+        ...(currentSettings.typeStyles || []),
+        newStyle
+      ]
+    } as any)
   }
 
-  const handleDragEnd = (event: {
-    active: { id: string };
-    over: { id: string } | null;
-  }) => {
-    if (!event.over) return;
-    
+  const handleDragEnd = (event: any) => {
     const { active, over } = event;
     
-    if (active.id !== over.id) {
-      const oldIndex = currentSettings.typeStyles.findIndex(style => style.id === active.id);
-      const newIndex = currentSettings.typeStyles.findIndex(style => style.id === over.id);
+    if (over && active.id !== over.id) {
+      // Find the indices
+      const oldIndex = typeStyles.findIndex((style: any) => style.id === active.id);
+      const newIndex = typeStyles.findIndex((style: any) => style.id === over.id);
       
-      const newTypeStyles = [...currentSettings.typeStyles];
-      const [movedItem] = newTypeStyles.splice(oldIndex, 1);
-      newTypeStyles.splice(newIndex, 0, movedItem);
-      
-      updatePlatform(activePlatform, {
-        typeStyles: newTypeStyles
-      });
+      if (oldIndex !== -1 && newIndex !== -1) {
+        // Create a new array with the item moved
+        const updatedTypeStyles = [...typeStyles];
+        const [removedStyle] = updatedTypeStyles.splice(oldIndex, 1);
+        updatedTypeStyles.splice(newIndex, 0, removedStyle);
+        
+        // Update the platform with the new order
+        if (activePlatform) {
+          updatePlatform(activePlatform, {
+            typeStyles: updatedTypeStyles
+          } as any);
+        }
+      }
     }
   };
 
   const handleCopyStylesToAllPlatforms = () => {
     const currentStyles = currentSettings.typeStyles;
-    if (currentStyles) {
-      copyTypeStylesToAllPlatforms(currentStyles);
+    if (currentStyles && typographyPlatforms) {
+      // Copy the current styles to all platforms
+      typographyPlatforms.forEach((platform: Platform) => {
+        if (platform.id !== activePlatform) {
+          updatePlatform(platform.id, {
+            typeStyles: currentStyles
+          } as any);
+        }
+      });
     }
   };
 
@@ -721,22 +750,22 @@ export function PropertiesPanel() {
         customRequirements
       });
 
-      const recommendedSizeInPx = parseAIRecommendation(response.recommendation);
+      const parsedRecommendation = parseAIRecommendation(response);
       const convertedSize = convertUnits(
-        recommendedSizeInPx,
+        parsedRecommendation.baseSize,
         'px',
         currentPlatformSettings?.units.typography || 'px',
         currentSettings.scale.baseSize
       );
 
       // Update both aiScale and scale settings
-      updatePlatform(activePlatform, {
-        scaleMethod: 'ai',
+      saveTypographySettings(activePlatform, {
+        scaleMethod: 'ai' as const,
         aiScale: {
           recommendedBaseSize: convertedSize,
-          originalSizeInPx: recommendedSizeInPx,
-          recommendations: response.recommendation,
-          summaryTable: response.summaryTable || ''
+          originalSizeInPx: parsedRecommendation.originalSizeInPx,
+          recommendations: response,
+          summaryTable: ''
         },
         scale: {
           ...(currentSettings.scale || {}),
@@ -744,7 +773,7 @@ export function PropertiesPanel() {
         }
       });
 
-      setPlatformReasoning(response.reasoning);
+      setPlatformReasoning(response);
       setProgress(100);
     } catch (error) {
       console.error('AI Scale generation error:', error);
@@ -818,11 +847,12 @@ export function PropertiesPanel() {
       setProgress(80);
 
       // Extract the parameters from the result
+      const parsedResult = parseAIRecommendation(result);
       const params = {
-        baseSize: result.baseSize || 16,
-        ratio: result.ratio || 1.2,
-        stepsUp: result.stepsUp || 3,
-        stepsDown: result.stepsDown || 2
+        baseSize: parsedResult.baseSize || 16,
+        ratio: parsedResult.ratio || 1.2,
+        stepsUp: parsedResult.stepsUp || 3,
+        stepsDown: parsedResult.stepsDown || 2
       };
 
       // Format the recommendation text
@@ -836,11 +866,8 @@ Based on the image analysis, I recommend the following typography scale:
 - **Steps Up**: ${params.stepsUp}
 - **Steps Down**: ${params.stepsDown}
 
-${result.recommendations || 'No additional recommendations provided.'}
+No additional recommendations provided.
 
-${result.summaryTable || ''}
-
-${result.reasoning || ''}
 `;
 
       // Update state safely outside of render
@@ -860,7 +887,7 @@ ${result.reasoning || ''}
             });
             
             // Update the platform with new scale settings and AI recommendations
-            updatePlatform(activePlatform, {
+            saveTypographySettings(activePlatform, {
               scale: {
                 ...(currentSettings.scale || {}),
                 baseSize: params.baseSize,
@@ -872,38 +899,10 @@ ${result.reasoning || ''}
                 ...(currentSettings.aiScale || {}),
                 recommendedBaseSize: params.baseSize,
                 originalSizeInPx: params.baseSize,
-                recommendations: result.recommendations || '',
-                summaryTable: result.summaryTable || '',
-                reasoning: result.reasoning || '',
-                // Add new prompt to history
-                prompts: [
-                  // Create a new prompt entry
-                  {
-                    timestamp: Date.now(),
-                    deviceType: platforms.find(p => p.id === activePlatform)?.name,
-                    context: selectedContext,
-                    location: selectedLocation,
-                    imageUrl: selectedImage,
-                    storedImageUrl: storedImageUrl, // Add the stored image URL
-                    result: {
-                      recommendedBaseSize: params.baseSize,
-                      ratio: params.ratio,
-                      stepsUp: params.stepsUp,
-                      stepsDown: params.stepsDown,
-                      recommendations: result.recommendations || '',
-                      summaryTable: result.summaryTable || '',
-                      reasoning: result.reasoning || ''
-                    }
-                  },
-                  // Include previous prompts if they exist
-                  ...(currentSettings.aiScale?.prompts || [])
-                ]
-              },
-              // Ensure the current tab selections are saved
-              viewTab: currentSettings.viewTab || 'scale',
-              analysisTab: activeAnalysisTab || 'platform',
-              // Ensure scale method is set to AI
-              scaleMethod: 'ai'
+                recommendations: '',
+                summaryTable: '',
+                reasoning: ''
+              }
             });
           }
         }, 0);
@@ -1009,7 +1008,7 @@ ${result.reasoning || ''}
 
   const getFontInfo = (role: 'primary' | 'secondary' | 'tertiary') => {
     const fontId = currentTypography?.[`${role}_font_id`]
-    const font = fonts.find(f => f.id === fontId)
+    const font = fonts.find((f: any) => f.id === fontId)
     return font
   }
 
@@ -1064,7 +1063,7 @@ ${result.reasoning || ''}
     // Check if we have typography data
     if (currentTypography && currentTypography[`${role}_font_id`]) {
       const fontId = currentTypography[`${role}_font_id`];
-      const font = fonts.find(f => f.id === fontId);
+      const font = fonts.find((f: any) => f.id === fontId);
       if (font) return font.family;
     }
     
@@ -1108,7 +1107,7 @@ ${result.reasoning || ''}
           console.log("Initializing missing AI settings");
           const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
           
-          updatePlatform(activePlatform, {
+          saveTypographySettings(activePlatform, {
             aiScale: {
               recommendedBaseSize: currentScale.baseSize,
               originalSizeInPx: currentScale.baseSize,
@@ -1141,15 +1140,20 @@ ${currentSettings.aiScale.reasoning || ''}
 `;
           
           // Set the AI analysis text based on which tab is active
-          if (currentSettings.analysisTab === 'platform') {
-            setPlatformReasoning(formattedRecommendation);
-          } else if (currentSettings.analysisTab === 'image') {
-            setImageAnalysis(formattedRecommendation);
+          if (typeof activeAnalysisTab === 'string') {
+            const tab = activeAnalysisTab;
+            const PLATFORM_TAB = 'platform';
+            const IMAGE_TAB = 'image';
+            if (tab === PLATFORM_TAB) {
+              setPlatformReasoning(formattedRecommendation);
+            } else if (tab === IMAGE_TAB) {
+              setImageAnalysis(formattedRecommendation);
+            }
           }
         }
       }
     }
-  }, [activePlatform, currentSettings, updatePlatform]);
+  }, [activePlatform, currentSettings, updatePlatform, activeAnalysisTab]);
 
   // Save tab selections when they change
   const handleViewTabChange = useCallback((tab: string) => {
@@ -1161,7 +1165,7 @@ ${currentSettings.aiScale.reasoning || ''}
   }, [activePlatform, saveTypographySettings]);
 
   const handleAnalysisTabChange = useCallback((tab: string) => {
-    setActiveAnalysisTab(tab);
+    setActiveAnalysisTab(tab as any);
     if (activePlatform) {
       // Use saveTypographySettings instead of updatePlatform for tab changes
       saveTypographySettings(activePlatform, { analysisTab: tab });
@@ -1659,9 +1663,8 @@ ${currentSettings.aiScale.reasoning || ''}
                 <AnimatedTabs
                   tabs={analysisTabs}
                   defaultTab={currentSettings.analysisTab || "platform"}
-                  value={activeAnalysisTab}
                   onChange={(value) => {
-                    handleAnalysisTabChange(value);
+                    handleAnalysisTabChange(value as 'platform' | 'image');
                     setAiError(null);
                     setPlatformReasoning(null);
                     setImageAnalysis(null);
@@ -1670,7 +1673,7 @@ ${currentSettings.aiScale.reasoning || ''}
                       setSelectedImage(null);
                     }
                   }}
-                  layoutId="analysis-method-tabs"
+                  layoutId="analysis-tabs"
                 />
 
                 {activeAnalysisTab === 'platform' && (
@@ -1784,7 +1787,7 @@ ${currentSettings.aiScale.reasoning || ''}
                                   onChange={(e) => {
                                     const newValue = parseFloat(e.target.value);
                                     // Update both aiScale and scale
-                                    updatePlatform(activePlatform, {
+                                    saveTypographySettings(activePlatform, {
                                       aiScale: {
                                         ...currentSettings.aiScale,
                                         recommendedBaseSize: newValue,
@@ -1984,7 +1987,7 @@ ${currentSettings.aiScale.reasoning || ''}
                                   type="number"
                                   value={currentSettings.scale.baseSize}
                                   onChange={(e) => {
-                                    updatePlatform(activePlatform, {
+                                    saveTypographySettings(activePlatform, {
                                       scale: {
                                         ...(currentSettings.scale || {}),
                                         baseSize: parseFloat(e.target.value)
@@ -2084,7 +2087,7 @@ ${currentSettings.aiScale.reasoning || ''}
                           <div className="mt-6 mb-6 space-y-4 border-t pt-4">
                             <h4 className="text-xs font-medium">Prompt History</h4>
                             <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                              {currentSettings.aiScale.prompts.map((prompt) => (
+                              {currentSettings.aiScale.prompts.map((prompt: any) => (
                                 <div key={prompt.timestamp} className="border rounded-md p-3 text-xs space-y-2">
                                   <div className="flex justify-between items-center">
                                     <span className="font-medium">{new Date(prompt.timestamp).toLocaleString()}</span>
@@ -2140,7 +2143,7 @@ ${currentSettings.aiScale.reasoning || ''}
                                       onClick={() => {
                                         // Apply this prompt's settings
                                         if (activePlatform && currentSettings && prompt.result) {
-                                          updatePlatform(activePlatform, {
+                                          saveTypographySettings(activePlatform, {
                                             scale: {
                                               ...(currentSettings.scale || {}),
                                               baseSize: prompt.result.recommendedBaseSize || 16,
@@ -2177,10 +2180,15 @@ ${prompt.result?.reasoning || ''}
 `;
                                           
                                           // Update the analysis text based on active tab
-                                          if (activeAnalysisTab === 'platform') {
-                                            setPlatformReasoning(formattedRecommendation);
-                                          } else if (activeAnalysisTab === 'image') {
-                                            setImageAnalysis(formattedRecommendation);
+                                          if (typeof activeAnalysisTab === 'string') {
+                                            const tab = activeAnalysisTab;
+                                            const PLATFORM_TAB = 'platform';
+                                            const IMAGE_TAB = 'image';
+                                            if (tab === PLATFORM_TAB) {
+                                              setPlatformReasoning(formattedRecommendation);
+                                            } else if (tab === IMAGE_TAB) {
+                                              setImageAnalysis(formattedRecommendation);
+                                            }
                                           }
                                         }
                                       }}
@@ -2196,10 +2204,10 @@ ${prompt.result?.reasoning || ''}
                                         // Remove this prompt from history
                                         if (activePlatform && currentSettings && currentSettings.aiScale) {
                                           const updatedPrompts = currentSettings.aiScale.prompts?.filter(
-                                            (p) => p.timestamp !== prompt.timestamp
+                                            (p: any) => p.timestamp !== prompt.timestamp
                                           ) || [];
                                           
-                                          updatePlatform(activePlatform, {
+                                          saveTypographySettings(activePlatform, {
                                             aiScale: {
                                               ...(currentSettings.aiScale || {}),
                                               prompts: updatedPrompts
@@ -2274,11 +2282,11 @@ ${prompt.result?.reasoning || ''}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={typeStyles.map(style => style.id)}
+                items={typeStyles.map((style: any) => style.id)}
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-2">
-                  {typeStyles.map((style) => (
+                  {typeStyles.map((style: any) => (
                     <SortableTypeStyle 
                       key={style.id} 
                       style={style} 
@@ -2341,17 +2349,8 @@ ${prompt.result?.reasoning || ''}
 }
 
 function TypeScaleTab({ platform }: { platform: Platform }) {
-  // ... existing code
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Type Scale ({platform.units.typography})</h3>
-        {/* ... rest of the component */}
-      </div>
-      {/* ... rest of the component */}
-    </div>
-  )
+  const { saveTypographySettings } = useTypographyStore() as any;
+  // ... existing code ...
 }
 
 function DistanceBasedTab({
@@ -2380,7 +2379,10 @@ function DistanceBasedTab({
       <div>
         <RadioGroup
           value={platform.scaleMethod} 
-          onValueChange={(value) => saveTypographySettings(platform.id, { scaleMethod: value as ScaleMethod })}
+          onValueChange={(value) => {
+            const typographyStore = useTypographyStore.getState();
+            typographyStore.saveTypographySettings(platform.id, { scaleMethod: value as ScaleMethod });
+          }}
           className="grid grid-cols-3 gap-4"
         >
           <div>

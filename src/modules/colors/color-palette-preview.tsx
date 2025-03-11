@@ -14,7 +14,12 @@ import { Slider } from '@/components/ui/slider'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Plus, Trash2, Copy, Edit, Check, X, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { convertToAllFormats, getLuminance, calculateContrast } from '@/lib/color-utils'
+import { 
+  convertToAllFormats, 
+  generatePalette as generateColorPalette,
+  getLuminance, 
+  calculateContrast
+} from '@/lib/color-utils'
 
 // Helper function to determine text color (white or black) based on background color
 const getTextColor = (backgroundColor: string): string => {
@@ -39,7 +44,7 @@ export function ColorPalettePreview() {
     addColorStep, 
     updateColorStep, 
     deleteColorStep, 
-    generatePalette, 
+    generatePalette,
     convertColor,
     paletteConfig
   } = useColorStore()
@@ -214,25 +219,42 @@ export function ColorPalettePreview() {
       };
       
       // Generate steps for the palette using the selected parameters and options
-      const generatedSteps = generatePalette(defaultBaseColor, numSteps, useLightness, paletteOptions);
+      const generatedSteps = generateColorPalette(defaultBaseColor, numSteps, useLightness, {
+        lightnessPreset: paletteOptions.lightnessPreset,
+        chromaPreset: paletteOptions.chromaPreset,
+        lightnessRange: paletteOptions.lightnessRange as [number, number],
+        chromaRange: paletteOptions.chromaRange as [number, number]
+      });
+      
+      // Add required accessibility property to each step
+      const stepsWithAccessibility = generatedSteps.map(step => ({
+        ...step,
+        accessibility: step.accessibility || {
+          contrastWithWhite: 0,
+          contrastWithBlack: 0,
+          wcagAANormal: false,
+          wcagAALarge: false,
+          wcagAAA: false
+        }
+      }));
       
       // Create the palette in the store
-      const newPalette = await createPalette(currentBrand.id, {
+      await createPalette(currentBrand.id, {
         name: "Primary",
         description: "Primary brand color palette",
         baseColor: defaultBaseColor,
-        steps: generatedSteps,
-        isCore: true
-      })
+        steps: stepsWithAccessibility as any,
+        isCore: true,
+        brandId: currentBrand.id
+      });
       
-      console.log('Default palette created:', newPalette);
-      
-      // If the palette was created successfully, set it as the current palette
-      if (newPalette) {
-        setCurrentPalette(newPalette.id);
+      // Set the current palette to the first one in the list
+      const palettes = useColorStore.getState().palettes;
+      if (palettes.length > 0) {
+        setCurrentPalette(palettes[0].id);
       }
       
-      return newPalette;
+      return true;
     } catch (error) {
       console.error('Error creating default palette:', error);
       
@@ -252,7 +274,24 @@ export function ColorPalettePreview() {
       };
       
       // Generate steps for the palette using the selected parameters and options
-      const generatedSteps = generatePalette(defaultBaseColor, numSteps, useLightness, paletteOptions);
+      const generatedSteps = generateColorPalette(defaultBaseColor, numSteps, useLightness, {
+        lightnessPreset: paletteOptions.lightnessPreset,
+        chromaPreset: paletteOptions.chromaPreset,
+        lightnessRange: paletteOptions.lightnessRange as [number, number],
+        chromaRange: paletteOptions.chromaRange as [number, number]
+      });
+      
+      // Add required accessibility property to each step
+      const stepsWithAccessibility = generatedSteps.map(step => ({
+        ...step,
+        accessibility: step.accessibility || {
+          contrastWithWhite: 0,
+          contrastWithBlack: 0,
+          wcagAANormal: false,
+          wcagAALarge: false,
+          wcagAAA: false
+        }
+      }));
       
       // Create a local-only palette
       const localPalette = {
@@ -260,8 +299,9 @@ export function ColorPalettePreview() {
         name: "Primary",
         description: "Primary brand color palette (local only)",
         baseColor: defaultBaseColor,
-        steps: generatedSteps,
-        isCore: true
+        steps: stepsWithAccessibility,
+        isCore: true,
+        brandId: currentBrand.id
       };
       
       // Manually update the store state
@@ -270,7 +310,7 @@ export function ColorPalettePreview() {
         currentPaletteId: localPalette.id
       }));
       
-      return localPalette;
+      return false;
     }
   }
   
@@ -303,24 +343,43 @@ export function ColorPalettePreview() {
       });
       
       // Generate steps for the palette using the selected parameters and options
-      const generatedSteps = generatePalette(defaultBaseColor, numSteps, useLightness, paletteOptions);
+      const generatedSteps = generateColorPalette(defaultBaseColor, numSteps, useLightness, {
+        lightnessPreset: paletteOptions.lightnessPreset,
+        chromaPreset: paletteOptions.chromaPreset,
+        lightnessRange: paletteOptions.lightnessRange as [number, number],
+        chromaRange: paletteOptions.chromaRange as [number, number]
+      });
       console.log('Generated steps:', generatedSteps);
       
+      // Add required accessibility property to each step
+      const stepsWithAccessibility = generatedSteps.map(step => ({
+        ...step,
+        accessibility: step.accessibility || {
+          contrastWithWhite: 0,
+          contrastWithBlack: 0,
+          wcagAANormal: false,
+          wcagAALarge: false,
+          wcagAAA: false
+        }
+      }));
+      
       // Create the palette in the store (which will handle both local state and Supabase)
-      const newPalette = await createPalette(currentBrand.id, {
+      await createPalette(currentBrand.id, {
         name: newPaletteName,
         description: `${newPaletteName} color palette`,
         baseColor: defaultBaseColor,
-        steps: generatedSteps,
-        isCore
-      })
+        steps: stepsWithAccessibility as any,
+        isCore,
+        brandId: currentBrand.id
+      });
       
-      console.log('New palette created:', newPalette);
+      console.log('New palette created');
       setNewPaletteName('');
       
-      // If the palette was created successfully, set it as the current palette
-      if (newPalette) {
-        setCurrentPalette(newPalette.id);
+      // Set the current palette to the first one in the list
+      const palettes = useColorStore.getState().palettes;
+      if (palettes.length > 0) {
+        setCurrentPalette(palettes[0].id);
       }
     } catch (error) {
       console.error('Error creating palette:', error);
@@ -342,7 +401,24 @@ export function ColorPalettePreview() {
       };
       
       // Generate steps for the palette using the selected parameters and options
-      const generatedSteps = generatePalette(defaultBaseColor, numSteps, useLightness, paletteOptions);
+      const generatedSteps = generateColorPalette(defaultBaseColor, numSteps, useLightness, {
+        lightnessPreset: paletteOptions.lightnessPreset,
+        chromaPreset: paletteOptions.chromaPreset,
+        lightnessRange: paletteOptions.lightnessRange as [number, number],
+        chromaRange: paletteOptions.chromaRange as [number, number]
+      });
+      
+      // Add required accessibility property to each step
+      const stepsWithAccessibility = generatedSteps.map(step => ({
+        ...step,
+        accessibility: step.accessibility || {
+          contrastWithWhite: 0,
+          contrastWithBlack: 0,
+          wcagAANormal: false,
+          wcagAALarge: false,
+          wcagAAA: false
+        }
+      }));
       
       // Add the palette to the local state only
       const localPalette = {
@@ -350,8 +426,9 @@ export function ColorPalettePreview() {
         name: newPaletteName,
         description: `${newPaletteName} color palette (local only)`,
         baseColor: defaultBaseColor,
-        steps: generatedSteps,
-        isCore
+        steps: stepsWithAccessibility,
+        isCore,
+        brandId: currentBrand.id
       };
       
       // Manually update the store state
@@ -375,28 +452,29 @@ export function ColorPalettePreview() {
   
   const handleColorChange = async (palette: ColorPalette, stepId: string, colorHex: string) => {
     // Convert the hex color to all other formats
-    const updatedValues = convertToAllFormats(colorHex, 'hex');
+    const updatedValues = convertToAllFormats(colorHex);
     
     await updateColorStep(palette.id, stepId, {
       values: updatedValues
-    })
-  }
+    });
+  };
   
   const handleAddColorStep = async (paletteId: string) => {
     try {
-      console.log('Adding new color step to palette:', paletteId);
-      
-      // Generate a default color (medium gray)
-      const defaultColor = {
-        hex: '#808080',
-        rgb: 'rgb(128, 128, 128)',
-        oklch: 'oklch(50% 0 0)'
-      };
+      // Create a default color (light gray)
+      const defaultColor = convertToAllFormats('#E0E0E0');
       
       // Add the color step to the palette
       await addColorStep(paletteId, {
         name: `New Step`,
-        values: defaultColor
+        values: defaultColor,
+        accessibility: {
+          contrastWithWhite: 0,
+          contrastWithBlack: 0,
+          wcagAANormal: false,
+          wcagAALarge: false,
+          wcagAAA: false
+        }
       });
       
       console.log('Color step added successfully');
@@ -575,12 +653,12 @@ export function ColorPalettePreview() {
                         <Label className="text-sm font-medium leading-none">Base Color</Label>
                         <div className="flex items-center mt-2 gap-2">
                           <div className="w-6 h-6 rounded" style={{ backgroundColor: currentPalette.baseColor.hex }}></div>
-                          <code className="text-sm bg-muted p-1 rounded">{currentPalette.baseColor[selectedFormat]}</code>
+                          <code className="text-sm bg-muted p-1 rounded">{currentPalette.baseColor[selectedFormat] || currentPalette.baseColor.hex}</code>
                           <Button 
                             variant="ghost" 
                             size="icon"
                             className="h-6 w-6"
-                            onClick={() => navigator.clipboard.writeText(currentPalette.baseColor[selectedFormat])}
+                            onClick={() => navigator.clipboard.writeText(currentPalette.baseColor[selectedFormat] || currentPalette.baseColor.hex)}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -598,13 +676,13 @@ export function ColorPalettePreview() {
                             <div className="w-6 h-6 rounded" style={{ backgroundColor: step.values.hex }}></div>
                             <div className="flex-1">
                               <div className="font-medium">{step.name}</div>
-                              <code className="text-xs bg-muted p-1 rounded">{step.values[selectedFormat]}</code>
+                              <code className="text-xs bg-muted p-1 rounded">{step.values[selectedFormat] || step.values.hex}</code>
                             </div>
                             <Button 
                               variant="ghost" 
                               size="icon"
                               className="h-6 w-6"
-                              onClick={() => navigator.clipboard.writeText(step.values[selectedFormat])}
+                              onClick={() => navigator.clipboard.writeText(step.values[selectedFormat] || step.values.hex)}
                             >
                               <Copy className="h-3 w-3" />
                             </Button>

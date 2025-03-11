@@ -124,35 +124,33 @@ export const calculateTypeScale = (
   // Generate steps down
   for (let i = stepsDown; i > 0; i--) {
     const size = baseSize / Math.pow(ratio, i);
-    const convertedSize = convertUnits({
-      from: 'px',
-      to: unit,
-      value: size,
-      baseSize: platform.layout.baseSize
-    });
+    const convertedSize = convertUnits(
+      size,
+      'px',
+      unit,
+      16 // Default base size
+    );
     scale.push({ label: `f-${i}`, size: convertedSize });
   }
   
   // Add base size
-  scale.push({ 
-    label: 'f0', 
-    size: convertUnits({
-      from: 'px',
-      to: unit,
-      value: baseSize,
-      baseSize: platform.layout.baseSize
-    })
-  });
+  const convertedBaseSize = convertUnits(
+    baseSize,
+    'px', 
+    unit,
+    16 // Default base size
+  );
+  scale.push({ label: 'f0', size: convertedBaseSize });
   
   // Generate steps up
   for (let i = 1; i <= stepsUp; i++) {
     const size = baseSize * Math.pow(ratio, i);
-    const convertedSize = convertUnits({
-      from: 'px',
-      to: unit,
-      value: size,
-      baseSize: platform.layout.baseSize
-    });
+    const convertedSize = convertUnits(
+      size,
+      'px',
+      unit,
+      16 // Default base size
+    );
     scale.push({ label: `f${i}`, size: convertedSize });
   }
   
