@@ -673,10 +673,10 @@ export function PropertiesPanel() {
       return style;
     });
 
-    // Update the platform with all changes
-    updatePlatform(activePlatform, {
-      typeStyles: updatedTypeStyles as TypeStyle[]
-    } as any)
+    // Use saveTypographySettings instead of updatePlatform
+    saveTypographySettings(activePlatform, {
+      typeStyles: updatedTypeStyles
+    });
   };
 
   const getScaleValues = (platformId?: string) => {
@@ -714,18 +714,18 @@ export function PropertiesPanel() {
       opticalSize: 16
     };
     
-    updatePlatform(activePlatform, {
+    saveTypographySettings(activePlatform, {
       typeStyles: [
         ...(currentSettings.typeStyles || []),
         newStyle
       ]
-    } as any)
+    });
   }
 
   const handleDeleteTypeStyle = (id: string) => {
-    updatePlatform(activePlatform, {
+    saveTypographySettings(activePlatform, {
       typeStyles: currentSettings.typeStyles?.filter((s: TypeStyle) => s.id !== id) || []
-    } as any)
+    });
   }
 
   const handleDuplicateStyle = (style: TypeStyle) => {
@@ -735,12 +735,12 @@ export function PropertiesPanel() {
       name: `${style.name} (Copy)`
     }
     
-    updatePlatform(activePlatform, {
+    saveTypographySettings(activePlatform, {
       typeStyles: [
         ...(currentSettings.typeStyles || []),
         newStyle
       ]
-    } as any)
+    });
   }
 
   const handleDragEnd = (event: any) => {
@@ -757,11 +757,11 @@ export function PropertiesPanel() {
         const [removedStyle] = updatedTypeStyles.splice(oldIndex, 1);
         updatedTypeStyles.splice(newIndex, 0, removedStyle);
         
-        // Update the platform with the new order
+        // Update using saveTypographySettings instead of updatePlatform
         if (activePlatform) {
-          updatePlatform(activePlatform, {
+          saveTypographySettings(activePlatform, {
             typeStyles: updatedTypeStyles
-          } as any);
+          });
         }
       }
     }
