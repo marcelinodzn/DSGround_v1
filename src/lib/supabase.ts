@@ -6,14 +6,58 @@ let supabaseClient: ReturnType<typeof createClient>
 const createMockClient = () => {
   console.warn('Using mock Supabase client for static generation')
   
+  // In-memory mock data store for tables
+  const mockDataStore: Record<string, Array<Record<string, any>>> = {
+    brands: [],
+    platforms: [],
+    typography_settings: [],
+    fonts: []
+  };
+  
+  // Create a UUID function for mock data
+  const createUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+  
   // Create a mock query builder with all the necessary methods
-  const createMockQueryBuilder = () => {
+  const createMockQueryBuilder = (tableName: string) => {
+    let selectedColumns: string[] | null = null;
+    let whereConditions: Array<{column: string, value: any}> = [];
+    let limitCount: number | null = null;
+    let orderByColumn: string | null = null;
+    let orderDirection: 'asc' | 'desc' = 'asc';
+    let returnSingle = false;
+    let insertData: any[] = [];
+    let updateData: Record<string, any> = {};
+    
     const mockQueryBuilder = {
-      select: () => mockQueryBuilder,
-      insert: () => mockQueryBuilder,
-      update: () => mockQueryBuilder,
+      select: (columns?: string | string[] | null) => {
+        if (columns) {
+          selectedColumns = Array.isArray(columns) ? columns : [columns];
+        }
+        return mockQueryBuilder;
+      },
+      
+      insert: (data: any | any[]) => {
+        insertData = Array.isArray(data) ? data : [data];
+        return mockQueryBuilder;
+      },
+      
+      update: (data: Record<string, any>) => {
+        updateData = data;
+        return mockQueryBuilder;
+      },
+      
       delete: () => mockQueryBuilder,
-      eq: () => mockQueryBuilder,
+      
+      eq: (column: string, value: any) => {
+        whereConditions.push({column, value});
+        return mockQueryBuilder;
+      },
+      
       neq: () => mockQueryBuilder,
       gt: () => mockQueryBuilder,
       lt: () => mockQueryBuilder,
@@ -27,31 +71,168 @@ const createMockClient = () => {
       containedBy: () => mockQueryBuilder,
       range: () => mockQueryBuilder,
       overlaps: () => mockQueryBuilder,
-      limit: () => mockQueryBuilder,
-      order: () => mockQueryBuilder,
-      single: () => ({ data: null, error: null }),
-      maybeSingle: () => ({ data: null, error: null }),
-      then: () => Promise.resolve({ data: [], error: null }),
-      data: [],
-      error: null
+      
+      limit: (count: number) => {
+        limitCount = count;
+        return mockQueryBuilder;
+      },
+      
+      order: (column: string, { ascending }: { ascending: boolean }) => {
+        orderByColumn = column;
+        orderDirection = ascending ? 'asc' : 'desc';
+        return mockQueryBuilder;
+      },
+      
+      single: () => {
+        returnSingle = true;
+        return mockQueryBuilder;
+      },
+      
+      maybeSingle: () => {
+        returnSingle = true;
+        return mockQueryBuilder;
+      },
+      
+      // Execute the query based on the accumulated parameters
+      then: (callback?: (result: {data: any, error: any}) => void) => {
+        let result: {data: any, error: any} = {data: null, error: null};
+        
+        // Handle different query types
+        try {
+          // INSERT operation
+          if (insertData.length > 0) {
+            const newRecords = insertData.map(record => {
+              // Add default fields
+              const newRecord = {
+                id: createUUID(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...record
+              };
+              
+              // Add to mock data store
+              if (!mockDataStore[tableName]) {
+                mockDataStore[tableName] = [];
+              }
+              
+              mockDataStore[tableName].push(newRecord);
+              return newRecord;
+            });
+            
+            result.data = newRecords;
+            console.log(`[Mock] Inserted ${newRecords.length} records into ${tableName}`, newRecords);
+          }
+          // UPDATE operation
+          else if (Object.keys(updateData).length > 0) {
+            // Apply where conditions
+            let records = mockDataStore[tableName] || [];
+            whereConditions.forEach(condition => {
+              records = records.filter(record => record[condition.column] === condition.value);
+            });
+            
+            // Update matching records
+            if (records.length > 0) {
+              records.forEach(record => {
+                Object.assign(record, {
+                  ...updateData,
+                  updated_at: new Date().toISOString()
+                });
+              });
+              
+              result.data = returnSingle ? records[0] : records;
+              console.log(`[Mock] Updated ${records.length} records in ${tableName}`);
+            } else {
+              result.error = {
+                code: 'PGRST116',
+                details: 'The result contains 0 rows',
+                message: 'JSON object requested, multiple (or no) rows returned'
+              };
+            }
+          }
+          // SELECT operation
+          else {
+            let records = mockDataStore[tableName] || [];
+            
+            // Apply where conditions
+            whereConditions.forEach(condition => {
+              records = records.filter(record => record[condition.column] === condition.value);
+            });
+            
+            // Apply order
+            if (orderByColumn) {
+              records.sort((a, b) => {
+                if (a[orderByColumn!] < b[orderByColumn!]) return orderDirection === 'asc' ? -1 : 1;
+                if (a[orderByColumn!] > b[orderByColumn!]) return orderDirection === 'asc' ? 1 : -1;
+                return 0;
+              });
+            }
+            
+            // Apply limit
+            if (limitCount !== null) {
+              records = records.slice(0, limitCount);
+            }
+            
+            // Filter columns if specified
+            if (selectedColumns) {
+              records = records.map(record => {
+                const filteredRecord: Record<string, any> = {};
+                selectedColumns!.forEach(column => {
+                  filteredRecord[column] = record[column];
+                });
+                return filteredRecord;
+              });
+            }
+            
+            result.data = returnSingle ? (records[0] || null) : records;
+            
+            if (returnSingle && !result.data) {
+              result.error = {
+                code: 'PGRST116',
+                details: 'The result contains 0 rows',
+                message: 'JSON object requested, multiple (or no) rows returned'
+              };
+            }
+          }
+        } catch (err) {
+          result.error = {
+            message: err instanceof Error ? err.message : 'Unknown error in mock query',
+          };
+        }
+        
+        if (callback) {
+          callback(result);
+        }
+        
+        return Promise.resolve(result);
+      }
     };
+    
     return mockQueryBuilder;
   };
   
   // Return a mock client with methods that return empty data
   return {
-    from: () => createMockQueryBuilder(),
+    from: (tableName: string) => createMockQueryBuilder(tableName),
     rpc: () => ({ data: [], error: null }),
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ 
-        data: { 
-          subscription: { 
-            unsubscribe: () => console.log('[Mock] Unsubscribing from auth listener') 
-          } 
-        }, 
-        error: null 
-      }),
+      onAuthStateChange: (callback: Function) => {
+        // Call the callback with a mock sign-in event
+        setTimeout(() => {
+          if (callback && typeof callback === 'function') {
+            callback('SIGNED_OUT', null);
+          }
+        }, 0);
+        
+        return { 
+          data: { 
+            subscription: { 
+              unsubscribe: () => console.log('[Mock] Unsubscribing from auth listener') 
+            } 
+          }, 
+          error: null 
+        };
+      },
     },
     realtime: {
       setAuth: () => {},
