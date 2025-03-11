@@ -2435,52 +2435,6 @@ ${prompt.result?.reasoning || ''}
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Add this after the typography settings section */}
-      <div className="space-y-4">
-        <div className="px-4 py-2 bg-muted/50 rounded-md">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Platform Settings</h3>
-          </div>
-          
-          <div className="mt-2">
-            <Label className="text-xs">Select Platform</Label>
-            <Select
-              value={activePlatform || ''}
-              onValueChange={(value) => {
-                if (value) {
-                  console.log(`Setting current platform to: ${value}`);
-                  setCurrentPlatform(value);
-                  
-                  // Initialize the platform if needed
-                  if (typographyPlatforms && !typographyPlatforms.some((p: Platform) => p.id === value)) {
-                    console.log(`Initializing platform: ${value}`);
-                    initializePlatform(value);
-                  }
-                }
-              }}
-            >
-              <SelectTrigger className="text-xs h-8">
-                <SelectValue placeholder="Select platform" />
-              </SelectTrigger>
-              <SelectContent>
-                {platforms && platforms.map((platform) => (
-                  <SelectItem key={platform.id} value={platform.id}>
-                    {platform.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!activePlatform && (
-              <p className="text-xs text-red-500 mt-1">
-                Please select a platform to continue
-              </p>
-            )}
-          </div>
-        </div>
-        
-        {/* Rest of the component */}
-      </div>
     </div>
   )
 }
