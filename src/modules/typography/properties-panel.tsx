@@ -25,7 +25,7 @@ import { useRouter } from 'next/navigation';
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { useFontStore } from "@/store/font-store"
 import { useBrandStore } from "@/store/brand-store"
-import { useToast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 const typographyScales = [
   { name: "Major Second", ratio: 1.125 },
@@ -265,6 +265,7 @@ const getFontNameById = (fontId: string | null | undefined, fonts: any[]): strin
 
 export function PropertiesPanel() {
   const platforms = usePlatformStore((state) => state.platforms)
+  const typographyStore = useTypographyStore() as any
   const {
     currentPlatform: activePlatform,
     platforms: typographyPlatforms,
@@ -273,11 +274,67 @@ export function PropertiesPanel() {
     fetchTypographySettings,
     fetchTypeStyles,
     saveTypographySettings
-  } = useTypographyStore as any
+  } = typographyStore
   const { platforms: platformSettings, updatePlatform } = usePlatformStore()
-  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore as any
+  const fontStore = useFontStore() as any
+  const { currentBrand, saveBrandTypography, brandTypography, fonts, loadFonts, loadBrandTypography } = fontStore
   const { currentBrand: brandStoreCurrentBrand } = useBrandStore()
-  const { toast } = useToast()
+  
+  // Track initialization state
+  const [initializedPlatforms, setInitializedPlatforms] = useState<string[]>([])
+  
+  // Wrapper functions to safely call store methods
+  const safeLoadFonts = async () => {
+    if (typeof loadFonts === 'function') {
+      try {
+        await loadFonts();
+      } catch (error) {
+        console.warn('Error loading fonts:', error);
+      }
+    } else {
+      console.warn('loadFonts is not available - cannot load fonts');
+    }
+  };
+
+  const safeLoadBrandTypography = async (brandId: string) => {
+    if (typeof loadBrandTypography === 'function') {
+      try {
+        await loadBrandTypography(brandId);
+      } catch (error) {
+        console.warn('Error loading brand typography:', error);
+      }
+    } else {
+      console.warn('loadBrandTypography is not available - cannot load brand typography');
+    }
+  };
+
+  const safeSaveTypographySettings = (platformId: string, settings: any) => {
+    if (typeof saveTypographySettings === 'function') {
+      try {
+        return saveTypographySettings(platformId, settings);
+      } catch (error) {
+        console.error('Error saving typography settings:', error);
+        toast.error("Error saving settings", {
+          description: "Could not save typography settings - try refreshing the page"
+        });
+      }
+    } else if (typeof updatePlatform === 'function') {
+      console.warn('saveTypographySettings is not available - falling back to updatePlatform');
+      try {
+        return updatePlatform(platformId, settings);
+      } catch (error) {
+        console.error('Error updating platform:', error);
+        toast.error("Error updating platform", {
+          description: "Could not update platform settings - try refreshing the page"
+        });
+      }
+    } else {
+      console.error('No function available to update typography settings');
+      toast.error("Error", {
+        description: "No function available to update settings - try refreshing the page"
+      });
+    }
+  };
 
   // DnD hooks
   const sensors = useSensors(
@@ -341,61 +398,49 @@ export function PropertiesPanel() {
     // TODO: Implement duplicate platform functionality
   };
 
-  // Track if we've already initialized platforms to prevent infinite loops
-  const [initializedPlatforms, setInitializedPlatforms] = useState<Set<string>>(new Set());
-
+  // Initialize platforms when component mounts
   useEffect(() => {
-    if (platforms && platforms.length > 0 && typographyPlatforms) {
-      console.log('Initializing typography for platforms:', platforms);
+    if (platforms && platforms.length > 0 && (!activePlatform || activePlatform === '')) {
+      // Set the first platform as active if none is selected
+      console.log('Setting initial platform:', platforms[0].id);
+      setCurrentPlatform(platforms[0].id);
       
-      // Create a list of platforms that need initialization
-      const platformsToInitialize = platforms.filter((platform: any) => 
-        !initializedPlatforms.has(platform.id) && 
-        !typographyPlatforms.find((p: any) => p.id === platform.id)
-      );
-      
-      if (platformsToInitialize.length > 0) {
-        // Initialize typography settings for each platform if needed
-        platformsToInitialize.forEach(platform => {
-          console.log(`Initializing typography for platform: ${platform.id}`);
-          initializePlatform(platform.id);
-        });
-        
-        // Update our tracking set
-        const newInitialized = new Set(initializedPlatforms);
-        platformsToInitialize.forEach(p => newInitialized.add(p.id));
-        setInitializedPlatforms(newInitialized);
-      }
-      
-      // Set current platform if none selected
-      if (!activePlatform && platforms[0]) {
-        console.log(`Setting current platform to: ${platforms[0].id}`);
-        setCurrentPlatform(platforms[0].id);
+      // Initialize the platform if needed
+      if (typographyPlatforms && !typographyPlatforms.some((p: Platform) => p.id === platforms[0].id)) {
+        console.log('Initializing platform:', platforms[0].id);
+        initializePlatform(platforms[0].id);
+        setInitializedPlatforms(prev => [...prev, platforms[0].id]);
       }
     }
-  }, [platforms, typographyPlatforms, activePlatform, initializePlatform, setCurrentPlatform, fetchTypographySettings, fetchTypeStyles, initializedPlatforms]);
+  }, [platforms, typographyPlatforms, activePlatform, setCurrentPlatform, initializePlatform]);
 
   useEffect(() => {
     // Add a flag to prevent multiple loads
     const loadFontsOnce = async () => {
-      // Use a static flag to prevent multiple loads
-      if (!(window as any).__fontsLoaded) {
+      // Check if fonts are loaded either by window flag or by checking the array
+      if (!(window as any).__fontsLoaded || !fonts || fonts.length === 0) {
         console.log('Loading fonts from properties panel...');
-        await loadFonts();
+        await safeLoadFonts();
         (window as any).__fontsLoaded = true;
         
         if (currentBrand?.id) {
           console.log('Loading brand typography for brand:', currentBrand.id);
-          await loadBrandTypography(currentBrand.id);
+          await safeLoadBrandTypography(currentBrand.id);
         }
       }
     };
 
     loadFontsOnce();
-    
-    // Remove any delayed checks or other font loading triggers
-    
-  }, [currentBrand?.id]); // Remove loadFonts and loadBrandTypography from dependencies
+  }, [fonts, currentBrand]); // Remove loadFonts and loadBrandTypography to avoid the error if they don't exist
+
+  // Use a separate useEffect for initialization checks that depend on currentBrand
+  useEffect(() => {
+    // Add initialization logic that depends on currentBrand
+    if (currentBrand?.id) {
+      console.log('Brand changed, ensuring typography data is loaded');
+      // Add any logic here that should run when currentBrand changes
+    }
+  }, [currentBrand?.id]);
 
   useEffect(() => {
     if (activePlatform && !typographyPlatforms?.find((p: Platform) => p.id === activePlatform)) {
@@ -408,10 +453,12 @@ export function PropertiesPanel() {
     id: activePlatform || 'default',
     name: 'Default',
     scaleMethod: 'modular' as ScaleMethod,
-    baseSize: 16,
-    ratio: 1.2,
-    stepsUp: 3,
-    stepsDown: 2,
+    scale: {
+      baseSize: 16,
+      ratio: 1.2,
+      stepsUp: 3,
+      stepsDown: 2
+    },
     units: {
       typography: 'rem',
       spacing: 'rem',
@@ -441,10 +488,10 @@ export function PropertiesPanel() {
   
   useEffect(() => {
     // Only log once when fonts are loaded
-    if (fonts.length > 0) {
+    if (fonts && fonts.length > 0) {
       console.log('Fonts loaded:', fonts.length);
     }
-  }, [fonts.length]); // Only depend on the length, not the entire array
+  }, [fonts?.length]); // Use optional chaining to safely access length
 
   // Add a useEffect to ensure platforms are loaded and available for selection
   useEffect(() => {
@@ -1255,11 +1302,29 @@ ${currentSettings.aiScale.reasoning || ''}
             value={currentFontRole || 'primary'} 
             onValueChange={(value) => {
               const typedValue = value as 'primary' | 'secondary' | 'tertiary';
+              
+              if (!activePlatform) {
+                console.error('No active platform selected');
+                toast.error("Error", {
+                  description: "No platform selected - please select a platform first"
+                });
+                return;
+              }
+              
               handleFontRoleChange(typedValue);
-              updatePlatform(activePlatform, {
-                currentFontRole: typedValue
-              });
-              setCurrentFontRole(typedValue);
+              
+              // Use updatePlatform directly for font role since it's a UI-only state
+              try {
+                updatePlatform(activePlatform, {
+                  currentFontRole: typedValue
+                });
+                setCurrentFontRole(typedValue);
+              } catch (error) {
+                console.error('Error updating font role:', error);
+                toast.error("Error", {
+                  description: "An error occurred while updating font role"
+                });
+              }
             }}
           >
             <SelectTrigger className="text-xs">
@@ -1289,13 +1354,21 @@ ${currentSettings.aiScale.reasoning || ''}
                 const method = value as ScaleMethod;
                 console.log(`Changing scale method to: ${method}`);
                 
+                if (!activePlatform) {
+                  console.error('No active platform selected');
+                  toast.error("Error", {
+                    description: "No platform selected - please select a platform first"
+                  });
+                  return;
+                }
+                
                 // If switching to AI method, ensure AI settings are initialized
                 if (method === 'ai') {
                   // Initialize AI settings if they don't exist or are incomplete
                   const currentScale = currentSettings.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
                   
-                  // Use saveTypographySettings instead of updatePlatform for scale method changes
-                  saveTypographySettings(activePlatform, {
+                  // Use safeSaveTypographySettings instead of saveTypographySettings
+                  safeSaveTypographySettings(activePlatform, {
                     scaleMethod: method,
                     aiScale: currentSettings.aiScale || {
                       recommendedBaseSize: currentScale.baseSize,
@@ -1310,8 +1383,8 @@ ${currentSettings.aiScale.reasoning || ''}
                   });
                 } else {
                   // For other methods, just update the scale method
-                  // Use saveTypographySettings instead of updatePlatform for scale method changes
-                  saveTypographySettings(activePlatform, { 
+                  // Use safeSaveTypographySettings instead of saveTypographySettings
+                  safeSaveTypographySettings(activePlatform, { 
                     scaleMethod: method 
                   });
                 }
@@ -1357,8 +1430,13 @@ ${currentSettings.aiScale.reasoning || ''}
                   <Select
                     value={currentSettings?.scale?.ratio?.toString() || "1.2"}
                     onValueChange={(value) => {
-                      if (!currentSettings?.scale) return;
-                      handleScaleChange(parseFloat(value), currentSettings.scale.baseSize)
+                      // Use saveTypographySettings instead of updatePlatform for scale changes
+                      saveTypographySettings(activePlatform, {
+                        scale: {
+                          ...((currentSettings?.scale) || {}),
+                          ratio: parseFloat(value)
+                        }
+                      });
                     }}
                   >
                     <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
@@ -1385,20 +1463,33 @@ ${currentSettings.aiScale.reasoning || ''}
                     type="number"
                     min="8"
                     max="40"
-                    value={currentSettings.scale.baseSize}
+                    value={currentSettings?.scale?.baseSize || 16}
                     onChange={(e) => {
                       const newBaseSize = parseFloat(e.target.value);
                       console.log("Setting Base Size to:", newBaseSize);
                       
                       // Use setTimeout to ensure this update happens in a separate tick
                       setTimeout(() => {
-                        // Use saveTypographySettings instead of updatePlatform for scale changes
-                        saveTypographySettings(activePlatform, {
-                          scale: {
-                            ...(currentSettings.scale || {}),
-                            baseSize: newBaseSize
+                        try {
+                          if (activePlatform) {
+                            safeSaveTypographySettings(activePlatform, {
+                              scale: {
+                                ...((currentSettings?.scale) || {}),
+                                baseSize: newBaseSize
+                              }
+                            });
+                          } else {
+                            console.error('No active platform selected');
+                            toast.error("Error", {
+                              description: "No platform selected - please select a platform first"
+                            });
                           }
-                        });
+                        } catch (error) {
+                          console.error('Error updating typography settings:', error);
+                          toast.error("Error", {
+                            description: "An error occurred while updating settings"
+                          });
+                        }
                       }, 0);
                     }}
                     className="text-xs h-8"
@@ -1412,7 +1503,7 @@ ${currentSettings.aiScale.reasoning || ''}
                       type="number"
                       min="0"
                       max="10"
-                      value={currentSettings.scale.stepsUp}
+                      value={currentSettings?.scale?.stepsUp || 3}
                       onChange={(e) => {
                         const newValue = parseInt(e.target.value);
                         console.log("Setting Steps Up to:", newValue);
@@ -1421,7 +1512,7 @@ ${currentSettings.aiScale.reasoning || ''}
                           // Use saveTypographySettings instead of updatePlatform for scale changes
                           saveTypographySettings(activePlatform, {
                             scale: {
-                              ...(currentSettings.scale || {}),
+                              ...((currentSettings?.scale) || {}),
                               stepsUp: newValue
                             }
                           });
@@ -1436,7 +1527,7 @@ ${currentSettings.aiScale.reasoning || ''}
                       type="number"
                       min="0"
                       max="10"
-                      value={currentSettings.scale.stepsDown}
+                      value={currentSettings?.scale?.stepsDown || 2}
                       onChange={(e) => {
                         const newValue = parseInt(e.target.value);
                         console.log("Setting Steps Down to:", newValue);
@@ -1445,7 +1536,7 @@ ${currentSettings.aiScale.reasoning || ''}
                           // Use saveTypographySettings instead of updatePlatform for scale changes
                           saveTypographySettings(activePlatform, {
                             scale: {
-                              ...(currentSettings.scale || {}),
+                              ...((currentSettings?.scale) || {}),
                               stepsDown: newValue
                             }
                           });
@@ -2344,6 +2435,52 @@ ${prompt.result?.reasoning || ''}
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Add this after the typography settings section */}
+      <div className="space-y-4">
+        <div className="px-4 py-2 bg-muted/50 rounded-md">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Platform Settings</h3>
+          </div>
+          
+          <div className="mt-2">
+            <Label className="text-xs">Select Platform</Label>
+            <Select
+              value={activePlatform || ''}
+              onValueChange={(value) => {
+                if (value) {
+                  console.log(`Setting current platform to: ${value}`);
+                  setCurrentPlatform(value);
+                  
+                  // Initialize the platform if needed
+                  if (typographyPlatforms && !typographyPlatforms.some((p: Platform) => p.id === value)) {
+                    console.log(`Initializing platform: ${value}`);
+                    initializePlatform(value);
+                  }
+                }
+              }}
+            >
+              <SelectTrigger className="text-xs h-8">
+                <SelectValue placeholder="Select platform" />
+              </SelectTrigger>
+              <SelectContent>
+                {platforms && platforms.map((platform) => (
+                  <SelectItem key={platform.id} value={platform.id}>
+                    {platform.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!activePlatform && (
+              <p className="text-xs text-red-500 mt-1">
+                Please select a platform to continue
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Rest of the component */}
+      </div>
     </div>
   )
 }
@@ -2478,6 +2615,7 @@ function ModularScaleTab({
             
             // Use setTimeout to ensure this update happens in a separate tick
             setTimeout(() => {
+              // Use updatePlatform directly since it's passed as a prop
               updatePlatform(platform.id, {
                 scale: {
                   ...(platform.scale || {}),
@@ -2503,6 +2641,7 @@ function ModularScaleTab({
             
             // Use setTimeout to ensure this update happens in a separate tick
             setTimeout(() => {
+              // Use updatePlatform directly since it's passed as a prop
               updatePlatform(platform.id, {
                 scale: {
                   ...(platform.scale || {}),
