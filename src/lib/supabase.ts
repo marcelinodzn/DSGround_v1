@@ -382,7 +382,7 @@ const createMockClient = () => {
 };
 
 // Initialize the mock client
-supabaseClient = createMockClient();
+supabaseClient = createMockClient() as any;
 
 // Function to get the Supabase client
 export const getSupabaseClient = () => {
@@ -394,7 +394,7 @@ export const getSupabaseClient = () => {
     if (!supabaseUrl || !supabaseAnonKey) {
       console.warn('Missing Supabase environment variables, using mock client for static generation')
       // Instead of throwing an error, create a mock client for static generation
-      supabaseClient = createMockClient()
+      supabaseClient = createMockClient() as any
       return supabaseClient
     }
     
@@ -421,6 +421,32 @@ export const getSupabaseClient = () => {
     )
   }
   return supabaseClient
+}
+
+// Helper function to check if we have an authenticated session
+export const hasAuthSession = async () => {
+  const client = getSupabaseClient()
+  try {
+    const { data } = await client.auth.getSession()
+    return !!data.session
+  } catch (error) {
+    console.warn('Error checking auth session:', error)
+    return false
+  }
+}
+
+/**
+ * Get the current authenticated user's ID
+ * Returns null if not authenticated instead of throwing an error
+ */
+export const getCurrentUserId = async (): Promise<string | null> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.user?.id || null
+  } catch (error) {
+    console.warn('Error getting current user ID:', error)
+    return null
+  }
 }
 
 // Export the Supabase client
