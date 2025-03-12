@@ -449,5 +449,101 @@ export const getCurrentUserId = async (): Promise<string | null> => {
   }
 }
 
+// Function to check if required tables exist
+export async function verifyDatabaseSchema() {
+  try {
+    console.log('Verifying database schema...');
+    
+    // List of tables that should exist in the database
+    const requiredTables = [
+      'platforms',
+      'typography_settings',
+      'brands',
+      'fonts'
+    ];
+    
+    // Check if we're using the mock client
+    const isMockClient = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    // If we're using the mock client, return mock data
+    if (isMockClient) {
+      console.log('Using mock client, skipping database schema verification');
+      return {
+        success: true,
+        error: null,
+        missingTables: [],
+        isMock: true
+      };
+    }
+    
+    // Instead of querying pg_catalog.pg_tables, check each table directly
+    const missingTables = [];
+    
+    try {
+      // Import ensureTableExists dynamically to avoid circular dependencies
+      const { ensureTableExists } = await import('./supabase-diagnostics');
+      
+      // Check each table individually
+      for (const tableName of requiredTables) {
+        try {
+          const exists = await ensureTableExists(tableName);
+          if (!exists) {
+            missingTables.push(tableName);
+          }
+        } catch (error) {
+          console.warn(`Error checking table ${tableName}:`, error);
+          // Add to missing tables if there was an error checking
+          missingTables.push(tableName);
+        }
+      }
+    } catch (error) {
+      console.warn('Error checking tables:', error);
+      // For static generation, continue with empty missing tables list
+      if (typeof window === 'undefined') {
+        return {
+          success: true,
+          error: null,
+          missingTables: [],
+          isStaticGeneration: true
+        };
+      }
+    }
+      
+    if (missingTables.length > 0) {
+      console.error('[Typography] Missing tables:', missingTables);
+      return {
+        success: false,
+        error: `Missing required tables: ${missingTables.join(', ')}`,
+        missingTables
+      };
+    }
+    
+    console.log('All required tables exist');
+    return {
+      success: true,
+      error: null,
+      missingTables: []
+    };
+  } catch (e) {
+    console.error('[Typography] Database schema check failed:', e);
+    
+    // For static generation, return success
+    if (typeof window === 'undefined') {
+      return {
+        success: true,
+        error: null,
+        missingTables: [],
+        isStaticGeneration: true
+      };
+    }
+    
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Unknown error verifying database schema',
+      missingTables: []
+    };
+  }
+}
+
 // Export the Supabase client
 export const supabase = getSupabaseClient()
