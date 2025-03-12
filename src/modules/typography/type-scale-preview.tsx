@@ -19,6 +19,17 @@ import { useFontStore } from "@/store/font-store"
 import { Badge } from "@/components/ui/badge"
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 
+// Helper function to get fallback fonts based on font category
+const getFontCategoryFallback = (category: string): string => {
+  switch(category) {
+    case 'serif': return 'Georgia, Times, serif';
+    case 'monospace': return 'Consolas, "Courier New", monospace';
+    case 'display': return 'Impact, fantasy';
+    case 'handwriting': return 'cursive';
+    default: return 'Arial, Helvetica, sans-serif';
+  }
+}
+
 interface ScaleViewProps {
   scaleValues: Array<{
     label: string
@@ -182,22 +193,6 @@ interface StylesViewProps {
   }>
   units?: Platform['units']
   baseSize: number
-}
-
-// Add helper function for font fallbacks
-const getFontCategoryFallback = (category: string) => {
-  switch (category) {
-    case 'serif':
-      return 'serif'
-    case 'monospace':
-      return 'monospace'
-    case 'display':
-      return 'cursive'
-    case 'handwriting':
-      return 'cursive'
-    default:
-      return 'sans-serif'
-  }
 }
 
 // Update the StylesView component to use the Table component for a consistent look with the scale view
@@ -380,6 +375,9 @@ export function TypeScalePreview() {
   const { brandTypography, fonts, loadFonts, loadBrandTypography } = useFontStore()
   const router = useRouter()
   const [view, setView] = useState<string>('scale')
+  // Add loading state to prevent UI blocking
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Always define these memoized values unconditionally
   const currentTypography = useMemo(() => 
@@ -403,10 +401,16 @@ export function TypeScalePreview() {
     platformSettings.find(p => p.id === currentPlatform)
   , [platformSettings, currentPlatform])
 
-  // Get scale values - must be called unconditionally
-  const scaleValues = useMemo(() => 
-    activePlatform ? getScaleValues(activePlatform) : []
-  , [
+  // Get scale values - must be called unconditionally, with safety checks
+  const scaleValues = useMemo(() => {
+    try {
+      return activePlatform ? getScaleValues(activePlatform) : []
+    } catch (err) {
+      console.error("Error getting scale values:", err)
+      setError("Failed to load scale values")
+      return []
+    }
+  }, [
     activePlatform, 
     getScaleValues,
     // Add dependencies for scale properties to ensure recalculation when they change
@@ -432,28 +436,37 @@ export function TypeScalePreview() {
     }
   }, [activePlatform, currentBrand, loadBrandTypography, fetchPlatformsByBrand])
 
-  // Compute font family - must be called unconditionally
-  const fontFamily = useMemo(() => {
-    if (!currentTypography || !platform?.currentFontRole) return undefined
-    const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
-    if (!fontId) return undefined
-    
-    const font = fonts.find(f => f.id === fontId)
-    
-    // Define fallback fonts based on category
-    let fallbackFonts = 'sans-serif';
-    if (font?.category) {
-      switch(font.category) {
-        case 'serif': fallbackFonts = 'Georgia, Times, serif'; break;
-        case 'monospace': fallbackFonts = 'Consolas, "Courier New", monospace'; break;
-        case 'display': fallbackFonts = 'Impact, fantasy'; break;
-        case 'handwriting': fallbackFonts = 'cursive'; break;
-        default: fallbackFonts = 'Arial, Helvetica, sans-serif';
-      }
+  // Current font info - must be called unconditionally with safety checks
+  const currentFontInfo = useMemo(() => {
+    try {
+      if (!currentTypography || !platform?.currentFontRole) return null
+      const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
+      if (!fontId) return null
+      
+      const font = fonts.find(f => f.id === fontId)
+      return font ? {
+        name: font.family,
+        role: platform.currentFontRole,
+        category: font.category || 'sans-serif'
+      } : null
+    } catch (err) {
+      console.error("Error getting current font info:", err)
+      return null
     }
-    
-    return font ? `"${font.family}", ${fallbackFonts}` : undefined
   }, [currentTypography, platform?.currentFontRole, fonts])
+
+  // Font family calculation with safety checks
+  const fontFamily = useMemo(() => {
+    if (!currentFontInfo) return undefined
+    try {
+      // Add default fallback fonts if none are found
+      const fallbackFonts = getFontCategoryFallback(currentFontInfo.category || 'sans-serif')
+      return `"${currentFontInfo.name}", ${fallbackFonts}`
+    } catch (err) {
+      console.error("Error calculating font family:", err)
+      return undefined
+    }
+  }, [currentFontInfo])
 
   // Handle DOM side effects for font loading in a separate effect
   useEffect(() => {
@@ -466,12 +479,16 @@ export function TypeScalePreview() {
     if (typeof document !== 'undefined') {
       // Use requestAnimationFrame to ensure this happens after render
       const id = requestAnimationFrame(() => {
-        const styleEl = document.createElement('style');
-        styleEl.textContent = `:root { --fallback-fonts: ${fallbackFonts}; }`;
-        document.head.appendChild(styleEl);
-        
-        // Set the font family on the document root to ensure it loads
-        document.documentElement.style.setProperty('--current-font', fontName);
+        try {
+          const styleEl = document.createElement('style');
+          styleEl.textContent = `:root { --fallback-fonts: ${fallbackFonts}; }`;
+          document.head.appendChild(styleEl);
+          
+          // Set the font family on the document root to ensure it loads
+          document.documentElement.style.setProperty('--current-font', fontName);
+        } catch (err) {
+          console.error("Error setting font styles:", err)
+        }
       });
       
       // Clean up
@@ -480,20 +497,6 @@ export function TypeScalePreview() {
       };
     }
   }, [fontFamily]);
-
-  // Current font info - must be called unconditionally
-  const currentFontInfo = useMemo(() => {
-    if (!currentTypography || !platform?.currentFontRole) return null
-    const fontId = currentTypography[`${platform.currentFontRole}_font_id`]
-    if (!fontId) return null
-    
-    const font = fonts.find(f => f.id === fontId)
-    return font ? {
-      name: font.family,
-      role: platform.currentFontRole,
-      category: font.category || 'sans-serif'
-    } : null
-  }, [currentTypography, platform?.currentFontRole, fonts])
 
   const viewTabs = [
     { id: 'scale', label: 'Scale View' },
@@ -520,6 +523,24 @@ export function TypeScalePreview() {
     platform?.scale?.stepsUp, 
     platform?.scale?.stepsDown
   ]);
+
+  // If there's an error, show it
+  if (error) {
+    return (
+      <div className="w-full">
+        <div className="flex items-center justify-center h-[200px] text-red-500">
+          <div className="text-center">
+            <p className="mb-4">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()}
+            >
+              Reload Page
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Early return if no platforms are available - AFTER all hooks are called
   if (platformSettings.length === 0) {
@@ -559,24 +580,44 @@ export function TypeScalePreview() {
     )
   }
 
+  // Safety check for required properties
+  if (!platform.scale || !platform.scaleMethod) {
+    return (
+      <div className="flex items-center justify-center h-[200px] text-amber-500">
+        <div className="text-center">
+          <p className="mb-4">Platform scale configuration is incomplete</p>
+          <Button 
+            onClick={() => router.push('/settings/platforms')}
+          >
+            Configure Platform
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // Now we can safely use these values - calculate derived state AFTER all hooks
   const { scaleMethod, scale, distanceScale } = platform
-  const typographyUnit = platformSetting.units.typography
+  const typographyUnit = platformSetting.units?.typography || 'px'
 
-  // Calculate the correct base size based on scale method
-  let displayBaseSize = scale.baseSize
-  if (scaleMethod === 'distance' && distanceScale) {
-    const calculated = calculateDistanceBasedSize(
-      distanceScale.viewingDistance,
-      distanceScale.visualAcuity,
-      distanceScale.meanLengthRatio,
-      distanceScale.textType,
-      distanceScale.lighting,
-      distanceScale.ppi
-    )
-    displayBaseSize = Math.round(calculated * 100) / 100
-  } else {
-    displayBaseSize = Math.round(scale.baseSize * 100) / 100
+  // Calculate the correct base size based on scale method with safety checks
+  let displayBaseSize = 16 // Default fallback
+  try {
+    if (scaleMethod === 'distance' && distanceScale) {
+      const calculated = calculateDistanceBasedSize(
+        distanceScale.viewingDistance,
+        distanceScale.visualAcuity,
+        distanceScale.meanLengthRatio,
+        distanceScale.textType,
+        distanceScale.lighting,
+        distanceScale.ppi
+      )
+      displayBaseSize = Math.round(calculated * 100) / 100
+    } else {
+      displayBaseSize = Math.round(scale.baseSize * 100) / 100
+    }
+  } catch (err) {
+    console.error("Error calculating base size:", err)
   }
 
   // Add debugging to log the scale values
@@ -602,9 +643,9 @@ export function TypeScalePreview() {
           <div className="py-4 text-sm text-muted-foreground">
             Base Size: {displayBaseSize}{typographyUnit}
             {scaleMethod === 'distance' && ' (distance-based)'} • 
-            Scale Ratio: {scale.ratio} • 
-            Steps Up: {scale.stepsUp} • 
-            Steps Down: {scale.stepsDown}
+            Scale Ratio: {scale.ratio || 1.2} • 
+            Steps Up: {scale.stepsUp || 3} • 
+            Steps Down: {scale.stepsDown || 2}
             {platform?.currentFontRole && fontFamily && (
               <>
                 <span className="ml-2">•</span>
@@ -626,18 +667,18 @@ export function TypeScalePreview() {
           <div className="min-w-0 overflow-x-auto">
             {view === 'scale' ? (
               <ScaleView 
-                key={`scale-view-${platform.id}-${platform.scale.baseSize}-${platform.scale.ratio}-${platform.scale.stepsUp}-${platform.scale.stepsDown}-${refreshKey}`}
+                key={`scale-view-${platform.id}-${platform.scale.baseSize || 16}-${platform.scale.ratio || 1.2}-${platform.scale.stepsUp || 3}-${platform.scale.stepsDown || 2}-${refreshKey}`}
                 baseSize={displayBaseSize}
                 fontFamily={fontFamily}
                 typographyUnit={typographyUnit}
                 platformId={platform.id}
-                scaleValues={scaleValues}
+                scaleValues={scaleValues || []}
               />
             ) : (
               <StylesView 
-                typeStyles={platform.typeStyles} 
-                scaleValues={scaleValues}
-                baseSize={scale.baseSize}
+                typeStyles={platform.typeStyles || []} 
+                scaleValues={scaleValues || []}
+                baseSize={scale.baseSize || 16}
               />
             )}
           </div>
