@@ -10,7 +10,16 @@ const createMockClient = () => {
   const loadMockDataFromStorage = (): Record<string, Array<Record<string, any>>> => {
     if (typeof window === 'undefined') {
       return {
-        brands: [],
+        brands: [
+          {
+            id: '1234-sample-brand-id',
+            name: 'Sample Brand',
+            description: 'This is a sample brand created by the mock client',
+            type: 'master',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ],
         platforms: [],
         typography_settings: [],
         fonts: []
@@ -22,6 +31,21 @@ const createMockClient = () => {
       if (storedData) {
         const parsedData = JSON.parse(storedData);
         console.log('[Mock] Loaded data from localStorage:', parsedData);
+        
+        // If no brands exist, add a sample brand
+        if (!parsedData.brands || parsedData.brands.length === 0) {
+          parsedData.brands = [
+            {
+              id: '1234-sample-brand-id',
+              name: 'Sample Brand',
+              description: 'This is a sample brand created by the mock client',
+              type: 'master',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+          ];
+        }
+        
         return parsedData;
       }
     } catch (error) {
@@ -29,7 +53,16 @@ const createMockClient = () => {
     }
     
     return {
-      brands: [],
+      brands: [
+        {
+          id: '1234-sample-brand-id',
+          name: 'Sample Brand',
+          description: 'This is a sample brand created by the mock client',
+          type: 'master',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ],
       platforms: [],
       typography_settings: [],
       fonts: []
@@ -318,4 +351,77 @@ const createMockClient = () => {
       console.log(`[Mock] Creating channel: ${name}`);
       return {
         on: (event: string, config: any, callback: Function) => {
-          console.log(`
+          console.log(`[Mock] Subscribing to ${event} on channel ${name}`);
+          return {
+            on: () => ({}),
+            subscribe: (statusCallback: Function) => {
+              console.log(`[Mock] Mock subscription to ${name}`);
+              // Call the status callback with SUBSCRIBED status
+              if (statusCallback && typeof statusCallback === 'function') {
+                setTimeout(() => statusCallback('SUBSCRIBED'), 0);
+              }
+              return {
+                unsubscribe: () => console.log(`[Mock] Unsubscribing from ${name}`)
+              };
+            }
+          };
+        },
+        subscribe: (callback: Function) => {
+          console.log(`[Mock] Mock subscription to ${name}`);
+          // Call the callback with SUBSCRIBED status
+          if (callback && typeof callback === 'function') {
+            setTimeout(() => callback('SUBSCRIBED'), 0);
+          }
+          return {
+            unsubscribe: () => console.log(`[Mock] Unsubscribing from ${name}`)
+          };
+        }
+      } as any;
+    },
+  };
+};
+
+// Initialize the mock client
+supabaseClient = createMockClient();
+
+// Function to get the Supabase client
+export const getSupabaseClient = () => {
+  if (!supabaseClient) {
+    // Make sure we have the required environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.warn('Missing Supabase environment variables, using mock client for static generation')
+      // Instead of throwing an error, create a mock client for static generation
+      supabaseClient = createMockClient()
+      return supabaseClient
+    }
+    
+    console.log('Initializing Supabase client with URL:', supabaseUrl)
+    
+    // Create the Supabase client with proper configuration
+    supabaseClient = createClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        },
+        global: {
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+          }
+        }
+      }
+    )
+  }
+  return supabaseClient
+}
+
+// Export the Supabase client
+export const supabase = getSupabaseClient()

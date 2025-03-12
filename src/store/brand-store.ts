@@ -39,19 +39,29 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
   fetchBrands: async () => {
     set({ isLoading: true })
     try {
+      console.log('Fetching brands...');
+      
       const { data, error } = await supabase
         .from('brands')
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching brands:', error);
+        throw error;
+      }
+      
+      console.log('Brands fetched successfully:', data);
+      
       set({ brands: data as unknown as Brand[], error: null })
 
       const state = get()
       if (!state.currentBrand && data.length > 0) {
+        console.log('Setting current brand to:', data[0]);
         set({ currentBrand: data[0] as unknown as Brand })
       }
     } catch (error) {
+      console.error('Failed to fetch brands:', error);
       set({ error: (error as Error).message })
     } finally {
       set({ isLoading: false })
@@ -61,18 +71,31 @@ export const useBrandStore = create<BrandStore>((set, get) => ({
   createBrand: async (brand) => {
     set({ isLoading: true })
     try {
+      console.log('Creating brand with data:', brand);
+      
       const { data, error } = await supabase
         .from('brands')
         .insert([brand])
         .select()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error creating brand:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.error('No data returned from brand creation');
+        throw new Error('No data returned from brand creation');
+      }
+      
+      console.log('Brand created successfully:', data[0]);
       
       set(state => ({
         brands: [...state.brands, data[0] as unknown as Brand],
         currentBrand: data[0] as unknown as Brand
       }))
     } catch (error) {
+      console.error('Failed to create brand:', error);
       set({ error: (error as Error).message })
     } finally {
       set({ isLoading: false })
