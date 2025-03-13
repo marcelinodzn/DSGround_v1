@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 
 /**
  * SupabaseSyncManager - Component to ensure proper synchronization with Supabase
@@ -47,7 +49,7 @@ export function SupabaseSyncManager() {
     checkAuth();
     
     // Subscribe to auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       console.log(`[SyncManager] Auth state changed: ${event}`, session ? 'Session exists' : 'No session');
       
       if (session) {
@@ -65,12 +67,12 @@ export function SupabaseSyncManager() {
         event: '*', 
         schema: 'public', 
         table: 'typography_settings' 
-      }, (payload) => {
+      }, (payload: RealtimePostgresChangesPayload<any>) => {
         console.log('[SyncManager] Typography settings changed:', payload);
         setSyncStatus('synced');
         setLastSyncTime(new Date());
       })
-      .subscribe((status) => {
+      .subscribe((status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
         console.log(`[SyncManager] Realtime subscription status:`, status);
         if (status === 'SUBSCRIBED') {
           console.log('[SyncManager] Successfully subscribed to typography changes');
