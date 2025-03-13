@@ -820,7 +820,7 @@ export const useTypographyStore = create<TypographyState>()(
               const idsToKeep = [existingSettings[0].id];
               const idsToDelete = existingSettings
                 .slice(1)
-                .map((s: TypographySettings) => s.id);
+                .map((s: { id: string }) => s.id);
               
               if (idsToDelete.length > 0) {
                 const { error: deleteError } = await supabase
