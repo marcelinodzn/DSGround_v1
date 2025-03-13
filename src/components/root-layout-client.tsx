@@ -127,10 +127,10 @@ const BrandDropdown = () => {
   
   return (
     <Select value={currentBrand?.id || ''} onValueChange={handleBrandChange}>
-      <SelectTrigger className="min-w-[180px] bg-transparent">
+      <SelectTrigger className="w-[160px] bg-transparent">
         <SelectValue aria-label={currentBrand?.name || 'Select brand'}>
           {currentBrand?.name ? (
-            <span className="text-foreground font-medium">{currentBrand.name || 'Unnamed Brand'}</span>
+            <span className="text-foreground font-medium truncate">{currentBrand.name || 'Unnamed Brand'}</span>
           ) : (
             "Select brand"
           )}
@@ -142,7 +142,7 @@ const BrandDropdown = () => {
             key={brand.id} 
             value={brand.id}
           >
-            <span className="text-foreground font-normal">
+            <span className="text-foreground font-normal truncate">
               {brand.name || `Brand ${brand.id.substring(0, 6)}`}
             </span>
           </SelectItem>
@@ -150,7 +150,7 @@ const BrandDropdown = () => {
         <SelectSeparator />
         <SelectItem key="new" value="new">
           <span className="text-primary font-medium flex items-center">
-            <Plus className="mr-1 h-4 w-4" /> Add brand
+            <Plus className="mr-1 h-4 w-4 flex-shrink-0" /> Add brand
           </span>
         </SelectItem>
       </SelectContent>
@@ -285,20 +285,20 @@ export function RootLayoutClient({
           isFullscreen ? "left-0" : "left-64",
           "right-0"
         )}>
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-6 max-w-[85%]">
             {showBrandSelector && <BrandDropdown />}
-            <Breadcrumb className="pl-[4px]">
-              <BreadcrumbList>
-                <BreadcrumbItem key="home">
+            <Breadcrumb className="pl-[4px] whitespace-nowrap overflow-hidden">
+              <BreadcrumbList className="flex-nowrap">
+                <BreadcrumbItem key="home" className="flex-shrink-0">
                   <BreadcrumbLink href="/">Design System Ground</BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbItems.map((item, index) => (
-                  <BreadcrumbItem key={`${item.href}-${index}`}>
+                  <BreadcrumbItem key={`${item.href}-${index}`} className="flex-shrink-0">
                     <BreadcrumbSeparator />
                     {index === breadcrumbItems.length - 1 ? (
-                      <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                      <BreadcrumbPage className="truncate max-w-[180px]">{item.label}</BreadcrumbPage>
                     ) : (
-                      <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
+                      <BreadcrumbLink href={item.href} className="truncate max-w-[180px]">{item.label}</BreadcrumbLink>
                     )}
                   </BreadcrumbItem>
                 ))}

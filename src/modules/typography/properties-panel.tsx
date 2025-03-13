@@ -131,10 +131,8 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                   value={typeStyle.scaleStep}
                   onValueChange={handleScaleStepChange}
                 >
-                  <SelectTrigger className="text-xs h-8">
-                    <SelectValue>
-                      {typeStyle.scaleStep}
-                    </SelectValue>
+                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {props.getScaleValues().map((scale) => (
@@ -189,7 +187,7 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                           : typeStyle.lineHeight
                     })}
                   >
-                    <SelectTrigger className="text-xs h-8 w-16">
+                    <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -237,7 +235,7 @@ function SortableTypeStyle({ style: typeStyle, typographyUnit, ...props }: Sorta
                     textTransform: value as 'none' | 'uppercase' | 'lowercase' | 'capitalize'
                   })}
                 >
-                  <SelectTrigger className="text-xs h-8">
+                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1440,7 +1438,7 @@ ${currentSettings.aiScale.reasoning || ''}
                     }}
                   >
                     <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                      <SelectValue placeholder="Select scale type" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
@@ -1566,7 +1564,7 @@ ${currentSettings.aiScale.reasoning || ''}
                     }}
                   >
                     <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                      <SelectValue placeholder="Select scale type" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
@@ -1776,7 +1774,7 @@ ${currentSettings.aiScale.reasoning || ''}
                           value={selectedContext}
                           onValueChange={setSelectedContext}
                         >
-                          <SelectTrigger className="text-xs h-8">
+                          <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                             <SelectValue placeholder="Select context" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1802,7 +1800,7 @@ ${currentSettings.aiScale.reasoning || ''}
                           value={selectedLocation}
                           onValueChange={setSelectedLocation}
                         >
-                          <SelectTrigger className="text-xs h-8">
+                          <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
                             <SelectValue placeholder="Select location" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1916,8 +1914,8 @@ ${currentSettings.aiScale.reasoning || ''}
                                     });
                                   }}
                                 >
-                                  <SelectTrigger className="text-xs h-8">
-                                    <SelectValue placeholder="Select scale type" />
+                                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                    <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
@@ -2103,8 +2101,8 @@ ${currentSettings.aiScale.reasoning || ''}
                                     });
                                   }}
                                 >
-                                  <SelectTrigger className="text-xs h-8">
-                                    <SelectValue placeholder="Select scale type" />
+                                  <SelectTrigger className="text-xs h-8 ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                    <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="1.067">Minor Second (1.067)</SelectItem>
