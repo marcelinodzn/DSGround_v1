@@ -19,4 +19,28 @@ export type ScaleValue = {
   platforms: {
     [key in Platform]: TypeStyle[]
   }
+}
+
+export interface TypographySettings {
+  id: string;
+  platformId: string;
+  brandId: string;
+  settings: {
+    typeStyles: Array<{
+      id: string;
+      name: string;
+      fontFamily: string;
+      fontSize: number;
+      lineHeight: number;
+      letterSpacing: number;
+      fontWeight: number;
+      scaleStep: number;
+    }>;
+    scale: {
+      baseSize: number;
+      ratio: number;
+    };
+  };
+  createdAt?: string;
+  updatedAt?: string;
 } 

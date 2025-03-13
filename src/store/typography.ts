@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { v4 as uuidv4 } from 'uuid'
 import { notifySyncStarted, notifySyncCompleted, notifySyncError } from '@/components/supabase-sync-manager'
+import { TypographySettings } from '@/types/typography'
 
 // Function to upload an image to Supabase storage
 export const uploadImageToStorage = async (base64Image: string, brandId: string, platformId: string): Promise<string | null> => {
@@ -819,7 +820,7 @@ export const useTypographyStore = create<TypographyState>()(
               const idsToKeep = [existingSettings[0].id];
               const idsToDelete = existingSettings
                 .slice(1)
-                .map(s => s.id);
+                .map((s: TypographySettings) => s.id);
               
               if (idsToDelete.length > 0) {
                 const { error: deleteError } = await supabase
