@@ -20,33 +20,58 @@ export default function NewPlatformPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!currentBrand) return
-
     setIsSubmitting(true)
+
     try {
-      const platform = await addPlatform(currentBrand.id, {
+      if (!currentBrand?.id) {
+        alert('Please select a brand first.')
+        setIsSubmitting(false)
+        return
+      }
+
+      console.log("Creating platform with data:", {
         name,
         description,
-        layout: {
-          gridColumns: 12,
-          gridGutter: 16,
-          containerPadding: 16,
-          icon: icon // Store icon in layout
-        },
+        brand_id: currentBrand.id,
+        icon
+      })
+
+      // Generate a timestamp for consistency
+      const now = new Date().toISOString();
+
+      const newPlatform = await addPlatform(currentBrand.id, {
+        name,
+        description: description || null,
+        // Add created_at and updated_at for consistency with validation
+        created_at: now,
+        updated_at: now,
         units: {
           typography: 'rem',
           spacing: 'rem',
           dimensions: 'px',
           borderWidth: 'px',
           borderRadius: 'px'
+        },
+        layout: {
+          gridColumns: 12,
+          gridGutter: 16,
+          containerPadding: 16,
+          icon: icon || undefined
         }
       })
-      router.push(`/platforms/${platform.id}`)
+
+      if (newPlatform) {
+        console.log('Platform created successfully:', newPlatform)
+        router.push(`/platforms/${newPlatform.id}`)
+      } else {
+        throw new Error('Failed to create platform')
+      }
     } catch (error) {
-      console.error('Failed to create platform:', error)
-    } finally {
-      setIsSubmitting(false)
+      console.error('Error creating platform:', error)
+      alert('Failed to create platform. Please try again.')
     }
+
+    setIsSubmitting(false)
   }
 
   return (

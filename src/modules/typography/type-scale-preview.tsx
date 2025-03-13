@@ -18,17 +18,23 @@ import { AnimatedTabs } from "@/components/ui/animated-tabs"
 import { useFontStore } from "@/store/font-store"
 import { Badge } from "@/components/ui/badge"
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
+import { getFontCategoryFallback, loadFontOnce, applyFontToElements } from '@/lib/font-utils'
 
-// Helper function to get fallback fonts based on font category
-const getFontCategoryFallback = (category: string): string => {
-  switch(category) {
-    case 'serif': return 'Georgia, Times, serif';
-    case 'monospace': return 'Consolas, "Courier New", monospace';
-    case 'display': return 'Impact, fantasy';
-    case 'handwriting': return 'cursive';
-    default: return 'Arial, Helvetica, sans-serif';
-  }
-}
+// Helper to create a font loader that's safe and cancellable
+const createSafeFontLoader = () => {
+  let isCancelled = false;
+  
+  const load = async (fontFamily: string, url: string, options = {}) => {
+    if (isCancelled) return null;
+    return loadFontOnce(fontFamily, url, options);
+  };
+  
+  const cancel = () => {
+    isCancelled = true;
+  };
+  
+  return { load, cancel };
+};
 
 interface ScaleViewProps {
   scaleValues: Array<{
@@ -95,44 +101,41 @@ const ScaleView = dynamic(() => Promise.resolve(({ baseSize, fontFamily, typogra
 
   // Load font if provided and ensure it's available for the preview
   useEffect(() => {
-    if (fontFamily && typeof document !== 'undefined') {
-      // The fontFamily string should be in format: "Font Name, category"
-      const fontName = fontFamily.split(',')[0]?.replace(/["']/g, '');
-      if (fontName) {
-        console.log(`Using font in preview: ${fontName}`);
-        
-        // Forcibly load the font to ensure it's available
-        document.fonts.ready.then(() => {
-          console.log(`Fonts ready, applying: ${fontName}`);
-          
-          // Add a style tag with @font-face to ensure the font is prioritized
-          const styleTag = document.createElement('style');
-          styleTag.textContent = `
-            .font-preview-container {
-              font-family: "${fontName}", var(--fallback-fonts);
-            }
-          `;
-          document.head.appendChild(styleTag);
-          
-          // Force browser to recognize font change
-          setTimeout(() => {
-            // Find and update all preview containers
-            document.querySelectorAll('.font-preview-container').forEach(element => {
-              // Apply inline style directly to ensure it overrides any cascading styles
-              (element as HTMLElement).style.fontFamily = `"${fontName}", var(--fallback-fonts)`;
-              element.classList.add('font-loaded');
-              
-              // Force a repaint
-              const currentDisplay = (element as HTMLElement).style.display;
-              (element as HTMLElement).style.display = 'none';
-              void (element as HTMLElement).offsetHeight; // Trigger a reflow
-              (element as HTMLElement).style.display = currentDisplay;
-            });
-            console.log(`Applied font to all preview containers: ${fontName}`);
-          }, 100);
-        });
+    if (!fontFamily || typeof document === 'undefined') return;
+    
+    // The fontFamily string should be in format: "Font Name, category"
+    const fontName = fontFamily.split(',')[0]?.replace(/["']/g, '');
+    if (!fontName) return;
+    
+    console.log(`Using font in preview: ${fontName}`);
+    
+    // Create a safe font loader that can be cancelled on cleanup
+    const fontLoader = createSafeFontLoader();
+    
+    // Apply the font to all preview containers
+    const applyFont = () => {
+      try {
+        applyFontToElements('.font-preview-container', fontName);
+        console.log(`Applied font to all preview containers: ${fontName}`);
+      } catch (err) {
+        console.error("Error applying font:", err);
       }
-    }
+    };
+    
+    // Wait for fonts to be ready before applying
+    document.fonts.ready.then(() => {
+      console.log(`Fonts ready, applying: ${fontName}`);
+      applyFont();
+    }).catch(err => {
+      console.warn("Error waiting for fonts to be ready:", err);
+      // Still try to apply the font even if fonts.ready fails
+      applyFont();
+    });
+    
+    // Clean up function
+    return () => {
+      fontLoader.cancel();
+    };
   }, [fontFamily]);
 
   return (
@@ -217,57 +220,72 @@ function StylesView({ typeStyles, scaleValues, baseSize }: StylesViewProps) {
   
   // Load all relevant fonts when component mounts
   useEffect(() => {
+    const fontLoader = createSafeFontLoader();
+    
     const loadFonts = async () => {
-      // First load style-specific fonts
-      const styleFontFamilies = typeStyles.map(style => style.fontFamily);
-      
-      // Then also load brand fonts if we have a current brand
-      let brandFonts: string[] = [];
-      if (currentBrand?.id && brandTypography[currentBrand.id]) {
-        const typography = brandTypography[currentBrand.id];
-        const fontIds = [
-          typography.primary_font_id, 
-          typography.secondary_font_id, 
-          typography.tertiary_font_id
-        ].filter(Boolean);
+      try {
+        // First load style-specific fonts
+        const styleFontFamilies = typeStyles.map(style => style.fontFamily);
         
-        // Find font families for each font ID
-        brandFonts = fontIds.map(id => {
-          const font = fonts.find(f => f.id === id);
-          return font ? font.family : '';
-        }).filter(Boolean);
-      }
-      
-      // Combine all unique font families
-      const allFontFamilies = [...new Set([...styleFontFamilies, ...brandFonts])];
-      
-      // Load each font that exists
-      for (const fontFamily of allFontFamilies) {
-        const font = fonts.find(f => f.family === fontFamily);
-        if (!font?.file_url) continue;
-        
-        try {
-          console.log(`Loading font for styles: ${font.family}`);
-          const fontFace = new FontFace(
-            font.family,
-            `url(${font.file_url})`,
-            {
-              weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
-              style: font.style || 'normal',
-            }
-          );
+        // Then also load brand fonts if we have a current brand
+        let brandFonts: string[] = [];
+        if (currentBrand?.id && brandTypography[currentBrand.id]) {
+          const typography = brandTypography[currentBrand.id];
+          const fontIds = [
+            typography.primary_font_id, 
+            typography.secondary_font_id, 
+            typography.tertiary_font_id
+          ].filter(Boolean);
           
-          const loadedFont = await fontFace.load();
-          document.fonts.add(loadedFont);
-          console.log(`Font loaded successfully: ${font.family}`);
-        } catch (error) {
-          console.error(`Error loading font ${font.family}:`, error);
+          // Find font families for each font ID
+          brandFonts = fontIds.map(id => {
+            const font = fonts.find(f => f.id === id);
+            return font ? font.family : '';
+          }).filter(Boolean);
         }
+        
+        // Combine all unique font families
+        const allFontFamilies = [...new Set([...styleFontFamilies, ...brandFonts])];
+        
+        // Load each font that exists, but limit to 3 concurrent loads
+        // to avoid overwhelming the browser
+        const loadFont = async (fontFamily: string) => {
+          const font = fonts.find(f => f.family === fontFamily);
+          if (!font?.file_url) return;
+          
+          try {
+            console.log(`Loading font for styles: ${font.family}`);
+            await fontLoader.load(
+              font.family,
+              font.file_url,
+              {
+                weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                style: font.style || 'normal',
+              }
+            );
+          } catch (error) {
+            console.error(`Error loading font ${font.family}:`, error);
+          }
+        };
+        
+        // Load fonts in batches of 3 to prevent performance issues
+        const BATCH_SIZE = 3;
+        for (let i = 0; i < allFontFamilies.length; i += BATCH_SIZE) {
+          const batch = allFontFamilies.slice(i, i + BATCH_SIZE);
+          await Promise.allSettled(batch.map(loadFont));
+        }
+      } catch (error) {
+        console.error('Error loading fonts:', error);
       }
     };
     
     loadFonts();
-  }, [typeStyles, fonts, currentBrand?.id, brandTypography])
+    
+    // Cleanup
+    return () => {
+      fontLoader.cancel();
+    };
+  }, [typeStyles, fonts, currentBrand?.id, brandTypography]);
   
   return (
     <Table>
@@ -468,33 +486,37 @@ export function TypeScalePreview() {
     }
   }, [currentFontInfo])
 
-  // Handle DOM side effects for font loading in a separate effect
+  // Handle DOM side effects for font loading in a separate effect with better error handling
   useEffect(() => {
     if (!fontFamily) return;
     
-    // Extract the fallback part after the comma
-    const fallbackFonts = fontFamily.split(',').slice(1).join(',').trim();
-    const fontName = fontFamily.split(',')[0].trim();
-    
-    if (typeof document !== 'undefined') {
-      // Use requestAnimationFrame to ensure this happens after render
-      const id = requestAnimationFrame(() => {
-        try {
-          const styleEl = document.createElement('style');
-          styleEl.textContent = `:root { --fallback-fonts: ${fallbackFonts}; }`;
-          document.head.appendChild(styleEl);
-          
-          // Set the font family on the document root to ensure it loads
-          document.documentElement.style.setProperty('--current-font', fontName);
-        } catch (err) {
-          console.error("Error setting font styles:", err)
-        }
-      });
+    try {
+      // Extract the fallback part after the comma
+      const fallbackFonts = fontFamily.split(',').slice(1).join(',').trim();
+      const fontName = fontFamily.split(',')[0].trim().replace(/["']/g, '');
       
-      // Clean up
-      return () => {
-        cancelAnimationFrame(id);
-      };
+      if (typeof document !== 'undefined') {
+        // Use requestAnimationFrame to ensure this happens after render
+        const id = requestAnimationFrame(() => {
+          try {
+            const styleEl = document.createElement('style');
+            styleEl.textContent = `:root { --fallback-fonts: ${fallbackFonts}; }`;
+            document.head.appendChild(styleEl);
+            
+            // Set the font family on the document root to ensure it loads
+            document.documentElement.style.setProperty('--current-font', fontName);
+          } catch (err) {
+            console.error("Error setting font styles:", err);
+          }
+        });
+        
+        // Clean up
+        return () => {
+          cancelAnimationFrame(id);
+        };
+      }
+    } catch (err) {
+      console.error("Error processing font family:", err);
     }
   }, [fontFamily]);
 

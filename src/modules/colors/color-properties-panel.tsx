@@ -1029,11 +1029,12 @@ export function ColorPropertiesPanel() {
               {/* Out of Gamut Warning Toggle */}
               <div className="flex items-center justify-between mt-4">
                 <Label htmlFor="show-out-of-gamut" className="text-sm">Show Out-of-Gamut Warning</Label>
-                <button
+                <div
+                  role="switch"
+                  aria-checked={showOutOfGamut}
                   id="show-out-of-gamut"
-                  type="button"
                   className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer",
                     showOutOfGamut ? "bg-primary" : "bg-muted"
                   )}
                   onClick={() => setShowOutOfGamut(!showOutOfGamut)}
@@ -1044,7 +1045,7 @@ export function ColorPropertiesPanel() {
                       showOutOfGamut ? "translate-x-6" : "translate-x-1"
                     )}
                   />
-                </button>
+                </div>
               </div>
               <div className="text-xs text-muted-foreground">
                 Shows warnings for colors that cannot be accurately displayed in the selected color space.

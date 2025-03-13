@@ -6,6 +6,13 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000', 'localhost:3001', 'localhost:3002', 'localhost:3003', 'localhost:3004', 'localhost:3005'],
     },
   },
+  // Disable webpack persistent caching to prevent ENOENT errors
+  webpack: (config, { dev, isServer }) => {
+    // Disable the persistent caching
+    config.cache = false;
+    
+    return config;
+  },
   // Improve static file handling
   poweredByHeader: false,
   // Ensure static files are properly cached

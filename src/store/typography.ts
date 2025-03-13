@@ -362,6 +362,11 @@ const initialPlatforms: Platform[] = [
   },
 ]
 
+// Add a circuit breaker to prevent too many consecutive updates
+let consecutiveUpdates: Record<string, { count: number, lastUpdate: number }> = {};
+const UPDATE_THRESHOLD = 5;  // Max updates allowed in 1 second
+const UPDATE_WINDOW = 1000;  // Time window in milliseconds
+
 export const useTypographyStore = create<TypographyState>()(
   persist(
     (set, get) => ({
@@ -461,162 +466,138 @@ export const useTypographyStore = create<TypographyState>()(
       },
 
       updatePlatform: (platformId: string, updates: Partial<Platform>) => {
-        // First check if platform exists in state
-        console.log(`[Typography] updatePlatform called for ${platformId}`, updates);
-
-        const state = get() as TypographyState;
-        const existingPlatform = state.platforms.find((p: Platform) => p.id === platformId);
-        const platformExists = !!existingPlatform;
+        // Circuit breaker to prevent excessive updates
+        // Track consecutive updates for each platform to prevent infinite loops
+        const consecutiveUpdates = {
+          count: 0,
+          lastUpdate: 0,
+          platformIds: {} as Record<string, {count: number, lastUpdate: number}>
+        };
         
-        // Check if there are actual changes to avoid unnecessary updates
-        if (platformExists && existingPlatform && Object.keys(updates).length > 0) {
-          // Check if any values are actually different
-          let hasChanges = false;
-          
-          for (const key in updates) {
-            if (key === 'units' && updates.units) {
-              // Special handling for units object
-              const existingUnits = existingPlatform.units || {};
-              const updatedUnits = updates.units;
-              
-              for (const unitKey in updatedUnits) {
-                if (existingUnits[unitKey as keyof typeof existingUnits] !== 
-                    updatedUnits[unitKey as keyof typeof updatedUnits]) {
-                  hasChanges = true;
-                  break;
-                }
-              }
-            } else if (key === 'scale' && updates.scale) {
-              // Special handling for scale object
-              const existingScale = existingPlatform.scale || {};
-              const updatedScale = updates.scale;
-              
-              for (const scaleKey in updatedScale) {
-                if (existingScale[scaleKey as keyof typeof existingScale] !== 
-                    updatedScale[scaleKey as keyof typeof updatedScale]) {
-                  hasChanges = true;
-                  break;
-                }
-              }
-            } else if (JSON.stringify(existingPlatform[key as keyof Platform]) !== 
-                       JSON.stringify(updates[key as keyof Partial<Platform>])) {
-              hasChanges = true;
-              break;
-            }
-          }
-          
-          if (!hasChanges) {
-            console.log(`No actual changes detected for platform ${platformId}, skipping update`);
-            return;
-          }
+        if (!consecutiveUpdates.platformIds[platformId]) {
+          consecutiveUpdates.platformIds[platformId] = { count: 0, lastUpdate: Date.now() };
         }
         
-        if (!platformExists) {
-          console.log(`Platform ${platformId} not found, initializing it first`);
-          // Create a default platform with this ID
-          const defaultPlatform: Platform = {
-            id: platformId,
-            name: 'New Platform',
-            scaleMethod: 'modular',
-            scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
-            units: { 
-              typography: 'px', 
-              spacing: 'px', 
-              dimensions: 'px', 
-              borderWidth: 'px', 
-              borderRadius: 'px' 
-            },
-            distanceScale: {
-              viewingDistance: 400,
-              visualAcuity: 1,
-              meanLengthRatio: 5,
-              textType: 'continuous',
-              lighting: 'good',
-              ppi: 96
-            },
-            accessibility: {
-              minContrastBody: 4.5,
-              minContrastLarge: 3
-            },
-            typeStyles: []
-          };
-          
-          // Add the new platform to state
-          set((state: TypographyState) => ({
-            ...state,
-            platforms: [...state.platforms, { ...defaultPlatform, ...updates }]
-          }));
+        // If we've had too many updates in a short period, skip this one
+        const platformUpdates = consecutiveUpdates.platformIds[platformId];
+        const now = Date.now();
+        const timeSinceLastUpdate = now - platformUpdates.lastUpdate;
+        
+        // Reset counter if it's been more than 1 second since last update
+        if (timeSinceLastUpdate > 1000) {
+          platformUpdates.count = 0;
+        }
+        
+        // Update counters
+        platformUpdates.count++;
+        platformUpdates.lastUpdate = now;
+        
+        // Circuit breaker: if too many updates in succession, skip this one
+        if (platformUpdates.count > 5) {
+          console.warn(`[Typography] Too many updatePlatform calls for ${platformId} (${platformUpdates.count}), skipping to prevent loop`);
           return;
         }
         
-        // If platform exists, update it
+        // First check if platform exists in state
         set((state: TypographyState) => {
-          // Ensure units property has all required fields
-          let updatedUnits = updates.units as Platform['units'] | undefined;
-          if (updatedUnits) {
-            const platform = state.platforms.find((p: Platform) => p.id === platformId);
-            if (platform) {
-              updatedUnits = {
-                typography: updatedUnits.typography || platform.units.typography || 'px',
-                spacing: updatedUnits.spacing || platform.units.spacing || 'px',
-                dimensions: updatedUnits.dimensions || platform.units.dimensions || 'px',
-                borderWidth: updatedUnits.borderWidth || platform.units.borderWidth || 'px',
-                borderRadius: updatedUnits.borderRadius || platform.units.borderRadius || 'px'
+          const existingPlatformIndex = state.platforms.findIndex(p => p.id === platformId);
+          const platformExists = existingPlatformIndex !== -1;
+          
+          console.log(`[Typography] Updating platform ${platformId}. Platform exists: ${platformExists}`);
+          console.log(`[Typography] Updates:`, updates);
+          
+          // Skip update if nothing to change and platform already exists
+          const hasUpdates = Object.keys(updates).length > 0;
+          if (!hasUpdates && platformExists) {
+            console.log(`[Typography] No updates provided for platform ${platformId}, skipping`);
+            return state;
+          }
+          
+          if (platformExists) {
+            // Create a copy of platforms array
+            const updatedPlatforms = [...state.platforms];
+            
+            // Safely merge the current platform with updates
+            const currentPlatform = updatedPlatforms[existingPlatformIndex];
+            
+            // Handle special case of fontId and currentFontRole updates
+            if ('fontId' in updates || 'currentFontRole' in updates) {
+              console.log(`[Typography] Updating font role for platform ${platformId}`);
+              
+              // Special case fonts data should only update if both are provided
+              if (updates.currentFontRole) {
+                currentPlatform.currentFontRole = updates.currentFontRole;
+              }
+              
+              if ('fontId' in updates) {
+                currentPlatform.fontId = updates.fontId;
+              }
+              
+              updatedPlatforms[existingPlatformIndex] = {
+                ...currentPlatform
+              };
+            } else {
+              // Normal case - merge all updates
+              updatedPlatforms[existingPlatformIndex] = {
+                ...currentPlatform,
+                ...updates
               };
             }
+            
+            // If currentPlatform matches the platformId, also update it
+            const newCurrentPlatform = 
+              state.currentPlatform === platformId 
+                ? updatedPlatforms[existingPlatformIndex] 
+                : undefined;
+            
+            return {
+              ...state,
+              platforms: updatedPlatforms,
+              ...(newCurrentPlatform ? { currentPlatform: platformId } : {})
+            };
+          } else {
+            console.log(`Platform ${platformId} not found, initializing it first`);
+            // Create a default platform with this ID
+            const defaultPlatform: Platform = {
+              id: platformId,
+              name: 'New Platform',
+              scaleMethod: 'modular',
+              scale: { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 },
+              units: { 
+                typography: 'px', 
+                spacing: 'px', 
+                dimensions: 'px', 
+                borderWidth: 'px', 
+                borderRadius: 'px' 
+              },
+              distanceScale: {
+                viewingDistance: 400,
+                visualAcuity: 1,
+                meanLengthRatio: 5,
+                textType: 'continuous',
+                lighting: 'good',
+                ppi: 96
+              },
+              accessibility: {
+                minContrastBody: 4.5,
+                minContrastLarge: 3
+              },
+              typeStyles: [],
+              ...(updates.currentFontRole ? { currentFontRole: updates.currentFontRole } : {}),
+              ...(updates.fontId !== undefined ? { fontId: updates.fontId } : {})
+            };
+            
+            // Add the new platform to state with updates (except special font cases handled above)
+            const updatesWithoutSpecialCases = { ...updates };
+            delete updatesWithoutSpecialCases.currentFontRole;
+            delete updatesWithoutSpecialCases.fontId;
+            
+            return {
+              ...state,
+              platforms: [...state.platforms, { ...defaultPlatform, ...updatesWithoutSpecialCases }]
+            };
           }
-          
-          return {
-            ...state,
-            platforms: state.platforms.map((platform: Platform) => 
-              platform.id === platformId 
-                ? { ...platform, ...updates, ...(updatedUnits ? { units: updatedUnits } : {}) }
-                : platform
-            )
-          };
         });
-        
-        // Then persist the changes to Supabase with a delay
-        // We need to use setTimeout to ensure this runs after the state update
-        (window as any).__typographySaveTimeout = setTimeout(() => {
-          const store = get() as TypographyState
-          const updatedPlatform = store.platforms.find(p => p.id === platformId)
-          
-          if (updatedPlatform) {
-            // Check which properties were updated and include only those
-            const settingsToSave: Partial<Platform> = {}
-            
-            if (updates.scaleMethod !== undefined) settingsToSave.scaleMethod = updates.scaleMethod
-            if (updates.scale !== undefined) settingsToSave.scale = updates.scale
-            if (updates.distanceScale !== undefined) settingsToSave.distanceScale = updates.distanceScale
-            if (updates.aiScale !== undefined) settingsToSave.aiScale = updates.aiScale
-            if (updates.viewTab !== undefined) settingsToSave.viewTab = updates.viewTab
-            if (updates.analysisTab !== undefined) settingsToSave.analysisTab = updates.analysisTab
-            
-            // If we're updating baseSize directly, make sure to include it in the scale
-            if (updates.baseSize !== undefined) {
-              const currentScale = updatedPlatform.scale || { baseSize: 16, ratio: 1.2, stepsUp: 3, stepsDown: 2 };
-              settingsToSave.scale = { ...currentScale, baseSize: updates.baseSize };
-              console.log(`[Typography] Updating baseSize to ${updates.baseSize} in scale settings for platform ${platformId}`);
-            }
-            
-            // Only call saveTypographySettings if we have settings to save
-            if (Object.keys(settingsToSave).length > 0) {
-              console.log('[Typography] Preparing to save typography settings to Supabase in 500ms (debounced):', settingsToSave);
-              store.saveTypographySettings(platformId, settingsToSave)
-                .then(() => {
-                  console.log(`[Typography] Debounced save completed for platform ${platformId}`);
-                })
-                .catch(error => {
-                  console.error('[Typography] Error in debounced save to Supabase:', error);
-                  // Update the error state
-                  set({ error: (error as Error).message });
-                });
-            } else {
-              console.log('[Typography] No typography settings to save to Supabase after debounce');
-            }
-          }
-        }, 500) // Increase the debounce time to 500ms
       },
 
       getScaleValues: (platformId: string) => {

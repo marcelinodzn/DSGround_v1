@@ -26,7 +26,14 @@ export default function BrandsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
-    fetchBrands()
+    const fetchOnce = async () => {
+      const state = useBrandStore.getState()
+      // Only fetch if we don't have brands already
+      if (state.brands.length === 0 && !state.isLoading) {
+        await fetchBrands()
+      }
+    }
+    fetchOnce()
   }, [fetchBrands])
 
   const handleAddBrand = () => {
@@ -134,82 +141,105 @@ export default function BrandsPage() {
               : "space-y-4"
           )}>
             {/* Add Brand card */}
-            <Button 
-              variant="outline" 
-              className={cn(
-                "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
-                viewMode === 'grid'
-                  ? "h-[116px]"
-                  : "h-14"
-              )}
-              onClick={handleAddBrand}
-            >
-              {viewMode === 'grid' ? (
-                <div className="h-full w-full flex flex-col justify-between p-6">
-                  <div className="text-left">
-                    <h3 className="font-semibold">Add New Brand</h3>
+            <div key="add-brand-button" className="relative group">
+              <Button 
+                variant="outline" 
+                className={cn(
+                  "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
+                  viewMode === 'grid'
+                    ? "h-[116px]"
+                    : "h-14"
+                )}
+                onClick={handleAddBrand}
+              >
+                {viewMode === 'grid' ? (
+                  <div className="h-full w-full flex flex-col justify-between p-6">
+                    <div className="text-left">
+                      <h3 className="font-semibold">Add New Brand</h3>
+                    </div>
+                    <div className="flex items-center">
+                      <Plus className="h-4 w-4" />
+                    </div>
                   </div>
-                  <div className="flex items-center">
+                ) : (
+                  <div className="h-full w-full flex items-center gap-2 px-4">
                     <Plus className="h-4 w-4" />
+                    <span className="font-semibold">Add New Brand</span>
                   </div>
-                </div>
-              ) : (
-                <div className="h-full w-full flex items-center gap-2 px-4">
-                  <Plus className="h-4 w-4" />
-                  <span className="font-semibold">Add New Brand</span>
-                </div>
-              )}
-            </Button>
+                )}
+              </Button>
+            </div>
             
             {/* Brand cards */}
-            {brands.map((brand) => (
-              <div key={brand.id} className="relative group">
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
-                    viewMode === 'grid'
-                      ? "h-[116px]"
-                      : "h-14"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleViewBrand(brand.id)
-                  }}
-                >
-                  {viewMode === 'grid' ? (
-                    <div className="h-full w-full flex flex-col justify-between p-6">
-                      <div className="text-left">
-                        <h3 className="font-semibold">{brand.name}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                          {brand.description}
-                        </p>
-                      </div>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {brands.map((brand) => (
+                  <Button
+                    key={brand.id}
+                    variant="outline"
+                    className="h-auto p-6 flex flex-col items-start gap-2 text-left hover:bg-secondary/50 hover:border-primary/20 transition-colors"
+                    onClick={() => handleViewBrand(brand.id)}
+                  >
+                    <h3 className="text-lg font-semibold text-primary">
+                      {brand.name || `Brand ${brand.id.substring(0, 6)}`}
+                    </h3>
+                    <p className="text-muted-foreground text-sm line-clamp-2">
+                      {brand.description || "No description available"}
+                    </p>
+                    <div className="flex items-center gap-4 mt-2">
+                      <span className="text-xs text-muted-foreground">
+                        {brand.type || "master"}
+                      </span>
+                      <CardMenu 
+                        onEdit={() => handleEditBrand(brand.id, prompt('Enter new name:', brand.name) || '')}
+                        onDelete={() => handleDeleteBrand(brand.id)} 
+                        onDuplicate={() => handleDuplicateBrand(brand)}
+                        onShare={() => {/* Implement sharing functionality */}}
+                      />
                     </div>
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-between px-4">
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold">{brand.name}</span>
-                        {brand.description && (
-                          <span className="text-sm text-muted-foreground">
-                            {brand.description}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </Button>
-                <CardMenu
-                  onEdit={() => {
-                    const newName = prompt('Enter new name:', brand.name)
-                    if (newName) handleEditBrand(brand.id, newName)
-                  }}
-                  onDelete={() => handleDeleteBrand(brand.id)}
-                  onDuplicate={() => handleDuplicateBrand(brand)}
-                  onShare={() => {/* Implement sharing functionality */}}
-                />
+                  </Button>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="space-y-2">
+                {brands.map((brand) => (
+                  <div key={brand.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors">
+                    <div className="flex-1">
+                      <h3 className="font-medium">{brand.name || `Brand ${brand.id.substring(0, 6)}`}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-1">
+                        {brand.description || "No description available"}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        key={`view-${brand.id}`}
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleViewBrand(brand.id)}
+                      >
+                        View
+                      </Button>
+                      <Button 
+                        key={`edit-${brand.id}`}
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditBrand(brand.id, prompt('Enter new name:', brand.name) || '')}
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        key={`delete-${brand.id}`}
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteBrand(brand.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

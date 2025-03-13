@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Don't initialize with mock client by default
 let supabaseClient: ReturnType<typeof createClient>
 
 // Create a mock client for static generation during build time
@@ -94,6 +95,41 @@ const createMockClient = () => {
     });
   };
   
+  // Add this function after the createUUID function
+  const ensurePlatformFields = (record: any, tableName: string) => {
+    // Only process platforms table
+    if (tableName !== 'platforms') return record;
+    
+    const now = new Date().toISOString();
+    
+    // Ensure required fields are present
+    return {
+      ...record,
+      id: record.id || createUUID(),
+      created_at: record.created_at || now,
+      updated_at: record.updated_at || now
+    };
+  };
+  
+  // Add this function after the ensurePlatformFields function
+  const ensureBrandFields = (record: any, tableName: string) => {
+    // Only process brands table
+    if (tableName !== 'brands') return record;
+    
+    const now = new Date().toISOString();
+    
+    // Ensure required fields are present
+    return {
+      ...record,
+      id: record.id || createUUID(),
+      name: record.name ? String(record.name).trim() : `Brand ${createUUID().substring(0, 6)}`,
+      description: record.description || '',
+      type: record.type || 'master',
+      created_at: record.created_at || now,
+      updated_at: record.updated_at || now
+    };
+  };
+  
   // Create a mock query builder with all the necessary methods
   const createMockQueryBuilder = (tableName: string) => {
     let selectedColumns: string[] | null = null;
@@ -178,21 +214,27 @@ const createMockClient = () => {
           // INSERT operation
           if (insertData.length > 0) {
             const newRecords = insertData.map(record => {
-              // Add default fields
+              const id = record.id || createUUID();
+              const now = new Date().toISOString();
+              
               const newRecord = {
-                id: createUUID(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                ...record
+                id,
+                ...record,
+                created_at: record.created_at || now,
+                updated_at: record.updated_at || now
               };
               
-              // Add to mock data store
+              // Add additional required fields based on table type
+              let enhancedRecord = ensurePlatformFields(newRecord, tableName);
+              // Also ensure brand fields
+              enhancedRecord = ensureBrandFields(enhancedRecord, tableName);
+              
               if (!mockDataStore[tableName]) {
                 mockDataStore[tableName] = [];
               }
               
-              mockDataStore[tableName].push(newRecord);
-              return newRecord;
+              mockDataStore[tableName].push(enhancedRecord);
+              return enhancedRecord;
             });
             
             // Save updated data to localStorage
@@ -321,6 +363,7 @@ const createMockClient = () => {
   
   // Return a mock client with methods that return empty data
   return {
+    __mockClient: true, // Flag to identify this as a mock client
     from: (tableName: string) => createMockQueryBuilder(tableName),
     rpc: () => ({ data: [], error: null }),
     auth: {
@@ -381,24 +424,27 @@ const createMockClient = () => {
   };
 };
 
-// Initialize the mock client
-supabaseClient = createMockClient() as any;
-
 // Function to get the Supabase client
 export const getSupabaseClient = () => {
+  // Make sure we have the required environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  
+  console.log('Attempting to initialize Supabase with:', {
+    hasUrl: !!supabaseUrl,
+    hasKey: !!supabaseAnonKey,
+    url: supabaseUrl
+  });
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Missing Supabase environment variables, using mock client for static generation')
+    // Instead of throwing an error, create a mock client for static generation
+    return createMockClient() as any
+  }
+  
+  // Only create a new client if we don't already have one
   if (!supabaseClient) {
-    // Make sure we have the required environment variables
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('Missing Supabase environment variables, using mock client for static generation')
-      // Instead of throwing an error, create a mock client for static generation
-      supabaseClient = createMockClient() as any
-      return supabaseClient
-    }
-    
-    console.log('Initializing Supabase client with URL:', supabaseUrl)
+    console.log('Initializing real Supabase client with URL:', supabaseUrl)
     
     // Create the Supabase client with proper configuration
     supabaseClient = createClient(
@@ -419,7 +465,10 @@ export const getSupabaseClient = () => {
         }
       }
     )
+  } else {
+    console.log('Reusing existing Supabase client');
   }
+  
   return supabaseClient
 }
 
@@ -545,5 +594,6 @@ export async function verifyDatabaseSchema() {
   }
 }
 
-// Export the Supabase client
+// Export a direct reference to the client for convenience
+// This ensures we're always using the real client when available
 export const supabase = getSupabaseClient()

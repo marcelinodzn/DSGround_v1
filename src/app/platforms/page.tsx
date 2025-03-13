@@ -59,8 +59,11 @@ export default function PlatformsPage() {
 
   useEffect(() => {
     const loadPlatforms = async () => {
-      if (currentBrand) {
+      if (currentBrand?.id) {
+        console.log('Loading platforms for brand:', currentBrand.id);
         await fetchPlatformsByBrand(currentBrand.id)
+      } else {
+        console.log('No current brand with valid ID, skipping platform fetch');
       }
     }
     
@@ -234,32 +237,34 @@ export default function PlatformsPage() {
               : "flex flex-col gap-4"
           )}>
             {/* Add Platform card */}
-            <Button 
-              variant="outline" 
-              className={cn(
-                "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
-                viewMode === 'grid'
-                  ? "h-[116px]"
-                  : "h-14"
-              )}
-              onClick={() => router.push('/platforms/new')}
-            >
-              {viewMode === 'grid' ? (
-                <div className="h-full w-full flex flex-col justify-between p-6">
-                  <div className="text-left">
-                    <h3 className="font-semibold">Add New Platform</h3>
+            <div key="add-platform-button" className="relative group">
+              <Button 
+                variant="outline" 
+                className={cn(
+                  "relative border rounded-lg hover:bg-accent w-full p-0 overflow-hidden",
+                  viewMode === 'grid'
+                    ? "h-[116px]"
+                    : "h-14"
+                )}
+                onClick={() => router.push('/platforms/new')}
+              >
+                {viewMode === 'grid' ? (
+                  <div className="h-full w-full flex flex-col justify-between p-6">
+                    <div className="text-left">
+                      <h3 className="font-semibold">Add New Platform</h3>
+                    </div>
+                    <div className="flex items-center">
+                      <Plus className="h-4 w-4" />
+                    </div>
                   </div>
-                  <div className="flex items-center">
+                ) : (
+                  <div className="h-full w-full flex items-center gap-2 px-4">
                     <Plus className="h-4 w-4" />
+                    <span className="font-semibold">Add New Platform</span>
                   </div>
-                </div>
-              ) : (
-                <div className="h-full w-full flex items-center gap-2 px-4">
-                  <Plus className="h-4 w-4" />
-                  <span className="font-semibold">Add New Platform</span>
-                </div>
-              )}
-            </Button>
+                )}
+              </Button>
+            </div>
 
             {/* Platform cards */}
             {platforms.map((platform) => (

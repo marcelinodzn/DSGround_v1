@@ -4,6 +4,7 @@ import { useAuth } from '@/providers/auth-provider'
 import { supabase, getCurrentUserId } from '@/lib/supabase'
 import { useTypographyStore } from '@/store/typography'
 import { usePlatformStore } from '@/store/platform-store'
+import { loadFontOnce } from '@/lib/font-utils'
 
 interface UploadFontParams {
   id: string
@@ -59,6 +60,9 @@ interface FontState {
   addFontToBrand: (brandId: string, fontId: string, role: string) => Promise<void>
   removeFontFromBrand: (brandId: string, fontId: string) => Promise<void>
 }
+
+// Create a debounce mechanism for typography saving
+let saveTypographyDebounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 export const useFontStore = create<FontState>((set, get) => ({
   fonts: [],
@@ -218,117 +222,140 @@ export const useFontStore = create<FontState>((set, get) => ({
     })),
 
   saveBrandTypography: async (brandId: string, typography: Partial<BrandTypography>) => {
-    console.log('Saving brand typography:', { brandId, typography })
+    console.log('Saving brand typography:', { brandId, typography });
     try {
-      // First check if record exists
-      const { data: existing } = await supabase
-        .from('brand_typography')
-        .select('*')
-        .eq('brand_id', brandId)
-        .single()
-
-      let data;
-      let error;
-
-      if (existing) {
-        // Update existing record
-        const result = await supabase
-          .from('brand_typography')
-          .update({
-            ...typography,
-            brand_id: brandId
-          })
-          .eq('brand_id', brandId) // Add WHERE clause
-          .select()
-          .single()
-        
-        data = result.data
-        error = result.error
-      } else {
-        // Insert new record
-        const result = await supabase
-          .from('brand_typography')
-          .insert({
-            ...typography,
-            brand_id: brandId
-          })
-          .select()
-          .single()
-        
-        data = result.data
-        error = result.error
+      // Create a unique key for this save operation based on the brandId and which field is being updated
+      const updateKey = Object.keys(typography).find(k => k !== 'brand_id') || 'unknown';
+      const debounceKey = `${brandId}:${updateKey}`;
+      
+      // Clear any existing timeout for this key
+      if (saveTypographyDebounceTimers[debounceKey]) {
+        clearTimeout(saveTypographyDebounceTimers[debounceKey]);
+        console.log(`Debounced previous save for ${debounceKey}`);
       }
-
-      console.log('Supabase save response:', { data, error })
-
-      if (error) throw error
-
-      if (data) {
-        set(state => ({
-          brandTypography: {
-            ...state.brandTypography,
-            [brandId]: data as unknown as BrandTypography
+      
+      // Immediately update the local state for a responsive UI
+      set(state => ({
+        brandTypography: {
+          ...state.brandTypography,
+          [brandId]: {
+            ...state.brandTypography[brandId],
+            ...typography
           }
-        }))
-
-        // Update typography store after saving
-        const typographyStore = useTypographyStore.getState()
-        const platformStore = usePlatformStore.getState()
-        
-        if (platformStore.currentPlatform) {
-          // Determine which font role was updated
-          if (typography.primary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
-              currentFontRole: 'primary',
-              fontId: typography.primary_font_id || undefined
-            })
-          } else if (typography.secondary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
-              currentFontRole: 'secondary',
-              fontId: typography.secondary_font_id || undefined
-            })
-          } else if (typography.tertiary_font_id !== undefined) {
-            typographyStore.updatePlatform(platformStore.currentPlatform.id, {
-              currentFontRole: 'tertiary',
-              fontId: typography.tertiary_font_id || undefined
-            })
-          }
-          
-          // Also reload the font to ensure it's available in the document
-          setTimeout(async () => {
-            // Get the font ID that was just set
-            const fontId = typography.primary_font_id !== undefined ? typography.primary_font_id :
-                          typography.secondary_font_id !== undefined ? typography.secondary_font_id :
-                          typography.tertiary_font_id;
-            
-            if (fontId) {
-              const font = get().fonts.find(f => f.id === fontId);
-              if (font?.file_url) {
-                try {
-                  console.log(`Re-loading font after selection: ${font.family}`);
-                  const fontFace = new FontFace(
-                    font.family,
-                    `url(${font.file_url})`,
-                    {
-                      weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
-                      style: font.style || 'normal',
-                    }
-                  );
-                  
-                  const loadedFont = await fontFace.load();
-                  document.fonts.add(loadedFont);
-                  console.log(`Font reloaded successfully: ${font.family}`);
-                } catch (error) {
-                  console.error(`Error reloading font ${font.family}:`, error);
-                }
-              }
-            }
-          }, 100);  // Small delay to ensure state has been updated
         }
-      }
+      }));
+      
+      // Debounce the actual save operation
+      return new Promise<any>((resolve, reject) => {
+        saveTypographyDebounceTimers[debounceKey] = setTimeout(async () => {
+          try {
+            const currentUser = await getCurrentUserId();
+            if (!currentUser) {
+              throw new Error('Unauthorized');
+            }
+            
+            let { data, error } = await supabase
+              .from('brand_typography')
+              .select('*')
+              .eq('brand_id', brandId)
+              .single();
+            
+            if (!data) {
+              // Create a new record with defaults
+              ({ data, error } = await supabase
+                .from('brand_typography')
+                .insert([{
+                  ...typography,
+                  brand_id: brandId,
+                  user_id: currentUser,
+                }])
+                .select()
+                .single());
+            } else {
+              // Update existing record
+              ({ data, error } = await supabase
+                .from('brand_typography')
+                .update({
+                  ...typography,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('brand_id', brandId)
+                .select()
+                .single());
+            }
+            
+            if (error) {
+              throw error;
+            }
+            
+            if (data) {
+              // Update typography store after saving
+              const typographyStore = useTypographyStore.getState();
+              const platformStore = usePlatformStore.getState();
+              
+              if (platformStore.currentPlatform) {
+                // Determine which font role was updated
+                if (typography.primary_font_id !== undefined) {
+                  typographyStore.updatePlatform(platformStore.currentPlatform.id, {
+                    currentFontRole: 'primary',
+                    fontId: typography.primary_font_id || undefined
+                  });
+                } else if (typography.secondary_font_id !== undefined) {
+                  typographyStore.updatePlatform(platformStore.currentPlatform.id, {
+                    currentFontRole: 'secondary',
+                    fontId: typography.secondary_font_id || undefined
+                  });
+                } else if (typography.tertiary_font_id !== undefined) {
+                  typographyStore.updatePlatform(platformStore.currentPlatform.id, {
+                    currentFontRole: 'tertiary',
+                    fontId: typography.tertiary_font_id || undefined
+                  });
+                }
+                
+                // Also reload the font to ensure it's available in the document
+                setTimeout(async () => {
+                  try {
+                    // Get the font ID that was just set
+                    const fontId = typography.primary_font_id !== undefined ? typography.primary_font_id :
+                                 typography.secondary_font_id !== undefined ? typography.secondary_font_id :
+                                 typography.tertiary_font_id;
+                    
+                    if (fontId) {
+                      const font = get().fonts.find(f => f.id === fontId);
+                      if (font?.file_url) {
+                        console.log(`Re-loading font after selection: ${font.family}`);
+                        // Use our new utility for safer font loading with timeout
+                        await loadFontOnce(
+                          font.family,
+                          font.file_url,
+                          {
+                            weight: font.is_variable ? '1 1000' : `${font.weight || 400}`,
+                            style: font.style || 'normal',
+                            force: true // Force reload
+                          }
+                        );
+                      }
+                    }
+                  } catch (loadError) {
+                    console.error(`Error reloading font:`, loadError);
+                    // Don't throw here to prevent the whole operation from failing
+                  }
+                }, 100);  // Small delay to ensure state has been updated
+              }
+              
+              resolve(data);
+            } else {
+              reject(new Error('Failed to save typography data'));
+            }
+          } catch (saveError) {
+            console.error('Error in debounced save:', saveError);
+            reject(saveError);
+          }
+        }, 300); // 300ms debounce time
+      });
     } catch (error) {
-      console.error('Error saving brand typography:', error)
-      throw error
+      console.error('Error saving brand typography:', error);
+      throw error;
     }
   },
 

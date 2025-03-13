@@ -22,7 +22,8 @@ import {
   Layers,
   Settings,
   Home,
-  ArrowUpDown
+  ArrowUpDown,
+  Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLayout } from "@/contexts/layout-context"
@@ -35,10 +36,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select"
 import { useBrandStore } from "@/store/brand-store"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { TypographyInitializer } from '@/components/typography-initializer'
+import React from 'react'
 
 function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
   const segments = pathname.split('/').filter(Boolean)
@@ -62,9 +65,12 @@ const BrandDropdown = () => {
   const { brands, currentBrand, setCurrentBrand, fetchBrands } = useBrandStore()
   const router = useRouter()
   const pathname = usePathname()
+  const initializedRef = React.useRef(false)
 
   useEffect(() => {
     const initializeBrands = async () => {
+      if (initializedRef.current) return
+      
       try {
         // Call fetchBrands but don't rely on its return value
         await fetchBrands()
@@ -77,8 +83,11 @@ const BrandDropdown = () => {
           return
         }
         
-        if (!currentBrand?.id && currentBrands[0]) {
+        if (!useBrandStore.getState().currentBrand?.id && currentBrands[0]) {
           await setCurrentBrand(currentBrands[0].id)
+          initializedRef.current = true
+        } else if (useBrandStore.getState().currentBrand?.id) {
+          initializedRef.current = true
         }
       } catch (error) {
         console.error('Error initializing brands:', error)
@@ -86,16 +95,21 @@ const BrandDropdown = () => {
     }
 
     initializeBrands()
-  }, [fetchBrands, setCurrentBrand, currentBrand])
+  }, [fetchBrands, setCurrentBrand])
 
   const handleBrandChange = async (brandId: string) => {
+    console.log('Brand dropdown change:', brandId);
+    
     if (brandId === 'new') {
       router.push('/brands/new')
       return
     }
 
     try {
+      console.log('Setting current brand to:', brandId);
       await setCurrentBrand(brandId)
+      
+      console.log('Current brand set successfully');
       if (pathname.includes('/brands/')) {
         const newPath = pathname.replace(/\/brands\/[^\/]+/, `/brands/${brandId}`)
         router.push(newPath)
@@ -107,26 +121,41 @@ const BrandDropdown = () => {
 
   if (!brands?.length) return null
 
+  console.log("Current brand:", currentBrand);
+  console.log("Current brand details:", currentBrand?.name, currentBrand?.id);
+  console.log("All brands:", brands);
+  
   return (
-    <Select
-      value={currentBrand?.id}
-      onValueChange={handleBrandChange}
-    >
-      <SelectTrigger className="w-[180px]">
-        <SelectValue placeholder="Select brand" />
+    <Select value={currentBrand?.id || ''} onValueChange={handleBrandChange}>
+      <SelectTrigger className="min-w-[180px] bg-transparent">
+        <SelectValue aria-label={currentBrand?.name || 'Select brand'}>
+          {currentBrand?.name ? (
+            <span className="text-foreground font-medium">{currentBrand.name || 'Unnamed Brand'}</span>
+          ) : (
+            "Select brand"
+          )}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {brands.map((brand) => (
-          <SelectItem key={brand.id} value={brand.id}>
-            {brand.name}
+          <SelectItem 
+            key={brand.id} 
+            value={brand.id}
+          >
+            <span className="text-foreground font-normal">
+              {brand.name || `Brand ${brand.id.substring(0, 6)}`}
+            </span>
           </SelectItem>
         ))}
-        <SelectItem value="new" className="border-t text-muted-foreground">
-          + Add brand
+        <SelectSeparator />
+        <SelectItem key="new" value="new">
+          <span className="text-primary font-medium flex items-center">
+            <Plus className="mr-1 h-4 w-4" /> Add brand
+          </span>
         </SelectItem>
       </SelectContent>
     </Select>
-  )
+  );
 }
 
 export function RootLayoutClient({
@@ -260,11 +289,11 @@ export function RootLayoutClient({
             {showBrandSelector && <BrandDropdown />}
             <Breadcrumb className="pl-[4px]">
               <BreadcrumbList>
-                <BreadcrumbItem>
+                <BreadcrumbItem key="home">
                   <BreadcrumbLink href="/">Design System Ground</BreadcrumbLink>
                 </BreadcrumbItem>
                 {breadcrumbItems.map((item, index) => (
-                  <BreadcrumbItem key={item.href}>
+                  <BreadcrumbItem key={`${item.href}-${index}`}>
                     <BreadcrumbSeparator />
                     {index === breadcrumbItems.length - 1 ? (
                       <BreadcrumbPage>{item.label}</BreadcrumbPage>
