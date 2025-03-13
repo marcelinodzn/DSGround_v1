@@ -285,21 +285,28 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
 
   addPlatform: async (brandId: string, platform: Partial<Platform>) => {
     try {
+      const now = new Date().toISOString();
       const newPlatform = {
         brand_id: brandId,
         name: platform.name || 'New Platform',
         description: platform.description || null,
-        units: platform.units || {
-          typography: 'px',
-          spacing: 'px',
+        units: {
+          typography: 'rem',
+          spacing: 'rem',
+          dimensions: 'px',
           borderWidth: 'px',
-          borderRadius: 'px'
+          borderRadius: 'px',
+          ...platform.units
         },
-        layout: platform.layout || {
+        layout: {
           gridColumns: 12,
           gridGutter: 16,
-          containerPadding: 16
-        }
+          containerPadding: 16,
+          icon: 'mdi:laptop',
+          ...platform.layout
+        },
+        created_at: now,
+        updated_at: now
       }
 
       const { data, error } = await supabase

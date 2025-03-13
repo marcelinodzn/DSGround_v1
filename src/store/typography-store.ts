@@ -4,13 +4,28 @@ import { type TypeStyle, type Platform } from '@/types/typography'
 
 // Define TypographySettings interface here since it's not exported from elsewhere
 interface TypographySettings {
-  scale: {
-    baseSize: number;
-    ratio: number;
-    stepsUp: number;
-    stepsDown: number;
+  id: string;
+  platform_id: string;
+  settings: {
+    scale: {
+      baseSize: number;
+      ratio: number;
+      stepsUp: number;
+      stepsDown: number;
+    };
+    typeStyles: Array<{
+      id: string;
+      name: string;
+      fontFamily: string;
+      fontSize: number;
+      lineHeight: number;
+      letterSpacing: number;
+      fontWeight: number;
+      scaleStep: number;
+    }>;
   };
-  // Add other properties as needed
+  created_at: string;
+  updated_at: string;
 }
 
 interface TypographyState {
@@ -103,38 +118,76 @@ export const useTypographyStore = create<TypographyState>((set, get) => ({
   error: null,
 
   fetchTypographySettings: async (platformId) => {
-    set({ isLoading: true })
+    set({ isLoading: true, error: null })
     try {
+      console.log(`[Typography] Fetching settings for platform ${platformId}`);
+      
       const { data, error } = await supabase
         .from('typography_settings')
         .select('*')
         .eq('platform_id', platformId)
         .single()
 
-      if (error && error.code !== 'PGRST116') throw error
-      set({ settings: data as TypographySettings | null })
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log(`[Typography] No settings found for platform ${platformId}, will create default`);
+          set({ settings: null });
+          return;
+        }
+        throw error;
+      }
+
+      if (!data) {
+        console.log(`[Typography] No data returned for platform ${platformId}`);
+        set({ settings: null });
+        return;
+      }
+
+      console.log(`[Typography] Successfully fetched settings for platform ${platformId}:`, data);
+      set({ settings: data as TypographySettings, error: null });
     } catch (error) {
-      set({ error: (error as Error).message })
+      console.error(`[Typography] Error fetching settings:`, error);
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch typography settings',
+        settings: null
+      });
     } finally {
-      set({ isLoading: false })
+      set({ isLoading: false });
     }
   },
 
   fetchTypeStyles: async (platformId) => {
-    set({ isLoading: true })
+    set({ isLoading: true, error: null })
     try {
+      console.log(`[Typography] Fetching type styles for platform ${platformId}`);
+      
       const { data, error } = await supabase
         .from('type_styles')
         .select('*')
         .eq('platform_id', platformId)
         .order('created_at', { ascending: true })
 
-      if (error) throw error
-      set({ styles: data as TypeStyle[] })
+      if (error) {
+        console.error(`[Typography] Error fetching type styles:`, error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        console.log(`[Typography] No type styles found for platform ${platformId}`);
+        set({ styles: [] });
+        return;
+      }
+
+      console.log(`[Typography] Successfully fetched ${data.length} type styles for platform ${platformId}`);
+      set({ styles: data as TypeStyle[], error: null });
     } catch (error) {
-      set({ error: (error as Error).message })
+      console.error(`[Typography] Error fetching type styles:`, error);
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch type styles',
+        styles: []
+      });
     } finally {
-      set({ isLoading: false })
+      set({ isLoading: false });
     }
   }
 })) 
