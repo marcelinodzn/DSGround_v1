@@ -620,13 +620,14 @@ export function PropertiesPanel() {
     // Round to 2 decimal places for display
     const roundedBaseSize = Math.round(calculatedBaseSize * 100) / 100;
 
-    updatePlatform(activePlatform, {
+    // Use saveTypographySettings instead of updatePlatform to save to Supabase
+    safeSaveTypographySettings(activePlatform, {
       distanceScale: updatedDistanceScale,
       scale: {
         ...(currentSettings.scale || {}),
         baseSize: roundedBaseSize // Update the main scale base size
       }
-    } as any)
+    })
   };
 
   const handleAccessibilityChange = (updates: Partial<Platform['accessibility']>) => {
@@ -636,9 +637,10 @@ export function PropertiesPanel() {
       minContrastLarge: 3.0
     };
     
-    updatePlatform(activePlatform, {
+    // Use saveTypographySettings instead of updatePlatform to save to Supabase
+    safeSaveTypographySettings(activePlatform, {
       accessibility: { ...(currentSettings.accessibility || defaultAccessibility), ...updates }
-    } as any)
+    })
   }
 
   const handleTypeStyleChange = (id: string, updates: Partial<TypeStyle>) => {
@@ -771,9 +773,10 @@ export function PropertiesPanel() {
       // Copy the current styles to all platforms
       typographyPlatforms.forEach((platform: Platform) => {
         if (platform.id !== activePlatform) {
-          updatePlatform(platform.id, {
+          // Use safeSaveTypographySettings instead of updatePlatform to save to Supabase
+          safeSaveTypographySettings(platform.id, {
             typeStyles: currentStyles
-          } as any);
+          });
         }
       });
     }
@@ -1022,7 +1025,8 @@ No additional recommendations provided.
       // Update the platforms in the store
       const typographyStore = useTypographyStore.getState();
       if (activePlatform) {
-        typographyStore.updatePlatform(activePlatform, { currentFontRole: role, fontId });
+        // Use saveTypographySettings instead of updatePlatform to ensure data is saved to Supabase
+        typographyStore.saveTypographySettings(activePlatform, { currentFontRole: role, fontId });
       }
       
       // Force a font load if we have a font ID
@@ -2451,6 +2455,8 @@ function DistanceBasedTab({
   currentSettings: any;
   updatePlatform: (id: string, updates: Partial<Platform>) => void;
 }) {
+  // Get saveTypographySettings to ensure changes are saved to Supabase
+  const { saveTypographySettings } = useTypographyStore();
   const calculatedBaseSize = useMemo(() => {
     if (!platform.distanceScale) return 0;
     return calculateDistanceBasedSize(
@@ -2528,7 +2534,8 @@ function DistanceBasedTab({
           step="1"
           value={platform.distanceScale?.viewingDistance || 0}
           onChange={(e) => {
-            updatePlatform(platform.id, {
+            // Use saveTypographySettings instead of updatePlatform
+            saveTypographySettings(platform.id, {
               distanceScale: {
                 ...platform.distanceScale,
                 viewingDistance: Number(e.target.value)
@@ -2552,6 +2559,8 @@ function ModularScaleTab({
   currentSettings: any;
   updatePlatform: (id: string, updates: Partial<Platform>) => void;
 }) {
+  // Get saveTypographySettings to ensure changes are saved to Supabase
+  const { saveTypographySettings } = useTypographyStore();
   return (
     <div className="space-y-4">
       <div>
@@ -2567,8 +2576,8 @@ function ModularScaleTab({
             
             // Use setTimeout to ensure this update happens in a separate tick
             setTimeout(() => {
-              // Use updatePlatform directly since it's passed as a prop
-              updatePlatform(platform.id, {
+              // Use saveTypographySettings instead of updatePlatform to ensure data is saved to Supabase
+              saveTypographySettings(platform.id, {
                 scale: {
                   ...(platform.scale || {}),
                   baseSize: newBaseSize
@@ -2593,8 +2602,8 @@ function ModularScaleTab({
             
             // Use setTimeout to ensure this update happens in a separate tick
             setTimeout(() => {
-              // Use updatePlatform directly since it's passed as a prop
-              updatePlatform(platform.id, {
+              // Use saveTypographySettings instead of updatePlatform to ensure data is saved to Supabase
+              saveTypographySettings(platform.id, {
                 scale: {
                   ...(platform.scale || {}),
                   ratio: newRatio
@@ -2619,6 +2628,8 @@ function AIDistanceTab({
   currentSettings: any;
   updatePlatform: (id: string, updates: Partial<Platform>) => void;
 }) {
+  // Get saveTypographySettings to ensure changes are saved to Supabase
+  const { saveTypographySettings } = useTypographyStore();
   return (
     <div className="space-y-4">
       <div>

@@ -66,6 +66,25 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
     
     initAttemptedRef.current = true;
     
+    // Set up event listener for real-time updates
+    const handleTypographyChanged = (event: Event) => {
+      const typographyEvent = event as CustomEvent;
+      console.log(`[Typography Page] Received typography change event:`, typographyEvent.detail);
+      
+      // Reload typography data when changes are detected
+      if (brandId) {
+        console.log(`[Typography Page] Refreshing typography data for brand ${brandId} due to remote changes`);
+        loadBrandTypography(brandId).then(() => {
+          toast.success("Typography settings updated from another device");
+        }).catch(error => {
+          console.error(`[Typography Page] Error refreshing typography:`, error);
+        });
+      }
+    };
+    
+    // Listen for typography changes from other browsers
+    window.addEventListener('typographySettingsChanged', handleTypographyChanged);
+    
     const initPage = async () => {
       console.log("Initializing typography page");
       try {
@@ -175,6 +194,35 @@ export default function BrandFoundationsTypographyPage({ params }: BrandFoundati
     
     // Only run this effect once on component mount
   }, []);
+
+  // Set up event listener for real-time updates from other browsers
+  useEffect(() => {
+    const handleTypographyChanged = (event: Event) => {
+      const typographyEvent = event as CustomEvent;
+      console.log(`[Typography Page] Received typography change event:`, typographyEvent.detail);
+      
+      // Reload typography data when changes are detected
+      if (brandId) {
+        console.log(`[Typography Page] Refreshing typography data for brand ${brandId} due to remote changes`);
+        loadBrandTypography(brandId).then(() => {
+          console.log(`[Typography Page] Successfully refreshed typography data for brand ${brandId}`);
+          toast.success("Typography settings updated from another device");
+        }).catch(error => {
+          console.error(`[Typography Page] Error refreshing typography:`, error);
+        });
+      }
+    };
+    
+    // Listen for typography changes from other browsers
+    console.log(`[Typography Page] Setting up real-time typography change listener`);
+    window.addEventListener('typographySettingsChanged', handleTypographyChanged);
+    
+    // Cleanup function
+    return () => {
+      console.log(`[Typography Page] Removing real-time typography change listener`);
+      window.removeEventListener('typographySettingsChanged', handleTypographyChanged);
+    };
+  }, [brandId, loadBrandTypography]);
 
   useEffect(() => {
     console.log('Route Debug:', {

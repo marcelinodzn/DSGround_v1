@@ -60,28 +60,75 @@ export function SupabaseSyncManager() {
       }
     });
     
-    // Subscribe to realtime changes for typography_settings
-    const typographySubscription = supabase
-      .channel('typography_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'typography_settings' 
-      }, (payload: RealtimePostgresChangesPayload<any>) => {
-        console.log('[SyncManager] Typography settings changed:', payload);
-        setSyncStatus('synced');
-        setLastSyncTime(new Date());
-      })
-      .subscribe((status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
-        console.log(`[SyncManager] Realtime subscription status:`, status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[SyncManager] Successfully subscribed to typography changes');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[SyncManager] Error subscribing to typography changes');
-          setSyncStatus('error');
-          setError('Could not subscribe to real-time updates. Some changes may not be reflected immediately.');
+    // Subscribe to realtime changes for typography_settings with reconnection logic
+    let typographySubscription: RealtimeChannel;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    
+    const setupRealtimeSubscription = () => {
+      console.log('[SyncManager] Setting up realtime subscription for typography settings');
+      
+      // First remove any existing subscription to avoid duplicates
+      if (typographySubscription) {
+        try {
+          typographySubscription.unsubscribe();
+        } catch (e) {
+          console.error('[SyncManager] Error unsubscribing from previous channel:', e);
         }
-      });
+      }
+      
+      typographySubscription = supabase
+        .channel(`typography_changes_${Date.now()}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'typography_settings' 
+        }, (payload: RealtimePostgresChangesPayload<any>) => {
+          console.log('[SyncManager] Typography settings changed:', payload);
+          
+          // Notify the UI to refresh data when changes come in
+          // This will trigger a re-fetch in components that need the data
+          window.dispatchEvent(new CustomEvent('typographySettingsChanged', { 
+            detail: { 
+              platformId: payload.new?.platform_id,
+              operation: payload.eventType,
+              timestamp: new Date()
+            } 
+          }));
+          
+          setSyncStatus('synced');
+          setLastSyncTime(new Date());
+        })
+        .subscribe((status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
+          console.log(`[SyncManager] Realtime subscription status:`, status);
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('[SyncManager] Successfully subscribed to typography changes');
+            reconnectAttempts = 0; // Reset reconnect counter on success
+            setSyncStatus('synced');
+            setError(null);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('[SyncManager] Error subscribing to typography changes');
+            setSyncStatus('error');
+            setError('Could not subscribe to real-time updates. Some changes may not be reflected immediately.');
+            
+            // Try to reconnect with exponential backoff
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              const delay = Math.min(1000 * (2 ** reconnectAttempts), 30000); // Max 30 second delay
+              console.log(`[SyncManager] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+              
+              setTimeout(() => {
+                console.log(`[SyncManager] Reconnecting now (attempt ${reconnectAttempts})`);
+                setupRealtimeSubscription();
+              }, delay);
+            }
+          }
+        });
+    };
+    
+    // Initial subscription setup
+    setupRealtimeSubscription();
     
     // Monitor network status
     const handleOnline = () => {
@@ -117,7 +164,14 @@ export function SupabaseSyncManager() {
     // Cleanup 
     return () => {
       authListener?.subscription?.unsubscribe();
-      typographySubscription.unsubscribe();
+      // Ensure the typographySubscription exists before trying to unsubscribe
+      if (typographySubscription) {
+        try {
+          typographySubscription.unsubscribe();
+        } catch (e) {
+          console.error('[SyncManager] Error unsubscribing during cleanup:', e);
+        }
+      }
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('supabaseSyncStatusChange', handleSyncEvent as EventListener);
@@ -181,6 +235,14 @@ export function notifySyncStarted() {
 export function notifySyncCompleted() {
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'synced' } 
+  }));
+  
+  // Also dispatch an event to trigger data refresh in components
+  window.dispatchEvent(new CustomEvent('typographySettingsChanged', { 
+    detail: { 
+      operation: 'UPDATE',
+      timestamp: new Date()
+    } 
   }));
 }
 
