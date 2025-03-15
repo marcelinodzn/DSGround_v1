@@ -142,6 +142,8 @@ interface TypographyState {
   platforms: Platform[]
   isLoading: boolean
   error: string | null
+  // Track platforms that are currently being initialized to prevent infinite loops
+  _initializingPlatforms: Set<string>
   setCurrentPlatform: (platformId: string) => void
   updatePlatform: (platformId: string, updates: Partial<Platform>) => void
   getScaleValues: (platformId: string) => { size: number; ratio: number; label: string }[]
@@ -377,6 +379,9 @@ export const useTypographyStore = create<TypographyState>()(
       isLoading: false,
       error: null,
       
+      // Track platforms that are currently being initialized to prevent infinite loops
+      _initializingPlatforms: new Set<string>(),
+      
       setCurrentPlatform: (platformId: string) => {
         set({ currentPlatform: platformId })
       },
@@ -384,20 +389,24 @@ export const useTypographyStore = create<TypographyState>()(
       setPlatforms: (updatedPlatforms: Platform[]) => {
         set({ platforms: updatedPlatforms })
       },
-
-      // Track platforms that are currently being initialized to prevent infinite loops
-      _initializingPlatforms: new Set<string>(),
       
       initializePlatform: async (platformId: string) => {
         // Check if this platform is already being initialized to prevent infinite loops
         const state = get();
-        if ((state as any)._initializingPlatforms.has(platformId)) {
+        
+        // Ensure _initializingPlatforms is a Set
+        if (!state._initializingPlatforms || !(state._initializingPlatforms instanceof Set)) {
+          console.log('[Typography] Re-initializing _initializingPlatforms as a new Set');
+          state._initializingPlatforms = new Set<string>();
+        }
+        
+        if (state._initializingPlatforms.has(platformId)) {
           console.log(`[Typography] Skipping initialization for platform ${platformId} - already in progress`)
           return;
         }
         
         // Add to tracking set
-        (state as any)._initializingPlatforms.add(platformId);
+        state._initializingPlatforms.add(platformId);
         
         console.log(`[Typography] Initializing platform ${platformId}`)
         const platformStore = usePlatformStore.getState()
@@ -523,7 +532,7 @@ export const useTypographyStore = create<TypographyState>()(
           console.error(`[Typography] Error saving default settings for platform ${platformId}:`, error)
         } finally {
           // Always remove from tracking set to prevent infinite loops
-          (get() as any)._initializingPlatforms.delete(platformId);
+          get()._initializingPlatforms.delete(platformId);
         }
       },
 
@@ -1146,14 +1155,21 @@ export const useTypographyStore = create<TypographyState>()(
         
         // Check if this platform is already being initialized to prevent infinite loops
         const state = get();
-        if ((state as any)._initializingPlatforms.has(platformId)) {
+        
+        // Ensure _initializingPlatforms is a Set
+        if (!state._initializingPlatforms || !(state._initializingPlatforms instanceof Set)) {
+          console.log('[Typography] Re-initializing _initializingPlatforms as a new Set');
+          state._initializingPlatforms = new Set<string>();
+        }
+        
+        if (state._initializingPlatforms.has(platformId)) {
           console.log(`[Typography] Skipping fetch for platform ${platformId} - initialization already in progress`);
           set({ isLoading: false });
           return;
         }
         
         // Add to tracking set to prevent recursive calls
-        (state as any)._initializingPlatforms.add(platformId);
+        state._initializingPlatforms.add(platformId);
         
         try {
           // Check if platformId is a UUID or a named platform (like 'web', 'mobile', etc.)
@@ -1397,7 +1413,7 @@ export const useTypographyStore = create<TypographyState>()(
           return get().initializePlatform(platformId)
         } finally {
           // Always remove from tracking set to prevent infinite loops
-          (get() as any)._initializingPlatforms.delete(platformId);
+          get()._initializingPlatforms.delete(platformId);
         }
       },
 
@@ -1406,14 +1422,21 @@ export const useTypographyStore = create<TypographyState>()(
         
         // Check if this platform is already being initialized to prevent infinite loops
         const state = get();
-        if ((state as any)._initializingPlatforms.has(platformId)) {
+        
+        // Ensure _initializingPlatforms is a Set
+        if (!state._initializingPlatforms || !(state._initializingPlatforms instanceof Set)) {
+          console.log('[Typography] Re-initializing _initializingPlatforms as a new Set');
+          state._initializingPlatforms = new Set<string>();
+        }
+        
+        if (state._initializingPlatforms.has(platformId)) {
           console.log(`[Typography] Skipping type styles fetch for platform ${platformId} - initialization already in progress`);
           set({ isLoading: false });
           return;
         }
         
         // Add to tracking set to prevent recursive calls
-        (state as any)._initializingPlatforms.add(platformId);
+        state._initializingPlatforms.add(platformId);
         
         try {
           console.log(`Fetching type styles for platform ${platformId}`)
@@ -1489,12 +1512,24 @@ export const useTypographyStore = create<TypographyState>()(
           })
         } finally {
           // Always remove from tracking set to prevent infinite loops
-          (get() as any)._initializingPlatforms.delete(platformId);
+          get()._initializingPlatforms.delete(platformId);
         }
       },
     }),
     {
-      name: 'typography-store'
+      name: 'typography-store',
+      // Ensure _initializingPlatforms is a Set after rehydration
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        
+        // Ensure _initializingPlatforms is a Set
+        if (!state._initializingPlatforms || !(state._initializingPlatforms instanceof Set)) {
+          console.log('[Typography] Initializing _initializingPlatforms as a new Set');
+          state._initializingPlatforms = new Set<string>();
+        }
+        
+        return state;
+      }
     }
   )
 )
