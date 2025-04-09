@@ -30,7 +30,7 @@ import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useFontStore } from '@/store/font-store'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 import { VariableTag } from "@/components/ui/variable-tag"
 
 interface Font {
@@ -71,7 +71,6 @@ const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
 export function FontManagement() {
   const { fonts, loadFonts, deleteFont } = useFontStore()
-  const { toast } = useToast()
   const [previewText, setPreviewText] = useState(presetTexts[0].text)
   const [selectedPreset, setSelectedPreset] = useState(presetTexts[0].label)
   const [previewSize, setPreviewSize] = useState(32)
@@ -118,14 +117,12 @@ export function FontManagement() {
         }
       } catch (error) {
         console.error('Error loading font:', error)
-        toast({
-          title: 'Error',
-          description: `Failed to load font: ${font.family}`,
-          variant: 'destructive'
+        toast.error("Failed to load font", {
+          description: `${font.family}`,
         })
       }
     })
-  }, [loadFonts, fonts, toast])
+  }, [loadFonts, fonts])
 
   const handlePresetChange = useCallback((preset: typeof presetTexts[0]) => {
     setPreviewText(preset.text)
@@ -135,19 +132,12 @@ export function FontManagement() {
   const handleDeleteFont = useCallback(async (fontId: string) => {
     try {
       await deleteFont(fontId)
-      toast({
-        title: "Success",
-        description: "Font deleted successfully"
-      })
+      toast.success("Font deleted successfully")
     } catch (error) {
       console.error('Error deleting font:', error)
-      toast({
-        title: "Error",
-        description: "Failed to delete font",
-        variant: "destructive"
-      })
+      toast.error("Failed to delete font")
     }
-  }, [deleteFont, toast])
+  }, [deleteFont])
 
   const handleSetAsBrandFont = useCallback((fontId: string, type: 'primary' | 'secondary') => {
     // TODO: Implement brand font assignment

@@ -40,7 +40,7 @@ import { Card } from "@/components/ui/card"
 import { useAuth } from '@/providers/auth-provider'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { toast as sonnerToast } from "sonner"
+import { toast } from 'sonner'
 
 interface FontMetadata extends Partial<Font> {
   file: File
@@ -88,7 +88,6 @@ const formatBytes = (bytes: number, decimals = 2) => {
 }
 
 export function FontUploader() {
-  const { toast } = useToast()
   const previewRef = useRef<HTMLDivElement>(null)
   const [files, setFiles] = useState<FontMetadata[]>([])
   const [uploading, setUploading] = useState(false)
@@ -244,16 +243,22 @@ export function FontUploader() {
 
   const handleUpload = async () => {
     if (files.length === 0) {
-      sonnerToast.error('Please add at least one font file')
-      return
+      toast('Please add at least one font file', {
+        description: 'You need to add font files before uploading.',
+        icon: '⚠️',
+      });
+      return;
     }
     
     // Check if user is authenticated
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
-      sonnerToast.error('You must be signed in to upload fonts')
+      toast('Authentication required', {
+        description: 'You must be signed in to upload fonts',
+        icon: '⚠️',
+      });
       router.push('/auth/signin')
-      return
+      return;
     }
     
     setUploading(true)
@@ -293,7 +298,7 @@ export function FontUploader() {
                 const validFormats = ['ttf', 'otf', 'woff', 'woff2'];
                 
                 if (!validFormats.includes(fileExt)) {
-                  sonnerToast.error(`Unsupported font format: ${fileExt}. Please use TTF, OTF, WOFF, or WOFF2.`);
+                  toast.error(`Unsupported font format: ${fileExt}. Please use TTF, OTF, WOFF, or WOFF2.`);
                   continue;
                 }
                 
@@ -342,33 +347,33 @@ export function FontUploader() {
                 setProgress((uploaded / totalFiles) * 100)
               } catch (error: any) {
                 console.error('Font upload error:', error)
-                sonnerToast.error(`Failed to upload font: ${font.name}`)
+                toast.error(`Failed to upload font: ${font.name}`)
               }
             }
           } catch (error: any) {
             console.error('Family creation error:', error)
-            sonnerToast.error(`Failed to create font family: ${familyName}`)
+            toast.error(`Failed to create font family: ${familyName}`)
           }
         } catch (error: any) {
           if (error.message === 'Authentication required') {
-            sonnerToast.error('You must be signed in to upload fonts')
+            toast.error('You must be signed in to upload fonts')
             router.push('/auth/signin')
             return
           }
           console.error('Family creation error:', error)
-          sonnerToast.error(`Failed to create family: ${familyName}`)
+          toast.error(`Failed to create family: ${familyName}`)
         }
       }
 
       if (uploaded > 0) {
-        sonnerToast.success(`Successfully uploaded ${uploaded} font${uploaded > 1 ? 's' : ''}`)
+        toast.success(`Successfully uploaded ${uploaded} font${uploaded > 1 ? 's' : ''}`)
         setFiles([])
         setProgress(0)
         await loadFonts()
       }
     } catch (error: any) {
       console.error('Upload error:', error)
-      sonnerToast.error('Failed to upload fonts. Please try again.')
+      toast.error('Failed to upload fonts. Please try again.')
     } finally {
       setUploading(false)
     }

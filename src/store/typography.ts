@@ -4,8 +4,34 @@ import { usePlatformStore } from "@/store/platform-store"
 import { supabase } from '@/lib/supabase'
 import { calculateDistanceBasedSize } from '@/lib/scale-calculations'
 import { v4 as uuidv4 } from 'uuid'
-import { notifySyncStarted, notifySyncCompleted, notifySyncError } from '@/components/supabase-sync-manager'
+import { 
+  notifySyncStarted, 
+  notifySyncCompleted, 
+  notifySyncError, 
+  getCurrentUserId,
+  checkAuthentication
+} from '@/components/supabase-sync-manager'
 import { TypographySettings } from '@/types/typography'
+import { toast } from 'sonner'
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+
+// Type for Supabase real-time change payload
+type SupabaseChangePayload<T = Record<string, any>> = {
+  commit_timestamp?: string;
+  eventType?: string;
+  new?: T & { platform_id?: string };
+  old?: T & { platform_id?: string };
+};
+
+// Types for our database records
+interface TypographyRecord {
+  platform_id: string;
+  [key: string]: any;
+}
+
+interface HistoryRecord extends TypographyRecord {
+  description?: string;
+}
 
 // Function to upload an image to Supabase storage
 export const uploadImageToStorage = async (base64Image: string, brandId: string, platformId: string): Promise<string | null> => {
@@ -153,6 +179,7 @@ interface TypographyState {
   saveTypographySettings: (platformId: string, settings: Partial<Platform>) => Promise<void>
   fetchTypeStyles: (platformId: string) => Promise<void>
   fetchTypographySettings: (platformId: string) => Promise<void>
+  fetchTypographyHistory: (platformId: string) => Promise<any[]>
   setPlatforms: (updatedPlatforms: Platform[]) => void
   setupRealTimeSync: () => (() => void) | void
 }
@@ -816,59 +843,148 @@ export const useTypographyStore = create<TypographyState>()(
         }));
       },
 
-      saveTypeStyles: async (platformId: string, styles: TypeStyle[]): Promise<void> => {
-        set({ isLoading: true, error: null })
+      saveTypeStyles: async (platformId: string, styles: TypeStyle[]) => {
+        console.log(`[Typography] Saving type styles for platform ${platformId}:`, styles);
+        
+        // Check authentication first
+        const isAuthenticated = await checkAuthentication();
+        if (!isAuthenticated) {
+          return;
+        }
+        
+        // Notify sync started
+        notifySyncStarted();
+        
         try {
-          console.log(`Saving type styles for platform ${platformId}:`, styles)
+          // Get current user ID for tracking changes
+          const userId = await getCurrentUserId();
           
-          // Find platform in state
-          const existingPlatform = get().platforms.find(p => p.id === platformId)
-          if (!existingPlatform) {
-            console.error(`Platform ${platformId} not found, can't save type styles`)
-            set({ error: `Platform ${platformId} not found` })
-            return // Just return undefined instead of false
+          // First, check if there are existing styles for this platform
+          const { data: existingStyles, error: checkError } = await supabase
+            .from('type_styles')
+            .select('*')
+            .eq('platform_id', platformId);
+          
+          if (checkError) {
+            console.error(`[Typography] Error checking existing styles:`, checkError);
+            notifySyncError(`Error checking existing styles: ${checkError.message}`);
+            return;
           }
           
-          // Update type styles in the database
-          const { error } = await supabase.from('platforms')
-            .update({ type_styles: styles })
-            .eq('id', platformId)
+          console.log(`[Typography] Found ${existingStyles?.length || 0} existing styles for platform ${platformId}`);
+          
+          // Create a lookup of existing styles by ID
+          const existingStylesMap: Record<string, any> = existingStyles?.reduce((map: Record<string, any>, style: any) => {
+            map[style.id] = style;
+            return map;
+          }, {}) || {};
+          
+          // Process each style - update existing ones, insert new ones
+          const operations: string[] = [];
+          const promises = styles.map(async (style) => {
+            // Generate new ID if none exists
+            const styleId = style.id || uuidv4();
             
-          if (error) {
-            console.error(`Error updating type styles for platform ${platformId}:`, error)
-            set({ error: `Error updating type styles: ${error.message}` })
-            return // Just return undefined instead of false
+            // Map the TypeStyle properties to database column names
+            const styleData = {
+              id: styleId,
+              platform_id: platformId,
+              name: style.name,
+              scale_step: style.scaleStep,
+              font_weight: style.fontWeight,
+              line_height: style.lineHeight,
+              letter_spacing: style.letterSpacing,
+              optical_size: style.opticalSize || null,
+              line_height_unit: style.lineHeightUnit || 'number',
+              text_transform: style.textTransform || 'none',
+              font_family: style.fontFamily || 'sans-serif',
+              updated_by: userId,
+              updated_at: new Date().toISOString()
+            };
+            
+            if (existingStylesMap[styleId]) {
+              // Update existing style
+              console.log(`[Typography] Updating existing style ${styleId}`);
+              operations.push('UPDATE');
+              return supabase
+                .from('type_styles')
+                .update(styleData)
+                .eq('id', styleId);
+            } else {
+              // Insert new style
+              console.log(`[Typography] Inserting new style ${styleId}`);
+              operations.push('INSERT');
+              return supabase
+                .from('type_styles')
+                .insert(styleData);
+            }
+          });
+          
+          // Wait for all operations to complete
+          await Promise.all(promises);
+          
+          // Record this change in the history table
+          const { error: historyError } = await supabase
+            .from('typography_history')
+            .insert({
+              platform_id: platformId,
+              user_id: userId,
+              operation: operations.includes('INSERT') ? 'CREATE' : 'UPDATE',
+              data: { styles: styles.map(s => ({ ...s })) },
+              description: `Modified ${styles.length} type styles`
+            });
+            
+          if (historyError) {
+            console.error('[Typography] Failed to save history:', historyError);
+            // Continue even if history saving fails
+          } else {
+            console.log('[Typography] History record saved successfully');
           }
           
-          // Update platform in state
-          const updatedPlatforms = get().platforms.map(p => 
-            p.id === platformId 
-              ? { ...p, typeStyles: styles } 
-              : p
-          )
+          // Store the update timestamp to identify our own updates in real-time events
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(`typestyle_last_update_${platformId}`, new Date().toISOString());
+          }
           
-          set({
-            platforms: updatedPlatforms,
-            error: null
-          })
+          // Refresh local state to ensure consistent data
+          await get().fetchTypeStyles(platformId);
           
-          console.log(`Successfully saved type styles for platform ${platformId}`)
-          // No explicit return needed for void return type
+          console.log(`[Typography] Successfully saved type styles for platform ${platformId}`);
+          notifySyncCompleted();
+          
+          // Display a success toast
+          toast.success('Typography Saved', {
+            description: `Successfully saved ${styles.length} type styles`,
+            duration: 3000
+          });
         } catch (error) {
-          console.error(`Exception in saveTypeStyles for platform ${platformId}:`, error)
-          set({ error: `Error saving type styles: ${error instanceof Error ? error.message : String(error)}` })
-        } finally {
-          set({ isLoading: false })
+          console.error(`[Typography] Error saving type styles:`, error);
+          notifySyncError(`Error saving type styles: ${(error instanceof Error) ? error.message : 'Unknown error'}`);
+          
+          // Display an error toast
+          toast.error('Save Failed', {
+            description: `Error saving typography: ${(error instanceof Error) ? error.message : 'Unknown error'}`,
+            duration: 5000
+          });
         }
       },
 
       saveTypographySettings: async (platformId: string, settings: Partial<Platform>) => {
         console.log(`[Typography] Saving typography settings for platform ${platformId}:`, settings);
         
+        // Check authentication first
+        const isAuthenticated = await checkAuthentication();
+        if (!isAuthenticated) {
+          return;
+        }
+        
         // Notify sync started
         notifySyncStarted();
         
         try {
+          // Get current user ID for tracking changes
+          const userId = await getCurrentUserId();
+          
           // Get the current platform state to ensure we have all necessary data
           const currentPlatforms = get().platforms;
           const currentPlatform = currentPlatforms.find(p => p.id === platformId);
@@ -961,10 +1077,31 @@ export const useTypographyStore = create<TypographyState>()(
           // Only add type_styles if the column exists or we're not sure yet
           if (hasTypeStylesColumn || existingSettings?.length === 0) {
             try {
-              baseUpdateData.type_styles = JSON.stringify(mergedSettings.typeStyles || []);
+              // Ensure typeStyles is an array before serializing
+              const typeStyles = Array.isArray(mergedSettings.typeStyles) ? mergedSettings.typeStyles : [];
+              
+              // Check if the database is expecting a string or a JSONB object
+              // For Supabase REST API, we should use a plain object and let the API handle serialization
+              if (existingSettings && existingSettings.length > 0 && 
+                  existingSettings[0].type_styles !== undefined) {
+                // If we have existing data, check its format
+                if (typeof existingSettings[0].type_styles === 'string') {
+                  // Database expects a JSON string
+                  baseUpdateData.type_styles = JSON.stringify(typeStyles);
+                  console.log(`[Typography] Serialized typeStyles as JSON string (${typeStyles.length} styles)`);
+                } else {
+                  // Database expects a JSONB object
+                  baseUpdateData.type_styles = typeStyles;
+                  console.log(`[Typography] Using typeStyles as direct object (${typeStyles.length} styles)`);
+                }
+              } else {
+                // No existing data to determine format, use direct object (Supabase handles conversion)
+                baseUpdateData.type_styles = typeStyles;
+                console.log(`[Typography] Using typeStyles as direct object for new record (${typeStyles.length} styles)`);
+              }
             } catch (e) {
-              console.error(`[Typography] Error stringifying typeStyles:`, e);
-              baseUpdateData.type_styles = '[]';
+              console.error(`[Typography] Error preparing typeStyles:`, e);
+              baseUpdateData.type_styles = [];
             }
           }
           
@@ -1035,6 +1172,12 @@ export const useTypographyStore = create<TypographyState>()(
             }
             
             console.log(`[Typography] Successfully updated typography settings:`, data);
+            
+            // Store the update timestamp to identify our own updates in real-time events
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(`typography_last_update_${platformId}`, new Date().toISOString());
+            }
+            
             notifySyncCompleted();
           } else {
             console.log(`[Typography] Inserting new typography settings for platform ${platformId}`);
@@ -1089,7 +1232,36 @@ export const useTypographyStore = create<TypographyState>()(
             }
             
             console.log(`[Typography] Successfully inserted typography settings:`, data);
+            
+            // Store the update timestamp to identify our own updates in real-time events
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(`typography_last_update_${platformId}`, new Date().toISOString());
+            }
+            
             notifySyncCompleted();
+          }
+          
+          // After successful save, record this change in the history table
+          const { error: historyError } = await supabase
+            .from('typography_history')
+            .insert({
+              platform_id: platformId,
+              user_id: userId,
+              operation: existingSettings && existingSettings.length > 0 ? 'UPDATE' : 'CREATE',
+              data: { settings },
+              description: `Modified typography settings`
+            });
+            
+          if (historyError) {
+            console.error('[Typography] Failed to save settings history:', historyError);
+            // Continue even if history saving fails
+          } else {
+            console.log('[Typography] Settings history record saved successfully');
+          }
+          
+          // Store the update timestamp to identify our own updates in real-time events
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(`typography_last_update_${platformId}`, new Date().toISOString());
           }
           
           // Update local state
@@ -1104,9 +1276,23 @@ export const useTypographyStore = create<TypographyState>()(
           // Update platforms in the store
           set({ platforms: updatedPlatforms });
           
+          // Show success notification
+          toast.success('Settings Saved', {
+            description: 'Typography settings updated successfully',
+            duration: 3000
+          });
+          
+          notifySyncCompleted();
+          
         } catch (error) {
           console.error(`[Typography] Exception in saveTypographySettings:`, error);
           notifySyncError(`Error saving settings: ${(error instanceof Error) ? error.message : 'Unknown error'}`);
+          
+          // Show error notification
+          toast.error('Save Failed', {
+            description: `Error saving typography settings: ${(error instanceof Error) ? error.message : 'Unknown error'}`,
+            duration: 5000
+          });
         }
       },
 
@@ -1116,42 +1302,159 @@ export const useTypographyStore = create<TypographyState>()(
         
         console.log('[Typography] Setting up real-time sync for typography settings');
         
-        // Function to handle changes from other browsers
-        const handleTypographyChanged = (event: Event) => {
-          const typographyEvent = event as CustomEvent;
-          console.log(`[Typography] Received real-time update:`, typographyEvent.detail);
+        // Create a unique client identifier for this browser session if not already set
+        let clientId = window.localStorage.getItem('typography_client_id');
+        if (!clientId) {
+          clientId = uuidv4();
+          window.localStorage.setItem('typography_client_id', clientId);
+        }
+        
+        // Create channels for each table we want to monitor
+        const typographyChannel = supabase.channel('typography_settings_changes');
+        const typeStylesChannel = supabase.channel('type_styles_changes');
+        const historyChannel = supabase.channel('typography_history_changes');
+        
+        // Track active subscriptions for cleanup
+        const channels = [typographyChannel, typeStylesChannel, historyChannel];
+        
+        // Set up subscription for typography settings
+        typographyChannel
+          .on('postgres_changes', {
+            event: '*', 
+            schema: 'public',
+            table: 'typography_settings'
+          }, (payload: any) => {
+            handleTypographyChange(payload);
+          })
+          .subscribe((status: { event: string, status: string }) => {
+            console.log(`[Typography] Typography settings subscription status: ${status.status}`);
+          });
+        
+        // Set up subscription for type styles
+        typeStylesChannel
+          .on('postgres_changes', {
+            event: '*', 
+            schema: 'public',
+            table: 'type_styles'
+          }, (payload: any) => {
+            handleTypeStyleChange(payload);
+          })
+          .subscribe((status: { event: string, status: string }) => {
+            console.log(`[Typography] Type styles subscription status: ${status.status}`);
+          });
           
-          // Extract platform ID if provided in the event
-          const platformId = typographyEvent.detail?.platformId;
+        // Set up subscription for history changes
+        historyChannel
+          .on('postgres_changes', {
+            event: 'INSERT', 
+            schema: 'public',
+            table: 'typography_history'
+          }, (payload: any) => {
+            handleHistoryChange(payload);
+          })
+          .subscribe((status: { event: string, status: string }) => {
+            console.log(`[Typography] History subscription status: ${status.status}`);
+          });
+        
+        // Function to handle typography setting changes from other clients
+        function handleTypographyChange(payload: any) {
+          const platformId = payload.new?.platform_id || payload.old?.platform_id;
+          // Early return if platformId is undefined
+          if (typeof platformId !== 'string') return;
           
-          if (platformId) {
-            // If we have a specific platform ID, only refresh that platform
-            console.log(`[Typography] Refreshing platform ${platformId} due to external changes`);
-            get().fetchTypographySettings(platformId);
-          } else {
-            // Otherwise refresh all platforms in the store
-            const platforms = get().platforms;
-            console.log(`[Typography] Refreshing all ${platforms.length} platforms due to external changes`);
+          // Skip if this change was made by the current client
+          const lastUpdate = window.localStorage.getItem(`typography_last_update_${platformId}`);
+          if (lastUpdate && payload.commit_timestamp) {
+            const commitTime = new Date(payload.commit_timestamp).getTime();
+            const updateTime = new Date(lastUpdate).getTime();
             
-            platforms.forEach(platform => {
-              get().fetchTypographySettings(platform.id);
+            // If the commit is within 2 seconds of our last update, assume it's our own change
+            if (Math.abs(commitTime - updateTime) < 2000) {
+              console.log(`[Typography] Ignoring own update for platform ${platformId}`);
+              return;
+            }
+          }
+          
+          console.log(`[Typography] Received external change for typography settings of platform ${platformId}`);
+          
+          // Refresh the data
+          get().fetchTypographySettings(platformId);
+          
+          // Show toast notification for the change
+          toast.info('Settings Updated', {
+            description: 'Typography settings have been updated by another user',
+            duration: 3000
+          });
+        }
+        
+        // Function to handle type style changes from other clients
+        function handleTypeStyleChange(payload: any) {
+          const platformId = payload.new?.platform_id || payload.old?.platform_id;
+          // Early return if platformId is undefined
+          if (typeof platformId !== 'string') return;
+          
+          // Skip if this change was made by the current client (same logic as above)
+          const lastUpdate = window.localStorage.getItem(`typestyle_last_update_${platformId}`);
+          if (lastUpdate && payload.commit_timestamp) {
+            const commitTime = new Date(payload.commit_timestamp).getTime();
+            const updateTime = new Date(lastUpdate).getTime();
+            
+            if (Math.abs(commitTime - updateTime) < 2000) {
+              console.log(`[Typography] Ignoring own update for platform ${platformId}`);
+              return;
+            }
+          }
+          
+          console.log(`[Typography] Received external change for type styles of platform ${platformId}`);
+          
+          // Refresh the data
+          get().fetchTypeStyles(platformId);
+          
+          // Show toast notification
+          toast.info('Type Styles Updated', {
+            description: 'Typography styles have been updated by another user',
+            duration: 3000
+          });
+        }
+        
+        // Function to handle history changes
+        function handleHistoryChange(payload: any) {
+          // Early return if platform_id is undefined
+          if (!payload.new || typeof payload.new.platform_id !== 'string') return;
+          
+          const platformId = payload.new.platform_id;
+          
+          // Only show notification if we're viewing this platform
+          if (get().currentPlatform === platformId) {
+            toast.info('Typography History', {
+              description: payload.new.description || 'Typography was modified',
+              duration: 3000
             });
           }
-        };
+        }
         
-        // Add event listener
-        window.addEventListener('typographySettingsChanged', handleTypographyChanged);
-        
-        // Return cleanup function that can be called when component unmounts
+        // Return cleanup function
         return () => {
-          window.removeEventListener('typographySettingsChanged', handleTypographyChanged);
-          console.log('[Typography] Removed real-time sync listeners');
+          console.log('[Typography] Removing real-time sync listeners and interval');
+          channels.forEach(channel => {
+            try {
+              supabase.removeChannel(channel);
+            } catch (e) {
+              console.error('[Typography] Error removing channel:', e);
+            }
+          });
         };
       },
       
       fetchTypographySettings: async (platformId: string) => {
         set({ isLoading: true, error: null })
         console.log(`[Typography] Fetching typography settings for platform ${platformId}`)
+        
+        // Record fetch attempt timestamp to avoid race conditions
+        const fetchStartTime = new Date().toISOString();
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`typography_fetch_started_${platformId}`, fetchStartTime);
+        }
         
         // Check if this platform is already being initialized to prevent infinite loops
         const state = get();
@@ -1194,6 +1497,9 @@ export const useTypographyStore = create<TypographyState>()(
             }
           }
           
+          // Add extra logging to diagnose issues
+          console.log(`[Typography] Fetching typography settings for platform ${actualPlatformId} from Supabase`);
+          
           // Modify query to get the most recent settings if multiple exist
           const { data: settingsData, error } = await supabase
             .from('typography_settings')
@@ -1221,6 +1527,11 @@ export const useTypographyStore = create<TypographyState>()(
           
           console.log(`[Typography] Received settings for platform ${platformId}:`, settings)
           
+          // Store the fetch timestamp to identify the most recent data
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(`typography_last_fetch_${platformId}`, new Date().toISOString());
+          }
+          
           if (settings) {
             // Transform the data from database format to app format
             // Parse typeStyles from the database if available
@@ -1232,21 +1543,44 @@ export const useTypographyStore = create<TypographyState>()(
             
             if (hasTypeStylesColumn) {
               try {
-                // Handle empty strings, null values, or non-string values by defaulting to an empty array
-                if (settings.type_styles && typeof settings.type_styles === 'string' && settings.type_styles.trim() !== '') {
-                  typeStylesFromDB = JSON.parse(settings.type_styles);
-                  console.log(`[Typography] Successfully parsed ${typeStylesFromDB.length} type styles from database`);
-                } else if (settings.type_styles && typeof settings.type_styles === 'object') {
-                  // Handle case where type_styles is already an object (not a string)
-                  typeStylesFromDB = settings.type_styles;
-                  console.log(`[Typography] type_styles is already an object, using directly`);
+                // Handle different formats of type_styles data
+                if (settings.type_styles) {
+                  if (typeof settings.type_styles === 'string') {
+                    // Handle string format (needs parsing)
+                    if (settings.type_styles.trim() !== '') {
+                      try {
+                        typeStylesFromDB = JSON.parse(settings.type_styles);
+                        console.log(`[Typography] Successfully parsed ${typeStylesFromDB.length} type styles from string`);
+                      } catch (parseError) {
+                        console.error(`[Typography] JSON parse error for type_styles:`, parseError);
+                        typeStylesFromDB = defaultTypeStyles;
+                      }
+                    } else {
+                      console.log(`[Typography] Empty type_styles string, using default styles`);
+                      typeStylesFromDB = defaultTypeStyles;
+                    }
+                  } else if (typeof settings.type_styles === 'object') {
+                    // Handle object format (already parsed JSON or native JSONB from Supabase)
+                    if (Array.isArray(settings.type_styles)) {
+                      // It's already an array, use directly
+                      typeStylesFromDB = settings.type_styles;
+                      console.log(`[Typography] Using ${typeStylesFromDB.length} type styles from array object`);
+                    } else {
+                      // It's an object but not an array, might be malformed
+                      console.warn(`[Typography] type_styles is an object but not an array, using default styles`);
+                      typeStylesFromDB = defaultTypeStyles;
+                    }
+                  } else {
+                    console.warn(`[Typography] Unexpected type_styles format: ${typeof settings.type_styles}, using default styles`);
+                    typeStylesFromDB = defaultTypeStyles;
+                  }
                 } else {
-                  console.log(`[Typography] type_styles is empty or invalid, using default styles`);
+                  console.log(`[Typography] type_styles is null or undefined, using default styles`);
                   typeStylesFromDB = defaultTypeStyles;
                 }
               } catch (e) {
-                console.error(`[Typography] Error parsing type_styles from database:`, e);
-                // Use default styles if there's a parsing error
+                console.error(`[Typography] Error handling type_styles from database:`, e);
+                // Use default styles if there's any error
                 typeStylesFromDB = defaultTypeStyles;
               }
             } else if (!hasTypeStylesColumn) {
@@ -1338,7 +1672,7 @@ export const useTypographyStore = create<TypographyState>()(
                       borderWidth: 'px',
                       borderRadius: 'px'
                     },
-                    accessibility: (platformData as any).accessibility || {
+                    accessibility: {
                       minContrastBody: 4.5,
                       minContrastLarge: 3
                     },
@@ -1349,6 +1683,8 @@ export const useTypographyStore = create<TypographyState>()(
                   console.log(`[Typography] Added new platform ${platformId} to state with default values`)
                 } else {
                   // We found the platform in the platform store
+                  // Note: platformData might have a different structure as it comes from the platform store
+                  // so we need to carefully construct our platform object
                   const newPlatform: Platform = {
                     id: platformId,
                     name: platformData.name,
@@ -1376,7 +1712,9 @@ export const useTypographyStore = create<TypographyState>()(
                       borderWidth: 'px',
                       borderRadius: 'px'
                     },
-                    accessibility: (platformData as any).accessibility || {
+                    // The platforms from the platform store don't have the accessibility property
+                    // so we need to provide a default value
+                    accessibility: {
                       minContrastBody: 4.5,
                       minContrastLarge: 3
                     },
@@ -1417,102 +1755,153 @@ export const useTypographyStore = create<TypographyState>()(
         }
       },
 
-      fetchTypeStyles: async (platformId: string) => {
-        set({ isLoading: true, error: null })
+      fetchTypeStyles: async (platformId: string): Promise<void> => {
+        console.log(`[Typography] Fetching type styles for platform ${platformId}`);
         
-        // Check if this platform is already being initialized to prevent infinite loops
-        const state = get();
-        
-        // Ensure _initializingPlatforms is a Set
-        if (!state._initializingPlatforms || !(state._initializingPlatforms instanceof Set)) {
-          console.log('[Typography] Re-initializing _initializingPlatforms as a new Set');
-          state._initializingPlatforms = new Set<string>();
-        }
-        
-        if (state._initializingPlatforms.has(platformId)) {
-          console.log(`[Typography] Skipping type styles fetch for platform ${platformId} - initialization already in progress`);
-          set({ isLoading: false });
+        if (!platformId) {
+          console.error('[Typography] fetchTypeStyles called without platformId');
           return;
         }
         
-        // Add to tracking set to prevent recursive calls
-        state._initializingPlatforms.add(platformId);
+        // Record fetch attempt timestamp to avoid race conditions
+        const fetchStartTime = new Date().toISOString();
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`typestyle_fetch_started_${platformId}`, fetchStartTime);
+        }
         
-        try {
-          console.log(`Fetching type styles for platform ${platformId}`)
-          
-          // Check if platformId is a UUID or a named platform (like 'web', 'mobile', etc.)
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(platformId);
-          
-          // For named platforms, we need to find their UUID first
-          let actualPlatformId = platformId;
-          
-          if (!isUUID) {
-            // Get the platform UUID from the platform store if it's a named platform
-            const platformStore = usePlatformStore.getState();
-            const platform = platformStore.platforms.find(p => p.name.toLowerCase() === platformId.toLowerCase());
+        // Notify sync started for better UI feedback
+        notifySyncStarted();
+        
+        // Add retry logic for reliability
+        let retryCount = 0;
+        const maxRetries = 2;
+        let success = false;
+        
+        while (!success && retryCount <= maxRetries) {
+          try {
+            if (retryCount > 0) {
+              console.log(`[Typography] Retry attempt ${retryCount} for fetching type styles for platform ${platformId}`);
+              // Small delay before retry to allow for network recovery
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
             
-            if (platform) {
-              actualPlatformId = platform.id;
-              console.log(`[Typography] Mapped named platform '${platformId}' to UUID '${actualPlatformId}' for type styles`);
-            } else {
-              console.log(`[Typography] Could not find UUID for named platform '${platformId}' for type styles, using defaults`);
-              // Use default type styles for platforms that don't exist
-              set({ isLoading: false });
+            // Get all type styles for this platform
+            const { data, error } = await supabase
+              .from('type_styles')
+              .select('*')
+              .eq('platform_id', platformId);
+            
+            if (error) {
+              console.error(`[Typography] Error fetching type styles for platform ${platformId}:`, error);
+              retryCount++;
+              
+              if (retryCount > maxRetries) {
+                notifySyncError(`Error fetching type styles: ${error.message}`);
+                return;
+              }
+              continue; // Try again
+            }
+            
+            console.log(`[Typography] Fetched ${data?.length || 0} type styles for platform ${platformId}:`, data);
+            
+            // Store the fetch timestamp to identify the most recent data
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(`typestyle_last_fetch_${platformId}`, new Date().toISOString());
+            }
+            
+            if (!data || data.length === 0) {
+              console.log(`[Typography] No type styles found for platform ${platformId}`);
+              
+              // Update platforms in the store - empty the type styles for this platform
+              const platforms = get().platforms;
+              const updatedPlatforms = platforms.map(p => {
+                if (p.id === platformId) {
+                  return { ...p, typeStyles: [] };
+                }
+                return p;
+              });
+              
+              set({ platforms: updatedPlatforms });
+              notifySyncCompleted();
+              success = true;
+              return;
+            }
+            
+            // Convert database records to TypeStyle objects
+            const typeStyles: TypeStyle[] = data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              scaleStep: item.scale_step,
+              fontWeight: item.font_weight,
+              lineHeight: item.line_height,
+              letterSpacing: item.letter_spacing,
+              opticalSize: item.optical_size,
+              lineHeightUnit: item.line_height_unit || 'number',
+              textTransform: item.text_transform || 'none',
+              // The fontFamily field might be missing in the database, so provide a default
+              fontFamily: item.font_family || 'sans-serif',
+              // Optionally include fontSize if available
+              ...(item.font_size ? { fontSize: item.font_size } : {})
+            }));
+            
+            // Log the type styles for debugging
+            console.log(`[Typography] Processed ${typeStyles.length} type styles for platform ${platformId}:`, typeStyles);
+            
+            // Update platforms in the store
+            const platforms = get().platforms;
+            const updatedPlatforms = platforms.map(p => {
+              if (p.id === platformId) {
+                return { ...p, typeStyles };
+              }
+              return p;
+            });
+            
+            set({ platforms: updatedPlatforms });
+            console.log(`[Typography] Successfully updated type styles for platform ${platformId}`);
+            notifySyncCompleted();
+            success = true;
+          } catch (error) {
+            console.error(`[Typography] Exception in fetchTypeStyles attempt ${retryCount}:`, error);
+            retryCount++;
+            
+            if (retryCount > maxRetries) {
+              notifySyncError(`Error fetching type styles: ${(error instanceof Error) ? error.message : 'Unknown error'}`);
               return;
             }
           }
-          
+        }
+      },
+
+      fetchTypographyHistory: async (platformId: string): Promise<any[]> => {
+        console.log(`[Typography] Fetching history for platform ${platformId}`);
+        
+        if (!platformId) {
+          console.error('[Typography] fetchTypographyHistory called without platformId');
+          return [];
+        }
+        
+        try {
           const { data, error } = await supabase
-            .from('type_styles')
+            .from('typography_history')
             .select('*')
-            .eq('platform_id', actualPlatformId)
-
+            .eq('platform_id', platformId)
+            .order('timestamp', { ascending: false })
+            .limit(20);
+            
           if (error) {
-            console.error('Error fetching type styles:', error)
-            // Don't throw, just return and use defaults
-            set({ isLoading: false })
-            return
+            console.error(`[Typography] Error fetching history:`, error);
+            toast.error('Error', {
+              description: 'Could not load typography history',
+              duration: 3000
+            });
+            return [];
           }
-
-          console.log(`Received ${data.length} type styles for platform ${platformId}:`, data)
-
-          const styles: TypeStyle[] = data.map((style: any) => ({
-            id: style.id as string,
-            name: style.name as string,
-            scaleStep: style.scale_step as string,
-            fontFamily: '',  // Default value since column doesn't exist in DB
-            fontWeight: style.font_weight as number,
-            lineHeight: style.line_height as number,
-            letterSpacing: style.letter_spacing as number,
-            opticalSize: style.optical_size as number || 14
-          }))
-
-          console.log('Transformed styles:', styles)
-
-          set((state: TypographyState): TypographyState => {
-            const updatedPlatforms = state.platforms.map((p: Platform) => 
-              p.id === platformId ? { ...p, typeStyles: styles } : p
-            );
-            
-            console.log('Updated platforms in state:', updatedPlatforms);
-            
-            return {
-              ...state,
-              platforms: updatedPlatforms,
-              isLoading: false,
-              error: null
-            };
-          })
+          
+          console.log(`[Typography] Fetched ${data?.length || 0} history records`);
+          return data || [];
         } catch (error) {
-          console.error('Error in fetchTypeStyles:', error)
-          set({ 
-            isLoading: false,
-            error: (error as Error).message 
-          })
-        } finally {
-          // Always remove from tracking set to prevent infinite loops
-          get()._initializingPlatforms.delete(platformId);
+          console.error(`[Typography] Exception in fetchTypographyHistory:`, error);
+          return [];
         }
       },
     }),

@@ -1,22 +1,18 @@
-import { Inter } from "next/font/google"
-import { ThemeProvider } from "next-themes"
-import { Toaster } from "sonner"
-import { LayoutProvider } from "@/contexts/layout-context"
-import { TypeScaleProvider } from "@/contexts/type-scale-context"
-import { StoreProvider } from "@/providers/store-provider"
-import { RootLayoutClient } from "@/components/root-layout-client"
-import { SupabaseSyncManager } from "@/components/supabase-sync-manager"
-import { TypographySyncInitializer } from "@/components/typography-sync-initializer"
-import { cn } from "@/lib/utils"
-import { Providers } from '@/components/providers'
+import '../styles/globals.css'
+import { Inter } from 'next/font/google'
+import { RootLayoutClient } from '@/components/root-layout-client'
+import { LayoutProvider } from '@/contexts/layout-context'
+import { SupabaseSyncManager } from '@/components/supabase-sync-manager'
+import { TypographyInitializer } from '@/components/typography-initializer'
+import { TypographySyncInitializer } from '@/components/typography-sync-initializer'
+import { TypescriptInitializer } from '@/components/typescript-initializer'
+import { Toaster } from 'sonner'
 
-import "@/styles/globals.css"
-
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: "Design System Ground",
-  description: "A design system management platform",
+  title: 'Design System Ground',
+  description: 'Design System Generator',
 }
 
 export default function RootLayout({
@@ -25,27 +21,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        <Providers
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TypeScaleProvider>
-            <StoreProvider>
-              <LayoutProvider>
-                <RootLayoutClient>
-                  {children}
-                </RootLayoutClient>
-                <SupabaseSyncManager />
-                <TypographySyncInitializer />
-              </LayoutProvider>
-            </StoreProvider>
-          </TypeScaleProvider>
-          <Toaster />
-        </Providers>
+    <html lang="en">
+      <body className={inter.className}>
+        <Toaster position="top-right" richColors />
+        <LayoutProvider>
+          <RootLayoutClient>
+            {/* Data loading and sync management components */}
+            <SupabaseSyncManager />
+            <TypographyInitializer />
+            <TypographySyncInitializer />
+            <TypescriptInitializer />
+            {children}
+          </RootLayoutClient>
+        </LayoutProvider>
       </body>
     </html>
   )

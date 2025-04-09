@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { TypographySyncStatus } from "@/components/typography-sync-status"
+import { TypographyHistoryButton } from "@/components/typography-history-button"
 
 export function Header({ 
   onDocumentationClick 
@@ -50,15 +52,14 @@ export function Header({
             </Select>
           )}
         </div>
-        <div className="flex items-center justify-end space-x-2">
+        
+        <div className="flex items-center space-x-4">
+          {isTypographyPage && <TypographySyncStatus />}
+          {isTypographyPage && <TypographyHistoryButton />}
           {isTypographyPage && onDocumentationClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDocumentationClick}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Documentation
+            <Button variant="ghost" size="sm" onClick={onDocumentationClick}>
+              <FileText className="h-5 w-5" />
+              <span className="ml-2 hidden md:inline">Documentation</span>
             </Button>
           )}
         </div>

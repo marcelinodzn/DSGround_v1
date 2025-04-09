@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { toast } from 'sonner';
 
 /**
  * SupabaseSyncManager - Component to ensure proper synchronization with Supabase
@@ -225,17 +226,83 @@ export function SupabaseSyncManager() {
   );
 }
 
-// Helper functions for triggering sync status changes from anywhere in the app
+/**
+ * Check if the user is authenticated with Supabase
+ * Returns a promise that resolves to true if authenticated, false otherwise
+ */
+export async function checkAuthentication(): Promise<boolean> {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('[SyncManager] Auth error:', error);
+      toast.error('Authentication Error', {
+        description: error.message,
+        duration: 5000
+      });
+      return false;
+    }
+    
+    if (!session) {
+      console.error('[SyncManager] User not authenticated');
+      toast.error('Authentication Required', {
+        description: 'Please sign in to save typography changes',
+        duration: 5000
+      });
+      return false;
+    }
+    
+    console.log('[SyncManager] User authenticated:', session.user.id);
+    return true;
+  } catch (error) {
+    console.error('[SyncManager] Exception checking auth:', error);
+    toast.error('Authentication Error', {
+      description: 'An error occurred while checking authentication',
+      duration: 5000
+    });
+    return false;
+  }
+}
+
+/**
+ * Get current user ID (or null if not authenticated)
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  } catch (error) {
+    console.error('[SyncManager] Error getting user ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Notify that data synchronization has started
+ */
 export function notifySyncStarted() {
+  // Dispatch custom event for sync started
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'syncing' } 
   }));
+  
+  // Also dispatch a typography-specific event for the new sync status component
+  window.dispatchEvent(new CustomEvent('typography-sync-started'));
+  
+  console.log('[Sync] Started');
 }
 
+/**
+ * Notify that data synchronization has completed successfully
+ */
 export function notifySyncCompleted() {
+  // Dispatch custom event for sync completed
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'synced' } 
   }));
+  
+  // Also dispatch a typography-specific event for the new sync status component
+  window.dispatchEvent(new CustomEvent('typography-sync-completed'));
   
   // Also dispatch an event to trigger data refresh in components
   window.dispatchEvent(new CustomEvent('typographySettingsChanged', { 
@@ -244,10 +311,50 @@ export function notifySyncCompleted() {
       timestamp: new Date()
     } 
   }));
+  
+  console.log('[Sync] Completed successfully');
 }
 
+/**
+ * Notify that data synchronization has failed with an error
+ */
 export function notifySyncError(error: string) {
+  // Dispatch custom event for sync error
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'error', error } 
   }));
+  
+  // Also dispatch a typography-specific event for the new sync status component
+  window.dispatchEvent(new CustomEvent('typography-sync-error', { 
+    detail: error
+  }));
+  
+  // Check for authentication-specific error messages
+  const isAuthError = error.toLowerCase().includes('auth') || 
+                      error.toLowerCase().includes('unauthorized') ||
+                      error.toLowerCase().includes('authenticate') ||
+                      error.toLowerCase().includes('login') ||
+                      error.toLowerCase().includes('sign in');
+  
+  // Show a toast notification for user feedback
+  if (isAuthError) {
+    toast.error('Authentication Required', {
+      description: 'Please sign in to save your changes',
+      duration: 5000,
+      action: {
+        label: 'Sign In',
+        onClick: () => {
+          // Redirect to auth page or trigger auth modal
+          window.location.href = '/auth/signin';
+        }
+      }
+    });
+  } else {
+    toast.error('Synchronization Error', {
+      description: error,
+      duration: 5000
+    });
+  }
+  
+  console.error('[Sync] Error:', error);
 } 

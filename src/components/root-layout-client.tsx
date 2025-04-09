@@ -41,6 +41,8 @@ import {
 import { useBrandStore } from "@/store/brand-store"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { TypographyInitializer } from '@/components/typography-initializer'
+import { TypographyHistoryButton } from '@/components/typography-history-button'
+import { TypographySyncStatus } from '@/components/typography-sync-status'
 import React from 'react'
 
 function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
@@ -169,6 +171,7 @@ export function RootLayoutClient({
   const breadcrumbItems = getBreadcrumbItems(pathname, platforms)
   const [isDocumentationOpen, setIsDocumentationOpen] = useState(false)
   const showDocumentation = pathname === '/foundations/typography'
+  const isTypographyPage = pathname === '/foundations/typography' || pathname.includes('/typography')
   const isAuthPage = ['/sign-in', '/sign-up', '/forgot-password'].includes(pathname)
   const showBrandSelector = !pathname.startsWith('/brands') && 
     !pathname.startsWith('/settings') && 
@@ -307,6 +310,8 @@ export function RootLayoutClient({
           </div>
 
           <div className="flex items-center">
+            {isTypographyPage && <TypographySyncStatus />}
+            {isTypographyPage && <TypographyHistoryButton />}
             {showDocumentation && (
               <Button 
                 variant="outline" 

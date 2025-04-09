@@ -2,10 +2,9 @@ import { useEffect } from 'react'
 import { useFontStore } from '@/store/font-store'
 import { useBrandStore } from '@/store/brand-store'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from 'sonner'
 
 export function BrandTypographySettings() {
-  const { toast } = useToast()
   const { currentBrand } = useBrandStore()
   const { 
     fonts, 

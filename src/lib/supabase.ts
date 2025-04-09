@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, RealtimeChannel } from '@supabase/supabase-js'
 
 // Don't initialize with mock client by default
 let supabaseClient: ReturnType<typeof createClient>
@@ -424,6 +424,9 @@ const createMockClient = () => {
   };
 };
 
+// Add the type export
+export type SupabaseChannel = RealtimeChannel
+
 // Function to get the Supabase client
 export const getSupabaseClient = () => {
   // Make sure we have the required environment variables
@@ -462,9 +465,28 @@ export const getSupabaseClient = () => {
             "Accept": "application/json",
             "Content-Type": "application/json",
           }
+        },
+        realtime: {
+          // Enable greater resilience for realtime connections
+          timeout: 30000, // Increase timeout to 30 seconds
+          params: {
+            eventsPerSecond: 10 // Allow more events per second
+          }
         }
       }
     )
+    
+    // Enable realtime for all tables we need to sync
+    if (typeof window !== 'undefined') {
+      console.log('Enabling realtime for typography tables');
+      supabaseClient.channel('system-changes')
+        .on('system', { event: 'extension' }, (payload) => {
+          console.log('Supabase extension change:', payload);
+        })
+        .subscribe((status) => {
+          console.log('System channel connected with status:', status);
+        });
+    }
   } else {
     console.log('Reusing existing Supabase client');
   }
