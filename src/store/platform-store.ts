@@ -490,6 +490,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       if (existingPlatform) {
         console.log(`Platform ${id} found in local state, setting as current`);
         set({ currentPlatform: existingPlatform, error: null });
+        
+        // Dispatch event to notify about platform change
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('current-platform-changed', {
+            detail: { platformId: id }
+          }));
+        }
         return;
       }
 
@@ -516,6 +523,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
               currentPlatform: firstPlatform, 
               error: `Platform ${id} not found, using ${firstPlatform.name} instead` 
             });
+            
+            // Dispatch event for the fallback platform
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('current-platform-changed', {
+                detail: { platformId: firstPlatform.id }
+              }));
+            }
             return;
           }
           
@@ -542,6 +556,13 @@ export const usePlatformStore = create<PlatformStore>((set, get) => ({
       const platform = convertToPlatform(rawData);
       console.log(`Successfully set current platform to ${id}:`, platform);
       set({ currentPlatform: platform, error: null });
+      
+      // Dispatch event for the newly fetched platform
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('current-platform-changed', {
+          detail: { platformId: id }
+        }));
+      }
     } catch (error) {
       console.error('Unexpected error setting current platform:', error);
       set({ 

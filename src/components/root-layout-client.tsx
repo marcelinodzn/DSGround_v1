@@ -43,6 +43,7 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { TypographyInitializer } from '@/components/typography-initializer'
 import { TypographyHistoryButton } from '@/components/typography-history-button'
 import { TypographySyncStatus } from '@/components/typography-sync-status'
+import { ProfileSidebar } from '@/components/profile-sidebar'
 import React from 'react'
 
 function getBreadcrumbItems(pathname: string, platforms: Platform[]) {
@@ -199,11 +200,11 @@ export function RootLayoutClient({
         "w-64 bg-card border-r fixed top-0 left-0 h-full overflow-y-auto transition-transform",
         isFullscreen && "-translate-x-full"
       )}>
-        <nav className="p-4">
+        <nav className="p-4 h-full flex flex-col">
           <div className="mb-6">
             <Logo />
           </div>
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1">
             <div className="space-y-1">
               <Link 
                 href="/" 
@@ -274,6 +275,11 @@ export function RootLayoutClient({
                 Platforms
               </Link>
             </div>
+          </div>
+            
+          {/* Profile sidebar at the bottom */}
+          <div className="mt-4">
+            <ProfileSidebar />
           </div>
         </nav>
       </aside>

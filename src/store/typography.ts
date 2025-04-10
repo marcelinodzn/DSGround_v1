@@ -410,7 +410,28 @@ export const useTypographyStore = create<TypographyState>()(
       _initializingPlatforms: new Set<string>(),
       
       setCurrentPlatform: (platformId: string) => {
-        set({ currentPlatform: platformId })
+        const prevPlatform = get().currentPlatform;
+        
+        // Only update and dispatch event if platform actually changed
+        if (prevPlatform !== platformId) {
+          set({ currentPlatform: platformId });
+          
+          // Dispatch event to notify about platform change
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('current-platform-changed', {
+              detail: { platformId }
+            }));
+          }
+          
+          // Make sure we have the latest data for this platform
+          const platform = get().platforms.find(p => p.id === platformId);
+          if (platform) {
+            // Ensure we have type styles for this platform
+            if (!platform.typeStyles || platform.typeStyles.length === 0) {
+              get().fetchTypeStyles(platformId);
+            }
+          }
+        }
       },
       
       setPlatforms: (updatedPlatforms: Platform[]) => {
@@ -1356,6 +1377,34 @@ export const useTypographyStore = create<TypographyState>()(
             console.log(`[Typography] History subscription status: ${status.status}`);
           });
         
+        // Listen for platform changes
+        const handlePlatformChange = () => {
+          const currentPlatform = get().currentPlatform;
+          if (currentPlatform) {
+            console.log(`[Typography] Platform change detected, refreshing data for ${currentPlatform}`);
+            // Refresh both typography settings and type styles
+            get().fetchTypographySettings(currentPlatform);
+            get().fetchTypeStyles(currentPlatform);
+          }
+        };
+        
+        // Listen for explicit refresh requests (e.g. after sign-in)
+        const handleRefreshRequest = () => {
+          const currentPlatform = get().currentPlatform;
+          if (currentPlatform) {
+            console.log(`[Typography] Manual refresh requested, reloading data for ${currentPlatform}`);
+            // Refresh both typography settings and type styles
+            get().fetchTypographySettings(currentPlatform);
+            get().fetchTypeStyles(currentPlatform);
+          }
+        };
+        
+        // Add event listeners for platform/brand changes and manual refreshes
+        window.addEventListener('current-platform-changed', handlePlatformChange);
+        window.addEventListener('current-brand-changed', handlePlatformChange);
+        window.addEventListener('auth-state-changed', handlePlatformChange);
+        window.addEventListener('refresh-typography-data', handleRefreshRequest);
+        
         // Function to handle typography setting changes from other clients
         function handleTypographyChange(payload: any) {
           const platformId = payload.new?.platform_id || payload.old?.platform_id;
@@ -1380,11 +1429,13 @@ export const useTypographyStore = create<TypographyState>()(
           // Refresh the data
           get().fetchTypographySettings(platformId);
           
-          // Show toast notification for the change
-          toast.info('Settings Updated', {
-            description: 'Typography settings have been updated by another user',
-            duration: 3000
-          });
+          // Only show toast notification if it's for the current platform
+          if (get().currentPlatform === platformId) {
+            toast.info('Settings Updated', {
+              description: 'Typography settings have been updated by another user',
+              duration: 3000
+            });
+          }
         }
         
         // Function to handle type style changes from other clients
@@ -1410,11 +1461,13 @@ export const useTypographyStore = create<TypographyState>()(
           // Refresh the data
           get().fetchTypeStyles(platformId);
           
-          // Show toast notification
-          toast.info('Type Styles Updated', {
-            description: 'Typography styles have been updated by another user',
-            duration: 3000
-          });
+          // Only show toast notification if it's for the current platform
+          if (get().currentPlatform === platformId) {
+            toast.info('Type Styles Updated', {
+              description: 'Typography styles have been updated by another user',
+              duration: 3000
+            });
+          }
         }
         
         // Function to handle history changes
@@ -1443,6 +1496,12 @@ export const useTypographyStore = create<TypographyState>()(
               console.error('[Typography] Error removing channel:', e);
             }
           });
+          
+          // Remove event listeners
+          window.removeEventListener('current-platform-changed', handlePlatformChange);
+          window.removeEventListener('current-brand-changed', handlePlatformChange);
+          window.removeEventListener('auth-state-changed', handlePlatformChange);
+          window.removeEventListener('refresh-typography-data', handleRefreshRequest);
         };
       },
       

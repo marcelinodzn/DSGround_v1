@@ -280,7 +280,7 @@ export async function getCurrentUserId(): Promise<string | null> {
 /**
  * Notify that data synchronization has started
  */
-export function notifySyncStarted() {
+export function notifySyncStarted(showToast = false) {
   // Dispatch custom event for sync started
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'syncing' } 
@@ -289,13 +289,23 @@ export function notifySyncStarted() {
   // Also dispatch a typography-specific event for the new sync status component
   window.dispatchEvent(new CustomEvent('typography-sync-started'));
   
+  // Only show toast if explicitly requested
+  // This helps prevent too many notifications for regular background syncs
+  if (showToast) {
+    toast.info('Synchronizing', {
+      description: 'Saving changes to the server...',
+      duration: 3000,
+      id: 'sync-started' // Use an ID to avoid duplicate toasts
+    });
+  }
+  
   console.log('[Sync] Started');
 }
 
 /**
  * Notify that data synchronization has completed successfully
  */
-export function notifySyncCompleted() {
+export function notifySyncCompleted(showToast = false) {
   // Dispatch custom event for sync completed
   window.dispatchEvent(new CustomEvent('supabaseSyncStatusChange', { 
     detail: { status: 'synced' } 
@@ -311,6 +321,15 @@ export function notifySyncCompleted() {
       timestamp: new Date()
     } 
   }));
+  
+  // Only show toast if explicitly requested
+  if (showToast) {
+    toast.success('Sync Completed', {
+      description: 'All changes have been saved successfully',
+      duration: 3000,
+      id: 'sync-completed' // Use an ID to avoid duplicate toasts
+    });
+  }
   
   console.log('[Sync] Completed successfully');
 }
@@ -344,8 +363,8 @@ export function notifySyncError(error: string) {
       action: {
         label: 'Sign In',
         onClick: () => {
-          // Redirect to auth page or trigger auth modal
-          window.location.href = '/auth/signin';
+          // Trigger sign-in dialog instead of redirecting
+          window.dispatchEvent(new CustomEvent('open-auth-dialog'));
         }
       }
     });
